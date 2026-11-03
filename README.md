@@ -94,6 +94,26 @@ console (DNS section).
 `npm run dev:lan` binds `0.0.0.0` instead, if you would rather use the plain
 LAN address and accept the insecure-context caveat.
 
+### Headless visual check
+
+```bash
+npm run shoot -- http://127.0.0.1:5173/?clean --out game --wait 3500
+```
+
+Loads the page in headless Chromium, captures a screenshot to `tools/shots/`,
+and reports the HUD, the debug panel, every console error, whether the page
+scrolls, and whether anything full-screen and interactive sits above the input
+surface — the bug class that once made the game unresponsive on a phone for
+two rounds.
+
+`?clean` hides the debug panel so the shot shows only what a player sees.
+
+Two constraints worth knowing. It passes `--single-process`: Chromium's
+multi-process model registers a Mach bootstrap port to rendezvous with its
+renderers, and the Bash sandbox denies `bootstrap_check_in`, so the browser
+dies at launch without it. And it renders through SwiftShader, which is a real
+WebGL 2.0 context but not a phone GPU — this catches breakage, never feel.
+
 ## Checks
 
 ```bash

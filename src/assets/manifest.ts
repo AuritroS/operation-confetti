@@ -69,6 +69,22 @@ export const CLIPS = {
   },
 } as const;
 
+/**
+ * Gameplay-authoritative character height in world units.
+ *
+ * The colliders and lane width were authored around a 1.38-unit capsule in
+ * 1.6-unit lanes. The KayKit characters are authored at 2.17-2.65 units tall
+ * and 1.94 wide, so dropping one in unscaled makes the player 57% taller than
+ * its own collider and wider than the lane it occupies.
+ *
+ * Visuals conform to gameplay, never the reverse (design doc §12 Phase 4:
+ * replace primitives "without changing colliders or gameplay timings"), so
+ * characters are scaled to this height at load from their measured bounds
+ * rather than by a hard-coded factor — which keeps it correct if an asset is
+ * ever swapped for one authored at a different scale.
+ */
+export const CHARACTER_HEIGHT = 1.45;
+
 /** Attachment node names present in every character GLB. */
 export const ATTACH_NODES = {
   handRight: 'handslot.r',

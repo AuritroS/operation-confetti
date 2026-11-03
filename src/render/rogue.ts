@@ -10,9 +10,9 @@
  * Rogue replaces it when ready — so a slow or failed asset load degrades to a
  * playable primitive instead of a stalled screen.
  */
-import { Group, Mesh, MeshStandardMaterial, type Object3D } from 'three';
+import { Box3, Group, Mesh, MeshStandardMaterial, Vector3, type Object3D } from 'three';
 import { AssetBundle, type Actor } from '../assets/characters';
-import { CLIPS, SOURCES } from '../assets/manifest';
+import { CHARACTER_HEIGHT, CLIPS, SOURCES } from '../assets/manifest';
 import type { PlayerVisual } from './primitives';
 
 /** The Rogue faces +Z in source; the camera looks down -Z, so turn it around. */
@@ -30,6 +30,7 @@ export async function loadRoguePlayer(): Promise<RogueLoadResult> {
 
   const actor = bundle.actor(SOURCES.characters.matthew);
   actor.root.rotation.y = FACING_Y;
+  fitToHeight(actor.root, CHARACTER_HEIGHT);
 
   // Running is the resting state on an auto-scrolling route.
   if (!actor.play(CLIPS.matthew.run)) {
@@ -42,6 +43,24 @@ export async function loadRoguePlayer(): Promise<RogueLoadResult> {
     clipCount: bundle.clips.size,
     visual: new RogueVisual(actor, originals),
   };
+}
+
+/**
+ * Scale an actor so its bind-pose height matches the gameplay height, and sit
+ * its feet on the ground. Measured rather than assumed: the packs author
+ * characters at inconsistent heights (Rogue 2.17, Knight 2.54, Mage 2.65).
+ */
+function fitToHeight(root: Object3D, target: number): number {
+  const box = new Box3().setFromObject(root);
+  const height = box.getSize(new Vector3()).y;
+  if (height <= 0) return 1;
+  const scale = target / height;
+  root.scale.setScalar(scale);
+  // Re-measure after scaling so the ground offset accounts for any authored
+  // offset in the source model rather than assuming feet are at the origin.
+  const scaled = new Box3().setFromObject(root);
+  root.position.y -= scaled.min.y;
+  return scale;
 }
 
 type MaterialRecord = { material: MeshStandardMaterial; original: number };

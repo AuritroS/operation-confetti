@@ -233,7 +233,10 @@ pauseBtn.addEventListener('click', () => {
 hud.setStage(1);
 hud.setScore(0);
 hud.setGifts(0, runner.snapshot.giftsTotal);
-debug.setVisible(true);
+// ?clean hides the debug panel, so a review screenshot shows only what a
+// player sees. The panel otherwise overlaps the character.
+const params = new URLSearchParams(location.search);
+debug.setVisible(!params.has('clean'));
 
 const hint = document.getElementById('hint');
 if (hint) hint.hidden = isTouchDevice();
