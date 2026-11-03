@@ -200,13 +200,38 @@ describe('no tunnelling at the configured speed', () => {
     expect(r.events.filter((e) => e.t === 'gift')).toHaveLength(dense.length);
   });
 
-  it('keeps the step advance well inside the contact window', () => {
-    // Checked at the FASTEST point of the route, which is where tunnelling
-    // would happen if it ever could.
-    const advancePerStep = (LEVEL_1.endForwardSpeed ?? LEVEL_1.forwardSpeed) * STEP_S;
+  it('catches every entity even at absurd speed', () => {
+    // The real guarantee, replacing an earlier margin check.
+    //
+    // That check asserted a step advanced less than a quarter of the contact
+    // window, which held only while the level was slow. Raising the ramp to
+    // 15.3 u/s moved 0.255 units per step against a 1.0-unit window and broke
+    // it. Rather than tune the speed down to suit the collision test, the
+    // collision became swept — so this asserts the property that actually
+    // matters, at a speed far beyond anything playable.
+    const dense: RouteEntity[] = [];
+    for (let z = 4; z < 96; z += 2) dense.push(gift(z, 1));
+
+    for (const speed of [7.5, 15.3, 40, 120]) {
+      const r = new LevelRunner(level(dense, { forwardSpeed: speed, endForwardSpeed: speed }));
+      runToEnd(r);
+      expect(
+        r.events.filter((e) => e.t === 'gift'),
+        `at ${speed} u/s`,
+      ).toHaveLength(dense.length);
+    }
+  });
+
+  it('sweeps across a whole step rather than sampling its end', () => {
+    // One hazard, and a speed that steps clean over it. A point-overlap test
+    // samples only where the step landed and would miss it entirely.
     const window = HALF_DEPTH.player + HALF_DEPTH.hazard;
-    // The margin is what makes a 1D test sufficient instead of a swept one.
-    expect(advancePerStep).toBeLessThan(window / 4);
+    const speed = (window * 3) / STEP_S;
+    const r = new LevelRunner(
+      level([crate(30, 1)], { forwardSpeed: speed, endForwardSpeed: speed, routeLength: 60 }),
+    );
+    runToEnd(r);
+    expect(r.events.filter((e) => e.t === 'incident')).toHaveLength(1);
   });
 });
 
@@ -333,15 +358,25 @@ describe('the authored level 1 route', () => {
     }
   });
 
-  it('runs for roughly a minute, matching the pacing target', () => {
-    // Measured by simulating, not computed from a formula. Speed ramps with
-    // distance, so length divided by the starting speed overstates the run
-    // by a quarter — which is exactly the mistake the old version made.
+  it('runs for about forty seconds, the chosen pacing', () => {
+    // Measured by simulating, not computed from a formula: speed ramps with
+    // distance, so length divided by the starting speed overstates the run.
+    //
+    // This is deliberately under the doc's proposed 55-65s window. That
+    // window is a pacing proposal and §14 lists it as reviewable; the level
+    // played too easy at 55s, so a shorter faster run was chosen over a
+    // longer gentle one. The bounds still exist so the figure cannot drift
+    // unnoticed.
     const r = new LevelRunner(LEVEL_1);
-    const steps = runToEnd(r);
-    const seconds = steps * STEP_S;
-    expect(seconds, `${seconds.toFixed(1)}s`).toBeGreaterThanOrEqual(55);
-    expect(seconds, `${seconds.toFixed(1)}s`).toBeLessThanOrEqual(65);
+    const seconds = runToEnd(r) * STEP_S;
+    expect(seconds, `${seconds.toFixed(1)}s`).toBeGreaterThanOrEqual(35);
+    expect(seconds, `${seconds.toFixed(1)}s`).toBeLessThanOrEqual(50);
+  });
+
+  it('ramps the speed by about seventy percent', () => {
+    const start = LEVEL_1.forwardSpeed;
+    const end = LEVEL_1.endForwardSpeed ?? start;
+    expect(end / start).toBeCloseTo(1.7, 1);
   });
 
   it('ramps the forward speed across the route', () => {

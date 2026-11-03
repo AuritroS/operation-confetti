@@ -7,8 +7,17 @@
  * changes.
  *
  * Collision reduces to one dimension: the player only moves laterally between
- * discrete lanes, and every entity approaches at the same constant speed, so
- * contact is `|entityZ - travelled| < combined half-depth` plus a lane match.
+ * discrete lanes and every entity approaches along the route, so contact is a
+ * 1D interval overlap plus a lane match.
+ *
+ * The test is SWEPT — it covers the whole span travelled during a step, not
+ * just where the player ended up. A point-overlap test only works while a
+ * step advances less than the contact window, and the speed ramp now reaches
+ * 15.3 u/s, which moves 0.255 units per step against a 1.0-unit window. That
+ * is within a factor of four of tunnelling straight through a hazard, and the
+ * margin would have to be rechecked every time anyone touched the speed. The
+ * doc calls for swept checks or equivalent protection (§4); this is exact and
+ * independent of speed.
  *
  * Lane authority: contact tests read the logical lane index, never the
  * interpolated render position. The lane slide is presentation only, so a hit
@@ -49,6 +58,8 @@ export class LevelRunner {
   readonly tracked: TrackedEntity[];
 
   private travelled = 0;
+  /** Where the player was at the start of the current step, for the sweep. */
+  private previousTravelled = 0;
   private invulnerableFor = 0;
   private complete = false;
   private giftsCollected = 0;
@@ -115,6 +126,7 @@ export class LevelRunner {
     if (this.complete) return;
 
     // Speed ramps with progress, so the route gets faster as it gets tighter.
+    this.previousTravelled = this.travelled;
     this.travelled = Math.min(
       this.travelled + speedAt(this.config, this.travelled) * step,
       this.config.routeLength,
@@ -145,12 +157,19 @@ export class LevelRunner {
 
       if (t.state !== 'pending') continue;
 
-      const reach = HALF_DEPTH.player + HALF_DEPTH[t.entity.kind];
-      if (Math.abs(t.relativeZ) >= reach) {
-        // Once an entity is fully behind the player it can never be reached.
-        if (t.relativeZ < -reach) t.state = 'missed';
+      // Swept overlap: the player's collision interval covers everything
+      // between where it started this step and where it finished, so nothing
+      // can pass through between two frames however fast the route gets.
+      const half = HALF_DEPTH.player + HALF_DEPTH[t.entity.kind];
+      const sweptNear = this.previousTravelled - half;
+      const sweptFar = this.travelled + half;
+
+      if (t.entity.z < sweptNear) {
+        // Fully behind the sweep: it can never be reached again.
+        t.state = 'missed';
         continue;
       }
+      if (t.entity.z > sweptFar) continue;
 
       if (t.entity.lane !== lane) continue;
 
