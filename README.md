@@ -42,12 +42,41 @@ npm run dev          # terminal 2 — Vite on :5173, proxies /api to the Worker
 ```
 
 Open `http://localhost:5173` for the game and `/probe.html` for the asset
-harness. Vite listens on all interfaces, so a phone on the same Wi-Fi can load
-the printed LAN address — which is how portrait sizing and touch actually get
-tested.
+harness.
 
-Keyboard equivalents for desktop work: arrows or `A`/`D` to change lane,
-`Space` to hold (level 2) or shoot (level 3).
+### Desktop controls
+
+| Key | Action |
+|---|---|
+| `←` `→` or `A` `D` | Move one lane |
+| `Space` | Tap (short press) or hold/release (level 2 grapple) |
+| `P` or `Esc` | Pause / resume |
+| `R` | Restart the run |
+
+`W`, `S` and the vertical arrows are claimed so the page cannot scroll, but do
+nothing — no level has a forward or backward axis. Gameplay keys are ignored
+while a text field has focus, so name entry types normally.
+
+### Testing on a phone
+
+`npm run dev` binds loopback only. To reach it from your phone, serve it over
+your tailnet:
+
+```bash
+npm run dev            # terminal 1
+npm run tunnel         # terminal 2 — prints the https://<host>.ts.net URL
+npm run tunnel -- off  # tear down when finished
+```
+
+This goes over **HTTPS on purpose**, not the raw `100.x` address: a plain
+`http://` origin is not a secure context, so `crypto.randomUUID` — which mints
+run and player IDs — is undefined there and the phone test would diverge from
+production. `tailscale serve` terminates TLS with a real cert for the tailnet
+name. It needs MagicDNS and HTTPS certificates enabled in the Tailscale admin
+console (DNS section).
+
+`npm run dev:lan` binds `0.0.0.0` instead, if you would rather use the plain
+LAN address and accept the insecure-context caveat.
 
 ## Checks
 
@@ -56,6 +85,10 @@ npm run typecheck        # tsc, no emit
 npm test                 # scoring, lane and gesture checks
 npm run assets:inspect   # real GLB metrics: triangles, clips, attachments
 ```
+
+Current measured cold transfer, pre-compression: **2.9 MB** — 1.9 MB
+characters and animation libraries, 428 KB story panels, 604 KB JS/CSS
+(≈140 KB gzipped). Targets are 5 MB total and 500 KB compressed JS/CSS.
 
 ## Deploy
 
@@ -79,7 +112,7 @@ src/ui/        HUD and overlays
 src/net/       score client with offline retry
 worker/        Cloudflare Worker: static host + /api
 supabase/      schema.sql
-tools/         asset inspection, asset staging, db push
+tools/         asset inspection, asset staging, stripping, db push, tunnel
 tests/         focused automated checks
 assets/        pinned CC0 source packs (committed on purpose)
 ```

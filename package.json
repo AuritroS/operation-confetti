@@ -18,7 +18,9 @@
     "db:push": "node tools/db-push.mjs",
     "db:check": "node tools/db-push.mjs --check",
     "assets:inspect": "node tools/inspect-glb.mjs",
-    "assets:build": "node tools/build-assets.mjs"
+    "assets:build": "node tools/build-assets.mjs",
+    "tunnel": "node tools/tunnel.mjs",
+    "dev:lan": "HOST=0.0.0.0 vite"
   },
   "dependencies": {
     "three": "^0.180.0"

@@ -42,15 +42,42 @@ describe('lane movement', () => {
     expect(l.laneToX(2)).toBeCloseTo(1.6);
   });
 
-  it('settles the visual position toward the logical lane', () => {
-    const l = new LaneRunner(3, 1.6);
+  it('finishes the slide within the stated settle duration', () => {
+    const settle = 0.11;
+    const l = new LaneRunner(3, 1.6, settle);
     l.swipe(1);
     expect(l.isSettling).toBe(true);
     const startX = l.renderX;
-    for (let i = 0; i < 30; i++) l.update(STEP_S);
+
+    // One step short of the duration it must still be moving; at the
+    // duration it must be exactly on target, not merely close.
+    const steps = Math.ceil(settle / STEP_S);
+    for (let i = 0; i < steps - 1; i++) l.update(STEP_S);
+    expect(l.isSettling).toBe(true);
+
+    l.update(STEP_S);
     expect(l.isSettling).toBe(false);
     expect(l.renderX).toBeGreaterThan(startX);
-    expect(l.renderX).toBeCloseTo(l.targetX, 5);
+    expect(l.renderX).toBe(l.targetX);
+  });
+
+  it('holds the render position exactly on target once settled', () => {
+    const l = new LaneRunner(3, 1.6);
+    l.swipe(-1);
+    for (let i = 0; i < 60; i++) l.update(STEP_S);
+    expect(l.renderX).toBe(l.targetX);
+    expect(l.renderX).toBeCloseTo(-1.6);
+  });
+
+  it('retargets from the current visual position on a second swipe', () => {
+    const l = new LaneRunner(5, 1.6);
+    l.swipe(1);
+    l.update(STEP_S);
+    const mid = l.renderX;
+    // Interrupting mid-slide must carry on from here, never jump backwards.
+    l.swipe(1);
+    expect(l.renderX).toBeCloseTo(mid, 6);
+    expect(l.laneIndex).toBe(4);
   });
 
   it('resets to the middle lane with no residual settle', () => {

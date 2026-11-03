@@ -16,7 +16,10 @@ export type Gesture =
   | { type: 'tap' }
   | { type: 'holdStart' }
   | { type: 'holdEnd'; heldMs: number }
-  | { type: 'holdCancel' };
+  | { type: 'holdCancel' }
+  /** Keyboard-only convenience commands. Never produced by touch. */
+  | { type: 'pauseToggle' }
+  | { type: 'restart' };
 
 export type GestureHandler = (g: Gesture) => void;
 
@@ -190,11 +193,39 @@ export class InputRecogniser {
     }
   }
 
-  // ---- keyboard (development parity) -----------------------------------
+  // ---- keyboard (desktop controls) -------------------------------------
+  //
+  // Lane movement: ArrowLeft/ArrowRight or A/D.
+  // Tap and hold:  Space (short press is a tap, long press is a hold).
+  // Convenience:   P or Escape to pause, R to restart.
+  //
+  // W and S are accepted as part of the WASD cluster but intentionally do
+  // nothing: there is no forward or backward axis in any level, so binding
+  // them would imply movement the simulation does not have.
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
+    // Never steal keys from a text field such as the name entry.
+    if (isTypingTarget(e.target)) return;
+
+    switch (e.code) {
+      case 'KeyP':
+      case 'Escape':
+        // Pause must work while input is disabled, so it is handled first.
+        if (e.repeat) return;
+        e.preventDefault();
+        this.handler({ type: 'pauseToggle' });
+        return;
+      case 'KeyR':
+        if (e.repeat) return;
+        e.preventDefault();
+        this.handler({ type: 'restart' });
+        return;
+      default:
+        break;
+    }
+
     if (!this.enabled) return;
-    // Ignore auto-repeat so one-shot actions fire once per physical press.
+    // Ignore auto-repeat so one physical press is one action.
     if (e.repeat) return;
 
     switch (e.code) {
@@ -209,11 +240,20 @@ export class InputRecogniser {
         this.handler({ type: 'swipe', dir: 1 });
         break;
       case 'Space':
+        // Swallow Space unconditionally: it would otherwise scroll the page
+        // or re-activate whichever button last had focus.
         e.preventDefault();
         if (this.keyHeldSince === null) {
           this.keyHeldSince = e.timeStamp;
           this.handler({ type: 'holdStart' });
         }
+        break;
+      case 'KeyW':
+      case 'KeyS':
+      case 'ArrowUp':
+      case 'ArrowDown':
+        // Claimed so the page cannot scroll, but deliberately inert.
+        e.preventDefault();
         break;
       default:
         break;
@@ -222,14 +262,22 @@ export class InputRecogniser {
 
   private readonly onKeyUp = (e: KeyboardEvent): void => {
     if (e.code !== 'Space') return;
+    if (isTypingTarget(e.target)) return;
     if (this.keyHeldSince === null) return;
     e.preventDefault();
     const heldMs = e.timeStamp - this.keyHeldSince;
     this.keyHeldSince = null;
-    // Mirror the pointer rule: a short press is a tap, a long one is a hold.
+    // Mirror the pointer rule: a short press is a tap, a long one a hold.
     if (heldMs <= this.cfg.tapMaxMs) this.handler({ type: 'tap' });
     this.handler({ type: 'holdEnd', heldMs });
   };
+}
+
+/** True when the event targets a text input, so gameplay keys must not fire. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
 function preventDefault(e: Event): void {

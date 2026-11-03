@@ -169,6 +169,38 @@ html, body {
 
 .debug[hidden] { display: none; }
 
+/* ---- desktop control legend ------------------------------------------ */
+.hint {
+  position: absolute;
+  z-index: 30;
+  right: calc(var(--safe-r) + 12px);
+  bottom: calc(var(--safe-b) + 12px);
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  padding: 9px 11px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: rgba(6, 10, 18, 0.6);
+  color: var(--ink-dim);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.hint kbd {
+  display: inline-block;
+  min-width: 17px;
+  margin: 0 1px;
+  padding: 1px 4px;
+  border: 1px solid var(--edge);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink);
+  font: 600 10px/1.4 ui-monospace, Menlo, monospace;
+  text-align: center;
+}
+
 /* ---- probe harness --------------------------------------------------- */
 .probe {
   position: absolute;

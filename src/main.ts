@@ -11,10 +11,10 @@ import { BoxGeometry, CapsuleGeometry, Mesh, MeshStandardMaterial, PlaneGeometry
 import { FixedLoop } from './core/loop';
 import { InputRecogniser } from './core/input';
 import { LaneRunner } from './core/lanes';
-import { Lifecycle } from './core/lifecycle';
 import { Stage } from './render/stage';
 import { DebugPanel, Hud, Overlay } from './ui/hud';
 import { health } from './net/scoreClient';
+import { isTouchDevice, Lifecycle } from './core/lifecycle';
 
 const LANE_COUNT = 3;
 const LANE_WIDTH = 1.6;
@@ -129,6 +129,13 @@ function render(): void {
 
 const loop = new FixedLoop({ update, render });
 
+let flashTimer = 0;
+function flashPlayer(): void {
+  player.material.color.setHex(0xffc54d);
+  window.clearTimeout(flashTimer);
+  flashTimer = window.setTimeout(() => player.material.color.setHex(0x4da3ff), 90);
+}
+
 // ---- input -------------------------------------------------------------
 
 const input = new InputRecogniser(surface);
@@ -141,11 +148,19 @@ input.onGesture((g) => {
       break;
     case 'tap':
       state.taps++;
-      player.material.color.setHex(0xffc54d);
-      setTimeout(() => player.material.color.setHex(0x4da3ff), 90);
+      flashPlayer();
       break;
     case 'holdStart':
       state.holds++;
+      break;
+    case 'pauseToggle':
+      // Keyboard pause works even while gameplay input is disabled.
+      if (overlay.isVisible) resumeFromOverlay();
+      else lifecycle.toggleUserPause();
+      break;
+    case 'restart':
+      overlay.hide();
+      resetRun();
       break;
     default:
       break;
@@ -200,8 +215,8 @@ function resetRun(): void {
 }
 
 pauseBtn.addEventListener('click', () => {
-  if (lifecycle.isPaused) lifecycle.clear('user');
-  else lifecycle.pause('user');
+  pauseBtn.blur();
+  lifecycle.toggleUserPause();
 });
 
 // ---- boot --------------------------------------------------------------
@@ -210,6 +225,10 @@ hud.setStage(0);
 hud.setScore(0);
 hud.setGifts(0, 4);
 debug.setVisible(true);
+
+// Desktop players have no swipe affordance, so state the bindings outright.
+const hint = document.getElementById('hint');
+if (hint) hint.hidden = isTouchDevice();
 
 loop.start();
 

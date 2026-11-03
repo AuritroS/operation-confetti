@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_RECOGNISER, InputRecogniser, type Gesture } from '../src/core/input';
 
 /**
@@ -37,6 +37,13 @@ beforeEach(() => {
   rec = new InputRecogniser(surface);
   rec.onGesture((g) => gestures.push(g));
   rec.attach();
+});
+
+afterEach(() => {
+  // The recogniser binds keyboard listeners to window, which outlives the
+  // document. Without this, every case would also be heard by the previous
+  // cases' recognisers — the same leak the design doc warns about for replays.
+  rec.detach();
 });
 
 const types = () => gestures.map((g) => g.type);
@@ -152,10 +159,45 @@ describe('keyboard parity', () => {
   it('maps arrows and A/D to single-lane swipes', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight' }));
     expect(gestures).toEqual([
       { type: 'swipe', dir: -1 },
       { type: 'swipe', dir: 1 },
+      { type: 'swipe', dir: -1 },
+      { type: 'swipe', dir: 1 },
     ]);
+  });
+
+  it('leaves W, S and the vertical arrows inert', () => {
+    for (const code of ['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown']) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+    }
+    expect(gestures).toEqual([]);
+  });
+
+  it('maps P and Escape to a pause toggle, and R to restart', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR' }));
+    expect(types()).toEqual(['pauseToggle', 'pauseToggle', 'restart']);
+  });
+
+  it('still allows pausing while gameplay input is disabled', () => {
+    rec.setEnabled(false);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
+    // Pause gets through; the lane change does not.
+    expect(types()).toEqual(['pauseToggle']);
+  });
+
+  it('ignores gameplay keys while a text field has focus', () => {
+    document.body.insertAdjacentHTML('beforeend', '<input id="name" />');
+    const field = document.getElementById('name') as HTMLInputElement;
+    field.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', bubbles: true }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP', bubbles: true }));
+    expect(gestures).toEqual([]);
   });
 
   it('ignores auto-repeat so a held arrow moves one lane', () => {

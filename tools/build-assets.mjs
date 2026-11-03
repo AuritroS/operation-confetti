@@ -74,37 +74,29 @@ for (const src of COPY) {
   if (dest) report.push({ file: basename(dest), step: 'copy', kb: kb(dest) });
 }
 
-// ---- 3. prune animation libraries --------------------------------------
-const gltfTransform = resolveBin('gltf-transform');
-
+// ---- 3. strip animation libraries --------------------------------------
+// These ship a mannequin mesh the game never draws, because clips are
+// transplanted onto the character skeletons instead. See strip-anim-library.mjs
+// for why `gltf-transform prune` alone cannot remove it.
 for (const src of PRUNE) {
   const dest = copy(src, SRC_OUT);
   if (!dest) continue;
   const before = kb(dest);
 
-  if (!gltfTransform) {
-    warnings.push(
-      'gltf-transform not installed; animation libraries keep their unused ' +
-        'mannequin mesh. Run: npm i -D @gltf-transform/cli',
-    );
-    report.push({ file: basename(dest), step: 'copy (unpruned)', kb: before });
-    continue;
-  }
-
-  // Drop every mesh and texture: only the clips and the skeleton are needed.
-  const res = spawnSync(
-    gltfTransform,
-    ['prune', dest, dest, '--keep-attributes', 'false', '--keep-leaves', 'false'],
-    { stdio: 'pipe', encoding: 'utf8' },
-  );
+  const res = spawnSync(process.execPath, ['tools/strip-anim-library.mjs', dest], {
+    stdio: 'pipe',
+    encoding: 'utf8',
+  });
 
   if (res.status !== 0) {
-    warnings.push(`prune failed for ${basename(dest)}: ${(res.stderr ?? '').trim().slice(0, 200)}`);
-    report.push({ file: basename(dest), step: 'copy (prune failed)', kb: before });
+    warnings.push(
+      `strip failed for ${basename(dest)}: ${(res.stderr || res.stdout || '').trim().slice(0, 200)}`,
+    );
+    report.push({ file: basename(dest), step: 'copy (strip failed)', kb: before });
     continue;
   }
 
-  report.push({ file: basename(dest), step: `prune (was ${before} KB)`, kb: kb(dest) });
+  report.push({ file: basename(dest), step: `strip (was ${before} KB)`, kb: kb(dest) });
 }
 
 // ---- 4. story images ----------------------------------------------------
@@ -147,15 +139,6 @@ if (warnings.length) {
   console.log('  warnings:');
   for (const w of [...new Set(warnings)]) console.log(`    - ${w}`);
   console.log('');
-}
-
-function resolveBin(name) {
-  for (const dir of ['node_modules/.bin']) {
-    const p = join(dir, name);
-    if (existsSync(p)) return p;
-  }
-  const which = spawnSync('which', [name], { encoding: 'utf8' });
-  return which.status === 0 ? which.stdout.trim() : null;
 }
 
 // City inventory is listed, not bundled: exact prop selection is still open.
