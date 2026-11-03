@@ -11,20 +11,19 @@
  * name entry and the leaderboard.
  */
 import { Group } from 'three';
-import { FixedLoop } from './core/loop';
+import { FixedLoop, STEP_S } from './core/loop';
 import { InputRecogniser } from './core/input';
 import { isTouchDevice, Lifecycle } from './core/lifecycle';
 import { scoreRun, type RunEvent } from './core/scoring';
 import { LevelRunner } from './levels/runner';
 import { LEVEL_1 } from './levels/level1';
 import { Stage } from './render/stage';
-import {
-  buildRoute,
-  EntityVisuals,
-  makeCapsulePlayer,
-  RouteMarkers,
-  type PlayerVisual,
-} from './render/primitives';
+import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from './render/primitives';
+import { EntityVisuals } from './render/entities';
+import { GuardPool } from './render/guards';
+import { loadGameplayProps, type PropProvider } from './render/props-loader';
+import { buildVaultDoor } from './render/custom';
+import { CLIPS } from './assets/manifest';
 import { loadRoguePlayer } from './render/rogue';
 import { Environment, requestedLayers } from './render/environment';
 import { DebugPanel, Hud } from './ui/hud';
@@ -51,8 +50,24 @@ stage.scene.add(world);
 const enabledLayers = requestedLayers();
 const hasRooftop = enabledLayers.has('rooftop');
 
+/**
+ * Prop provider for gameplay visuals.
+ *
+ * Returns nothing until the props arrive, at which point the entities are
+ * rebuilt with real assets — the same non-blocking pattern the player uses,
+ * so a slow or failed load leaves a playable level built from primitives
+ * rather than an empty one.
+ */
+let gameplayProps: PropProvider = () => null;
+
 let runner = new LevelRunner(LEVEL_1);
-let entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked);
+let entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked, gameplayProps);
+let guards: GuardPool | null = null;
+
+/** The route endpoint, revealed as the vault comes into range. */
+const vault = buildVaultDoor(LEVEL_1.laneWidth * LEVEL_1.laneCount, 3.6);
+vault.visible = false;
+world.add(vault);
 const markers = new RouteMarkers(LEVEL_1);
 // The rooftop layer brings its own surface and parapets, so the primitive
 // ground would z-fight with it, and the dividers can drop right back once the
@@ -61,6 +76,12 @@ const route = buildRoute(LEVEL_1, { surface: !hasRooftop, dimDividers: hasRoofto
 
 world.add(route, entityVisuals.group);
 if (!hasRooftop) world.add(markers.group);
+
+/** Hit feedback bell, parked above the player and shown only on impact. */
+const bell = new Group();
+bell.position.set(0, 2.1, -1.4);
+bell.visible = false;
+world.add(bell);
 
 /** Built asynchronously; gameplay never waits on decoration. */
 let environment: Environment | null = null;
@@ -86,6 +107,27 @@ const run = {
   finished: false,
 };
 
+/** Rises when the runner reports a collision, which drives hit feedback. */
+let lastIncidents = 0;
+
+/**
+ * Hit feedback.
+ *
+ * A collision previously only flashed the character. Now it also plays the
+ * hit reaction and swings the bell, which matters because the doc requires
+ * damage to be distinguishable without sound (§12 Phase 4).
+ *
+ * None of this touches the simulation: the penalty is already recorded by
+ * the time this runs.
+ */
+function onHit(): void {
+  bellSwing = 1;
+  player.playOneShot(CLIPS.matthew.hit);
+}
+
+/** Decays to zero after a hit; drives the bell's swing. */
+let bellSwing = 0;
+
 function onEvent(event: RunEvent): void {
   run.events.push(event);
   // The reducer is the single source of truth for score, exactly as the
@@ -105,8 +147,25 @@ function update(step: number): void {
 
   const snap = runner.snapshot;
   environment?.update(snap.travelled, step);
+  guards?.update(runner.tracked, step);
   player.setHitFlash(snap.invulnerable);
   player.update(step, true);
+
+  // The vault grows out of the fog as the route ends, so the run has a
+  // visible goal rather than just a progress bar.
+  vault.position.z = -(LEVEL_1.routeLength - snap.travelled);
+  vault.visible = LEVEL_1.routeLength - snap.travelled < 70;
+
+  if (snap.incidents > lastIncidents) {
+    lastIncidents = snap.incidents;
+    onHit();
+  }
+
+  if (bellSwing > 0) {
+    bellSwing = Math.max(0, bellSwing - step * 1.6);
+    bell.rotation.z = Math.sin(bellSwing * 34) * bellSwing * 0.5;
+  }
+  bell.visible = bellSwing > 0;
 
   if (snap.complete && !run.finished) {
     run.finished = true;
@@ -216,19 +275,29 @@ function resume(): void {
   if (!run.finished) loop.start();
 }
 
+/**
+ * Rebuild the entity visuals against the current prop provider.
+ *
+ * Disposing first is what stops a replay — or a late prop load — from
+ * accumulating meshes, which the doc calls out as a specific risk (§13).
+ */
+function rebuildEntities(): void {
+  entityVisuals.dispose();
+  entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked, gameplayProps);
+  world.add(entityVisuals.group);
+}
+
 function resetRun(): void {
   // The environment is independent of run state, so a replay keeps it rather
   // than rebuilding — which also means a replay cannot leak its meshes.
   // Rebuild the level cleanly rather than mutating it, so no resolved flag,
   // event or mesh survives into the next run.
-  entityVisuals.dispose();
-  entityVisuals.group.removeFromParent();
-
   runner = new LevelRunner(LEVEL_1);
   runner.onEvent(onEvent);
-  entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked);
-  world.add(entityVisuals.group);
+  rebuildEntities();
 
+  lastIncidents = 0;
+  bellSwing = 0;
   run.score = 0;
   run.events = [];
   run.finished = false;
@@ -255,6 +324,25 @@ hud.setGifts(0, runner.snapshot.giftsTotal);
 const params = new URLSearchParams(location.search);
 debug.setVisible(!params.has('clean'));
 
+/**
+ * `?start=400` fast-forwards the run before play begins.
+ *
+ * A review affordance, like ?clean and ?layers. The vault only enters view in
+ * the last 70 units, roughly a minute in, and nobody should have to play a
+ * full route to look at the ending. The skip replays real simulation steps
+ * rather than teleporting, so every event that would have fired still fires
+ * and the run stays identical to one played through.
+ */
+const skipTo = Number(params.get('start') ?? 0);
+if (skipTo > 0) {
+  const limit = Math.min(skipTo, LEVEL_1.routeLength);
+  let guard = 0;
+  while (runner.snapshot.travelled < limit && guard++ < 60_000) {
+    runner.update(STEP_S);
+  }
+  console.info(`[dev] skipped to ${runner.snapshot.travelled.toFixed(0)} units`);
+}
+
 const hint = document.getElementById('hint');
 if (hint) hint.hidden = isTouchDevice();
 
@@ -273,6 +361,31 @@ void Environment.build(LEVEL_1, enabledLayers)
     );
   })
   .catch((e) => console.error('[environment] build failed', e));
+
+/**
+ * Gameplay assets, loaded without blocking play.
+ *
+ * The entities are rebuilt once the props arrive so the run starts instantly
+ * on primitives and upgrades in place. Guards resolve to null on failure,
+ * which costs the telegraph but not the encounter — the collider lives in
+ * the runner and does not depend on any of this.
+ */
+void loadGameplayProps()
+  .then((provider) => {
+    gameplayProps = provider;
+    rebuildEntities();
+    console.info('[props] gameplay props ready');
+  })
+  .catch((e) => console.error('[props] load failed; keeping primitives', e));
+
+void GuardPool.load(LEVEL_1)
+  .then((pool) => {
+    if (!pool) return;
+    guards = pool;
+    world.add(pool.group);
+    console.info('[guards] pool ready');
+  })
+  .catch((e) => console.error('[guards] load failed', e));
 
 // Load the real character without blocking play.
 void loadRoguePlayer()

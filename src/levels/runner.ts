@@ -16,7 +16,13 @@
  */
 import { LaneRunner } from '../core/lanes';
 import type { RunEvent } from '../core/scoring';
-import { HALF_DEPTH, scoredGiftCount, type LevelConfig, type RouteEntity } from './types';
+import {
+  HALF_DEPTH,
+  isHazard,
+  scoredGiftCount,
+  type LevelConfig,
+  type RouteEntity,
+} from './types';
 
 export type EntityState = 'pending' | 'collected' | 'hit' | 'missed';
 
@@ -150,8 +156,11 @@ export class LevelRunner {
         continue;
       }
 
-      // Obstacle. Protection suppresses the penalty but still marks the
-      // entity, so one hazard can only ever bill once (§5).
+      // Hazard — an obstacle or a guard; both carry the same penalty, since
+      // the difference between them is only how they are drawn. Protection
+      // suppresses the cost but still marks the entity, so one hazard can
+      // only ever bill once (§5).
+      if (!isHazard(t.entity.kind)) continue;
       t.state = 'hit';
       if (this.invulnerableFor <= 0) {
         this.incidents++;

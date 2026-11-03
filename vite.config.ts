@@ -36,6 +36,17 @@ export default defineConfig({
     host,
     port: 5173,
     strictPort: true,
+    /**
+     * Poll for changes rather than relying on filesystem events.
+     *
+     * Edits made by tooling outside the editor were intermittently missed by
+     * the native watcher, so the dev server kept serving a stale transform
+     * while the source on disk was correct. That is quietly dangerous here:
+     * screenshots taken for review then show old code, and a fix looks like
+     * it failed when it never ran. Polling costs a little idle CPU and makes
+     * the loop trustworthy.
+     */
+    watch: { usePolling: true, interval: 250 },
     // Accept the Host header Tailscale sends when serving the tailnet name.
     allowedHosts: ['.ts.net', 'localhost', '127.0.0.1'],
     proxy: {

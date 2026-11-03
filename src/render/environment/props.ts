@@ -58,7 +58,17 @@ export const PROPS = {
   carPolice: P('car_police', 3.25, [1.1, 1.8], 'street below, Interpol nod'),
 
   // ---- gameplay props, scaled by the same rule --------------------------
-  gift: P('present_A_blue', 0.57, [0.28, 0.5], 'scored collectible'),
+  /**
+   * Deliberately larger than a real present would be.
+   *
+   * At true proportion — about a quarter of the player's height — a gift is a
+   * speck by the time it is far enough away to react to, which is the exact
+   * readability problem that sank the primitive torus it replaced. Gameplay
+   * legibility wins over strict scale for the one object the player has to
+   * see and decide about.
+   */
+  gift: P('present_A_blue', 1.05, [0.55, 0.9], 'scored collectible'),
+  /** Dressing, so it keeps the honest proportion. */
   giftDecor: P('present_C_red', 0.72, [0.25, 0.5], 'non-interactive dressing'),
   snowman: P('snowman_A', 0.61, [1.0, 1.6], 'physical hazard blocker'),
   cannon: P('snowball_cannon', 1.41, [0.8, 1.3], 'turret hazard, confetti blaster'),

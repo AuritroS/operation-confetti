@@ -43,6 +43,11 @@ export interface PlayerVisual {
   setHitFlash(active: boolean): void;
   /** Called with the fixed simulation step; drives animation if any. */
   update(step: number, moving: boolean): void;
+  /**
+   * Play a clip once, then fall back to the movement state. Used for the hit
+   * reaction. A no-op where there is no skeleton.
+   */
+  playOneShot(clip: string): void;
   dispose(): void;
 }
 
@@ -229,6 +234,9 @@ export function makeCapsulePlayer(): PlayerVisual {
     },
     update(): void {
       /* nothing to animate */
+    },
+    playOneShot(): void {
+      /* a capsule has no skeleton to react with */
     },
     dispose(): void {
       mesh.geometry.dispose();

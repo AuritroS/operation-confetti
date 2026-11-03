@@ -201,19 +201,45 @@ describe('no tunnelling at the configured speed', () => {
 });
 
 describe('the authored level 1 route', () => {
-  it('offers four scored gifts and four obstacles', () => {
+  it('offers four scored gifts, four obstacles and four guard encounters', () => {
     const gifts = LEVEL_1.entities.filter((e) => e.kind === 'gift' && e.scored);
     const crates = LEVEL_1.entities.filter((e) => e.kind === 'obstacle');
-    expect(gifts).toHaveLength(4);
-    expect(crates).toHaveLength(4);
+    const guards = LEVEL_1.entities.filter((e) => e.kind === 'guard');
+    expect(gifts, 'scored gifts').toHaveLength(4);
+    expect(crates, 'obstacles').toHaveLength(4);
+    expect(guards, 'guard encounters').toHaveLength(4);
+  });
+
+  it('teaches before it threatens', () => {
+    // The doc requires an unscored demonstration first, with hazards only
+    // afterwards (section 5), so a first-time player meets the swipe before
+    // it can cost them anything.
+    const sorted = [...LEVEL_1.entities].sort((a, b) => a.z - b.z);
+    const firstHazard = sorted.findIndex((e) => e.kind !== 'gift');
+    const before = sorted.slice(0, firstHazard);
+
+    expect(before.length, 'something must come before the first hazard').toBeGreaterThan(0);
+    expect(before.every((e) => e.kind === 'gift')).toBe(true);
+    expect(before.some((e) => !e.scored), 'at least one must be unscored').toBe(true);
+  });
+
+  it('keeps tutorial gifts outside the four scored ones', () => {
+    const tutorial = LEVEL_1.entities.filter((e) => e.kind === 'gift' && !e.scored);
+    expect(tutorial.length).toBeGreaterThan(0);
+    const scored = LEVEL_1.entities.filter((e) => e.kind === 'gift' && e.scored);
+    expect(scored).toHaveLength(4);
   });
 
   it('always leaves at least one safe lane at every hazard', () => {
-    for (const e of LEVEL_1.entities.filter((x) => x.kind === 'obstacle')) {
-      const blocked = LEVEL_1.entities.filter(
-        (x) => x.kind === 'obstacle' && Math.abs(x.z - e.z) < 2 * HALF_DEPTH.obstacle,
+    // Guards count as hazards here: a guard and an obstacle overlapping
+    // could close two lanes between them, and three would be unavoidable.
+    const hazards = LEVEL_1.entities.filter((e) => e.kind !== 'gift');
+    for (const e of hazards) {
+      const overlapping = hazards.filter((x) => Math.abs(x.z - e.z) < 2 * HALF_DEPTH.guard);
+      const lanes = new Set(overlapping.map((x) => x.lane));
+      expect(lanes.size, `hazards near z=${e.z} close ${lanes.size} lanes`).toBeLessThan(
+        LEVEL_1.laneCount,
       );
-      expect(blocked.length).toBeLessThan(LEVEL_1.laneCount);
     }
   });
 
@@ -236,9 +262,13 @@ describe('the authored level 1 route', () => {
     // Documenting it here proves a perfect run is actually reachable, which
     // a naive gift-chasing bot cannot establish.
     const line = [
-      { at: 100, lane: 2 }, // after o1 (lane 0), over to g2
-      { at: 145, lane: 0 }, // clear of o2 (lane 2), over for g3
-      { at: 272, lane: 1 }, // past o3 (lane 1), clear of o4 (lane 0), on for g4
+      { at: 30, lane: 2 }, //  after t1, over for the t2 teaching gift
+      { at: 58, lane: 1 }, //  back for g1 (lane 1) at 83
+      { at: 125, lane: 2 }, // past h1 (lane 0), over for g2 at 153
+      { at: 158, lane: 0 }, // clear of guard d1 (lane 2) and h2 (lane 1)
+      { at: 256, lane: 1 }, // after g3, clear of guard d2 (lane 0)
+      { at: 320, lane: 2 }, // past h3, clear of guard d3 (lane 1)
+      { at: 385, lane: 1 }, // past h4 (lane 0), on for g4 at 411
     ];
 
     const r = new LevelRunner(LEVEL_1);

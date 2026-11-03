@@ -12,6 +12,7 @@
 import { ROLE } from './palette';
 import {
   AdditiveBlending,
+  Vector3,
   BufferGeometry,
   CanvasTexture,
   Color,
@@ -141,6 +142,104 @@ export class Sparkle {
         (t - 0.5) * this.opts.rise,
         Math.sin(phase) * radius,
       );
+    }
+    attr.needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.points.geometry.dispose();
+    (this.points.material as PointsMaterial).dispose();
+    this.points.removeFromParent();
+  }
+}
+
+/**
+ * One particle system shared by every sparkling object on screen.
+ *
+ * A `Sparkle` per collectible would be one draw call per collectible. With
+ * four gifts, four lasers and the orb that is nine draws for an effect that
+ * is a handful of dots — and the budget is 100 for the whole scene. A single
+ * Points with a slot per anchor costs one.
+ *
+ * Anchors are set each frame; unused slots park their particles far away
+ * rather than being rebuilt, so the geometry never resizes.
+ */
+export class SparkleField {
+  readonly points: Points;
+
+  private readonly perAnchor: number;
+  private readonly phases: number[] = [];
+  private readonly radii: number[] = [];
+  private readonly heights: number[] = [];
+  private readonly anchors: Vector3[] = [];
+  private active = 0;
+  private time = 0;
+
+  constructor(
+    readonly maxAnchors: number,
+    options: SparkleOptions = {},
+  ) {
+    this.perAnchor = options.count ?? 10;
+    const total = maxAnchors * this.perAnchor;
+
+    for (let i = 0; i < total; i++) {
+      this.phases.push(Math.random() * Math.PI * 2);
+      this.radii.push((options.radius ?? 0.4) * (0.55 + Math.random() * 0.45));
+      this.heights.push(Math.random());
+    }
+    for (let i = 0; i < maxAnchors; i++) this.anchors.push(new Vector3());
+
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(total * 3), 3));
+
+    this.points = new Points(
+      geometry,
+      new PointsMaterial({
+        color: new Color(options.color ?? SPARKLE_BLUE),
+        size: options.size ?? 0.15,
+        map: dotTexture(),
+        transparent: true,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        sizeAttenuation: true,
+      }),
+    );
+    this.points.frustumCulled = false;
+  }
+
+  /** Replace the active anchor set. Extra anchors beyond capacity are dropped. */
+  setAnchors(positions: readonly Vector3[]): void {
+    this.active = Math.min(positions.length, this.maxAnchors);
+    for (let i = 0; i < this.active; i++) {
+      const p = positions[i];
+      if (p) this.anchors[i]?.copy(p);
+    }
+  }
+
+  update(step: number): void {
+    this.time += step;
+    const attr = this.points.geometry.getAttribute('position') as Float32BufferAttribute;
+
+    for (let a = 0; a < this.maxAnchors; a++) {
+      const anchor = this.anchors[a];
+      const live = a < this.active && anchor;
+      for (let k = 0; k < this.perAnchor; k++) {
+        const i = a * this.perAnchor + k;
+        if (!live) {
+          // Park, rather than resize the buffer every time a gift is taken.
+          attr.setXYZ(i, 0, -9999, 0);
+          continue;
+        }
+        const phase = (this.phases[i] ?? 0) + this.time * 0.9;
+        const radius = this.radii[i] ?? 0.4;
+        const t = ((this.heights[i] ?? 0) + this.time * 0.22) % 1;
+        attr.setXYZ(
+          i,
+          anchor.x + Math.cos(phase) * radius,
+          anchor.y + (t - 0.5) * 0.5,
+          anchor.z + Math.sin(phase) * radius,
+        );
+      }
     }
     attr.needsUpdate = true;
   }

@@ -109,8 +109,22 @@ class RogueVisual implements PlayerVisual {
     }
   }
 
+  /** Seconds left of a one-shot, during which the movement clip is held off. */
+  private oneShot = 0;
+
+  playOneShot(clip: string): void {
+    if (!this.actor.play(clip, { loop: false, clampWhenFinished: false, fade: 0.08 })) return;
+    // Long enough to read, short enough not to fight the run cycle. The
+    // simulation is unaffected either way: animation never gates movement.
+    this.oneShot = 0.45;
+  }
+
   update(step: number, moving: boolean): void {
-    this.actor.play(moving ? CLIPS.matthew.run : CLIPS.matthew.idle);
+    if (this.oneShot > 0) {
+      this.oneShot -= step;
+    } else {
+      this.actor.play(moving ? CLIPS.matthew.run : CLIPS.matthew.idle);
+    }
     this.actor.update(step);
   }
 

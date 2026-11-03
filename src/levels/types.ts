@@ -7,7 +7,26 @@
  * collisions or timings.
  */
 
-export type EntityKind = 'gift' | 'obstacle';
+/**
+ * `guard` is a hazard like `obstacle`, with identical collision semantics.
+ * The difference is presentational: a guard telegraphs its lane with a
+ * searchlight before the player reaches it.
+ *
+ * Its lane is authored, never chosen at runtime. The doc forbids targeting a
+ * lane on hidden last-millisecond input (§7), and the simplest way to be
+ * certain of that is to give the simulation no way to decide.
+ */
+export type EntityKind = 'gift' | 'obstacle' | 'guard';
+
+/** Hazard kinds, which cost an incident on contact. */
+export const HAZARD_KINDS: readonly EntityKind[] = ['obstacle', 'guard'];
+
+export function isHazard(kind: EntityKind): boolean {
+  return HAZARD_KINDS.includes(kind);
+}
+
+/** How a hazard is presented. Gameplay reads none of this. */
+export type HazardStyle = 'laser' | 'turret' | 'blocker';
 
 export interface RouteEntity {
   /** Stable id. Used to mark an entity resolved so it cannot score twice. */
@@ -22,6 +41,12 @@ export interface RouteEntity {
    * tutorial demonstration and must stay outside the four scored gifts (§5).
    */
   readonly scored: boolean;
+  /**
+   * Visual treatment for a hazard. Purely presentational: every style has the
+   * same collider and the same penalty, so changing one cannot alter
+   * difficulty.
+   */
+  readonly style?: HazardStyle;
 }
 
 export interface LevelConfig {
@@ -49,6 +74,7 @@ export const HALF_DEPTH = {
   player: 0.45,
   gift: 0.55,
   obstacle: 0.55,
+  guard: 0.6,
 } as const;
 
 /** Number of scored gifts expected per level, for HUD and validation. */
