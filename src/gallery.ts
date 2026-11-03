@@ -15,6 +15,8 @@ import {
   Color,
   DirectionalLight,
   Group,
+  Mesh,
+  MeshStandardMaterial,
   type Object3D,
   PerspectiveCamera,
   Scene,
@@ -24,6 +26,9 @@ import {
   type AnimationClip,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { PLAN, type PlannedAsset } from './assets/plan';
+import { CHARACTER_HEIGHT, SOURCES } from './assets/manifest';
+import { LaserBarrier, Searchlight, Sparkle } from './render/effects';
 import './gallery.css';
 
 interface AssetItem {
@@ -55,7 +60,15 @@ const THUMB = 256;
 
 // ---- shared renderer ---------------------------------------------------
 
-const renderer = new WebGLRenderer({ antialias: true, alpha: false });
+const renderer = new WebGLRenderer({
+  antialias: true,
+  alpha: false,
+  // Required: every tile is produced by rendering here and then copying the
+  // canvas with drawImage. Without this the drawing buffer is cleared once
+  // the compositor runs, and whichever render straddles a flush copies an
+  // empty frame — it showed up as exactly one blank thumbnail, the first one.
+  preserveDrawingBuffer: true,
+});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(THUMB, THUMB, false);
 renderer.setClearColor(new Color('#121a28'), 1);
@@ -111,22 +124,45 @@ function frame(object: Object3D, yaw: number, pitch = 0.32): void {
   camera.updateProjectionMatrix();
 }
 
+/**
+ * Serialises thumbnail rendering.
+ *
+ * Every tile shares one renderer, one scene and one holder, so concurrent
+ * renders interleave: one call clears the holder while another is mid-render
+ * and the loser draws an empty frame. The plan view queues every row at once,
+ * which made this show up as a blank tile for whichever model lost the race.
+ */
+let renderQueue: Promise<void> = Promise.resolve();
+
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const run = renderQueue.then(job, job);
+  // Keep the chain alive even if a job rejects, so one bad model cannot stall
+  // every thumbnail behind it.
+  renderQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /** Render one model into a destination 2D canvas. */
-async function renderThumb(item: AssetItem, target: HTMLCanvasElement): Promise<void> {
-  const { object } = await loadModel(item.url);
+function renderThumb(item: AssetItem, target: HTMLCanvasElement): Promise<void> {
+  return enqueue(async () => {
+    const { object } = await loadModel(item.url);
 
-  holder.clear();
-  holder.add(object);
-  renderer.setSize(THUMB, THUMB, false);
-  frame(object, 0.7);
-  renderer.render(scene, camera);
-  holder.clear();
+    holder.clear();
+    holder.add(object);
+    renderer.setSize(THUMB, THUMB, false);
+    frame(object, 0.7);
+    renderer.render(scene, camera);
+    holder.clear();
 
-  const ctx = target.getContext('2d');
-  if (!ctx) return;
-  target.width = THUMB;
-  target.height = THUMB;
-  ctx.drawImage(renderer.domElement, 0, 0, THUMB, THUMB);
+    const ctx = target.getContext('2d');
+    if (!ctx) return;
+    target.width = THUMB;
+    target.height = THUMB;
+    ctx.drawImage(renderer.domElement, 0, 0, THUMB, THUMB);
+  });
 }
 
 // ---- picks -------------------------------------------------------------
@@ -174,6 +210,21 @@ const el = {
   sortTris: document.getElementById('sort-tris') as HTMLButtonElement,
   sortBytes: document.getElementById('sort-bytes') as HTMLButtonElement,
   showPicks: document.getElementById('show-picks') as HTMLButtonElement,
+  tabPlan: document.getElementById('tab-plan') as HTMLButtonElement,
+  tabBrowse: document.getElementById('tab-browse') as HTMLButtonElement,
+  tabEffects: document.getElementById('tab-effects') as HTMLButtonElement,
+  browseControls: document.getElementById('browse-controls') as HTMLElement,
+  plan: document.getElementById('plan') as HTMLElement,
+  effects: document.getElementById('effects') as HTMLElement,
+  fxRow: document.getElementById('fx-row') as HTMLElement,
+  recolour: document.getElementById('detail-recolour') as HTMLElement,
+  recolourRows: document.getElementById('recolour-rows') as HTMLElement,
+  presetMatthew: document.getElementById('recolour-preset-matthew') as HTMLButtonElement,
+  presetAurora: document.getElementById('recolour-preset-aurora') as HTMLButtonElement,
+  recolourReset: document.getElementById('recolour-reset') as HTMLButtonElement,
+  recolourCopy: document.getElementById('recolour-copy') as HTMLButtonElement,
+  toggleScale: document.getElementById('toggle-scale') as HTMLButtonElement,
+  toggleSparkle: document.getElementById('toggle-sparkle') as HTMLButtonElement,
 };
 
 let index: AssetIndex;
@@ -264,6 +315,10 @@ let detailRaf = 0;
 let detailMixer: AnimationMixer | null = null;
 let detailObject: Object3D | null = null;
 let detailLast = 0;
+let scaleRef: Object3D | null = null;
+let showScale = false;
+let detailSparkle: Sparkle | null = null;
+let showSparkle = false;
 
 function stopDetail(): void {
   cancelAnimationFrame(detailRaf);
@@ -271,6 +326,11 @@ function stopDetail(): void {
   detailMixer?.stopAllAction();
   detailMixer = null;
   detailObject = null;
+  // The sparkle owns GPU buffers, so release it rather than leaking one per
+  // asset opened.
+  detailSparkle?.dispose();
+  detailSparkle = null;
+  scaleRef?.removeFromParent();
 }
 
 async function openDetail(item: AssetItem): Promise<void> {
@@ -301,8 +361,11 @@ async function openDetail(item: AssetItem): Promise<void> {
   syncPickButton(item);
   el.detailPick.onclick = () => togglePick(item);
 
-  const { object, clips } = await loadModel(item.url);
+  const { object, clips } = await enqueue(() => loadModel(item.url));
   detailObject = object;
+
+  // Per-part tint rows, for rigged characters and anything else with meshes.
+  buildRecolour(object);
 
   // Characters carry no clips of their own, so offer the shared libraries.
   const library = await libraryClips();
@@ -336,6 +399,23 @@ async function openDetail(item: AssetItem): Promise<void> {
 
     holder.clear();
     holder.add(detailObject);
+
+    // Optional comparisons, parented to the holder so framing includes them.
+    if (showScale && scaleRef) {
+      const box = new Box3().setFromObject(detailObject);
+      const size = box.getSize(new Vector3());
+      // Stand Matthew just clear of the asset's own footprint.
+      scaleRef.position.x = box.max.x + Math.max(size.x * 0.2, 0.4) + 0.4;
+      holder.add(scaleRef);
+    }
+    if (showSparkle) {
+      detailSparkle ??= new Sparkle({ count: 16, radius: 0.5, rise: 0.7 });
+      const box = new Box3().setFromObject(detailObject);
+      detailSparkle.points.position.copy(box.getCenter(new Vector3()));
+      detailSparkle.update(dt);
+      holder.add(detailSparkle.points);
+    }
+
     const size = Math.min(el.detailCanvas.clientWidth || 420, 560);
     renderer.setSize(size, size, false);
     frame(detailObject, (now / 4000) % (Math.PI * 2));
@@ -507,6 +587,390 @@ el.showPicks.onclick = () => {
   renderGrid();
 };
 
+// ---- recolour ----------------------------------------------------------
+
+/**
+ * Per-mesh tint. The characters are already split into Body, Cape, Head, Mask,
+ * Arms and Legs, so tinting per mesh gives per-part control without touching
+ * the atlas or editing UVs — and leaves the skin alone by simply not tinting
+ * the head and arms.
+ */
+interface TintRow {
+  mesh: Mesh;
+  name: string;
+  original: number;
+}
+
+let tintRows: TintRow[] = [];
+
+const PRESETS: Record<string, Record<string, string>> = {
+  matthew: { Body: '#2f6fd0', Cape: '#1f4f9c', Legs: '#24467e', Mask: '#1a1f2b' },
+  aurora: { Body: '#7a46c8', Cape: '#5a2f9e', Hat: '#5a2f9e', Legs: '#43307a' },
+};
+
+function buildRecolour(object: Object3D): void {
+  tintRows = [];
+  el.recolourRows.replaceChildren();
+
+  object.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh) return;
+    const material = mesh.material as MeshStandardMaterial;
+    if (!material?.color) return;
+    // Clone per mesh so a tint on one part never leaks into another that
+    // happens to share the source material.
+    if (!mesh.userData['tintCloned']) {
+      mesh.material = material.clone();
+      mesh.userData['tintCloned'] = true;
+    }
+    const cloned = mesh.material as MeshStandardMaterial;
+    tintRows.push({ mesh, name: shortPart(mesh.name), original: cloned.color.getHex() });
+  });
+
+  el.recolour.hidden = tintRows.length === 0;
+
+  for (const row of tintRows) {
+    const wrap = document.createElement('label');
+    wrap.className = 'swatch-row';
+
+    const label = document.createElement('span');
+    label.textContent = row.name;
+
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = `#${row.original.toString(16).padStart(6, '0')}`;
+    input.oninput = () => {
+      (row.mesh.material as MeshStandardMaterial).color.set(input.value);
+    };
+
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.textContent = 'reset';
+    reset.onclick = (e) => {
+      e.preventDefault();
+      (row.mesh.material as MeshStandardMaterial).color.setHex(row.original);
+      input.value = `#${row.original.toString(16).padStart(6, '0')}`;
+    };
+
+    wrap.append(label, input, reset);
+    el.recolourRows.append(wrap);
+  }
+}
+
+/** `RogueHooded_ArmLeft` -> `ArmLeft`, so rows read as body parts. */
+function shortPart(name: string): string {
+  const i = name.indexOf('_');
+  return i === -1 ? name : name.slice(i + 1);
+}
+
+function applyPreset(which: string): void {
+  const preset = PRESETS[which];
+  if (!preset) return;
+  for (const row of tintRows) {
+    const hex = preset[row.name];
+    const material = row.mesh.material as MeshStandardMaterial;
+    if (hex) material.color.set(hex);
+    else material.color.setHex(row.original);
+  }
+  // Re-render the inputs so their swatches match what is on screen.
+  const inputs = el.recolourRows.querySelectorAll('input[type="color"]');
+  tintRows.forEach((row, i) => {
+    const input = inputs[i] as HTMLInputElement | undefined;
+    if (input) input.value = `#${(row.mesh.material as MeshStandardMaterial).color.getHexString()}`;
+  });
+}
+
+el.presetMatthew.onclick = () => applyPreset('matthew');
+el.presetAurora.onclick = () => applyPreset('aurora');
+el.recolourReset.onclick = () => {
+  for (const row of tintRows) {
+    (row.mesh.material as MeshStandardMaterial).color.setHex(row.original);
+  }
+  const inputs = el.recolourRows.querySelectorAll('input[type="color"]');
+  tintRows.forEach((row, i) => {
+    const input = inputs[i] as HTMLInputElement | undefined;
+    if (input) input.value = `#${row.original.toString(16).padStart(6, '0')}`;
+  });
+};
+el.recolourCopy.onclick = async () => {
+  const lines = tintRows.map(
+    (r) => `  ${r.name.padEnd(12)} #${(r.mesh.material as MeshStandardMaterial).color.getHexString()}`,
+  );
+  const text = `Palette:\n${lines.join('\n')}\n`;
+  try {
+    await navigator.clipboard.writeText(text);
+    el.recolourCopy.textContent = 'Copied';
+  } catch {
+    console.log(text);
+    el.recolourCopy.textContent = 'See console';
+  }
+  setTimeout(() => (el.recolourCopy.textContent = 'Copy palette'), 1400);
+};
+
+// ---- scale comparison --------------------------------------------------
+
+/**
+ * A correctly scaled Matthew standing beside the asset. "Is the water tower
+ * the right size" is unanswerable from a thumbnail, and getting it wrong is
+ * the bug the headless check caught in the game itself.
+ */
+async function scaleReference(): Promise<Object3D> {
+  if (scaleRef) return scaleRef;
+  const { object } = await loadModel(SOURCES.characters.matthew);
+  const ref = object.clone(true);
+  const box = new Box3().setFromObject(ref);
+  const height = box.getSize(new Vector3()).y;
+  if (height > 0) ref.scale.setScalar(CHARACTER_HEIGHT / height);
+  const scaled = new Box3().setFromObject(ref);
+  ref.position.y -= scaled.min.y;
+  scaleRef = ref;
+  return ref;
+}
+
+el.toggleScale.onclick = async () => {
+  showScale = !showScale;
+  if (showScale) el.toggleScale.dataset['on'] = '1';
+  else el.toggleScale.removeAttribute('data-on');
+  if (showScale) await scaleReference();
+};
+
+el.toggleSparkle.onclick = () => {
+  showSparkle = !showSparkle;
+  if (showSparkle) el.toggleSparkle.dataset['on'] = '1';
+  else el.toggleSparkle.removeAttribute('data-on');
+};
+
+// ---- plan view ---------------------------------------------------------
+
+const LEVEL_LABEL: Record<string, string> = {
+  all: 'Characters and shared',
+  '1': 'Level 1 — The Gift Vault',
+  '2': 'Level 2 — Skyline Chase',
+  '3': 'Level 3 — The Cake Thief',
+};
+
+function renderPlan(): void {
+  el.plan.replaceChildren();
+  el.count.textContent = `${PLAN.length} roles · ${PLAN.filter((p) => !p.assetId).length} procedural`;
+
+  for (const level of ['all', '1', '2', '3'] as const) {
+    const rows = PLAN.filter((p) => String(p.level) === level);
+    if (!rows.length) continue;
+
+    const group = document.createElement('section');
+    group.className = 'plan-group';
+    const h = document.createElement('h2');
+    h.textContent = LEVEL_LABEL[level] ?? level;
+    const list = document.createElement('div');
+    list.className = 'plan-rows';
+
+    for (const planned of rows) list.append(planRow(planned));
+    group.append(h, list);
+    el.plan.append(group);
+  }
+}
+
+function planRow(planned: PlannedAsset): HTMLElement {
+  const row = document.createElement('article');
+  row.className = 'plan-row';
+
+  const item = planned.assetId ? index.items.find((i) => i.id === planned.assetId) : undefined;
+
+  if (item) {
+    const canvas = document.createElement('canvas');
+    canvas.width = THUMB;
+    canvas.height = THUMB;
+    canvas.title = 'Open for detail, recolour and scale comparison';
+    canvas.onclick = () => void openDetail(item);
+    row.append(canvas);
+    void renderThumb(item, canvas).catch((e) => console.error('[plan]', planned.role, e));
+  } else {
+    const box = document.createElement('div');
+    box.className = 'plan-row__proc';
+    box.textContent = planned.assetId ? 'missing from index' : 'built in code';
+    row.append(box);
+  }
+
+  const body = document.createElement('div');
+
+  const role = document.createElement('div');
+  role.className = 'plan-row__role';
+  role.textContent = planned.role;
+
+  const asset = document.createElement('div');
+  asset.className = 'plan-row__asset';
+  asset.textContent = planned.assetId ?? 'procedural';
+
+  const note = document.createElement('p');
+  note.className = 'plan-row__note';
+  note.textContent = planned.note;
+
+  const tags = document.createElement('div');
+  tags.className = 'plan-row__tags';
+  const status = document.createElement('span');
+  status.className = `tag${planned.status === 'procedural' ? ' tag--procedural' : ''}`;
+  status.textContent = planned.status;
+  tags.append(status);
+  if (item) {
+    const cost = document.createElement('span');
+    cost.className = 'tag';
+    cost.textContent = `${item.triangles.toLocaleString()} tris · ${kb(item.bytes)}`;
+    tags.append(cost);
+  }
+  for (const clip of planned.clips ?? []) {
+    const c = document.createElement('span');
+    c.className = 'tag tag--clip';
+    c.textContent = clip;
+    tags.append(c);
+  }
+
+  body.append(role, asset, note, tags);
+  row.append(body);
+  return row;
+}
+
+// ---- effects view ------------------------------------------------------
+
+interface FxPreview {
+  name: string;
+  note: string;
+  build: () => { object: Object3D; update: (step: number) => void; dispose: () => void };
+}
+
+const FX: FxPreview[] = [
+  {
+    name: 'Thief sparkle',
+    note: 'Marks anything interactable. Blue means take it. Particles orbit on independent phases so the cloud never reads as a rigid ring.',
+    build: () => {
+      const s = new Sparkle({ count: 16, radius: 0.5, rise: 0.7 });
+      return { object: s.points, update: (d) => s.update(d), dispose: () => s.dispose() };
+    },
+  },
+  {
+    name: 'Laser barrier',
+    note: 'The primary hazard. Red means avoid. Two crossed quads keep it solid from the shallow gameplay camera angle, where a single flat quad would vanish edge-on.',
+    build: () => {
+      const l = new LaserBarrier({ width: 1.5 });
+      return { object: l.group, update: (d) => l.update(d), dispose: () => l.dispose() };
+    },
+  },
+  {
+    name: 'Searchlight — sweeping',
+    note: 'Guard telegraph before it commits. Drifts across the full lane span so the threat is legible early.',
+    build: () => {
+      const s = new Searchlight();
+      s.sweep();
+      return { object: s.group, update: (d) => s.update(d), dispose: () => s.dispose() };
+    },
+  },
+  {
+    name: 'Searchlight — locked',
+    note: 'Committed to a lane and pulsing. The lock happens first and visibly, so the strike never targets a lane based on last-moment input.',
+    build: () => {
+      const s = new Searchlight();
+      s.lockTo(2);
+      return { object: s.group, update: (d) => s.update(d), dispose: () => s.dispose() };
+    },
+  },
+];
+
+let fxRaf = 0;
+const fxLive: { update: (d: number) => void; dispose: () => void }[] = [];
+
+function stopEffects(): void {
+  cancelAnimationFrame(fxRaf);
+  fxRaf = 0;
+  for (const fx of fxLive) fx.dispose();
+  fxLive.length = 0;
+}
+
+function renderEffects(): void {
+  stopEffects();
+  el.fxRow.replaceChildren();
+  el.count.textContent = `${FX.length} procedural effects`;
+
+  const cards: { canvas: HTMLCanvasElement; object: Object3D }[] = [];
+
+  for (const fx of FX) {
+    const card = document.createElement('div');
+    card.className = 'fx-card';
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 300;
+    const meta = document.createElement('div');
+    meta.className = 'fx-card__meta';
+    const name = document.createElement('div');
+    name.className = 'fx-card__name';
+    name.textContent = fx.name;
+    const note = document.createElement('p');
+    note.className = 'fx-card__note';
+    note.textContent = fx.note;
+    meta.append(name, note);
+    card.append(canvas, meta);
+    el.fxRow.append(card);
+
+    const built = fx.build();
+    fxLive.push(built);
+    cards.push({ canvas, object: built.object });
+  }
+
+  let last = performance.now();
+  const tick = (now: number): void => {
+    const dt = Math.min((now - last) / 1000, 0.1);
+    last = now;
+    for (const fx of fxLive) fx.update(dt);
+
+    for (const [i, card] of cards.entries()) {
+      holder.clear();
+      holder.add(card.object);
+      renderer.setSize(300, 300, false);
+      // Low, close camera: the gameplay viewing angle, where a flat effect
+      // would betray itself.
+      const yaw = 0.5 + Math.sin(now / 5000 + i) * 0.35;
+      frame(card.object, yaw, 0.2);
+      renderer.render(scene, camera);
+      holder.clear();
+
+      const ctx = card.canvas.getContext('2d');
+      if (ctx) ctx.drawImage(renderer.domElement, 0, 0, 300, 300);
+    }
+    fxRaf = requestAnimationFrame(tick);
+  };
+  fxRaf = requestAnimationFrame(tick);
+}
+
+// ---- view switching ----------------------------------------------------
+
+type View = 'plan' | 'browse' | 'effects';
+
+function setView(next: View): void {
+  stopDetail();
+  stopEffects();
+  el.detail.hidden = true;
+
+  for (const [key, btn] of [
+    ['plan', el.tabPlan],
+    ['browse', el.tabBrowse],
+    ['effects', el.tabEffects],
+  ] as const) {
+    if (key === next) btn.dataset['on'] = '1';
+    else btn.removeAttribute('data-on');
+  }
+
+  el.plan.hidden = next !== 'plan';
+  el.grid.hidden = next !== 'browse';
+  el.effects.hidden = next !== 'effects';
+  el.browseControls.hidden = next !== 'browse';
+
+  if (next === 'plan') renderPlan();
+  if (next === 'browse') renderGrid();
+  if (next === 'effects') renderEffects();
+}
+
+el.tabPlan.onclick = () => setView('plan');
+el.tabBrowse.onclick = () => setView('browse');
+el.tabEffects.onclick = () => setView('effects');
+
 // ---- boot --------------------------------------------------------------
 
 async function boot(): Promise<void> {
@@ -519,12 +983,14 @@ async function boot(): Promise<void> {
 
   const totalTris = index.items.reduce((a, i) => a + i.triangles, 0);
   el.note.textContent =
-    `${index.license} All models share the Rig_Medium skeleton where rigged, ` +
-    `so clips and props are interchangeable. ${totalTris.toLocaleString()} triangles indexed in total.`;
+    `${index.packs.length} packs, ${index.items.length} models, ` +
+    `${totalTris.toLocaleString()} triangles indexed. Rigged models all share the ` +
+    `Rig_Medium skeleton, so clips and props are interchangeable. ${index.license}`;
 
   renderFilters();
-  renderGrid();
   syncFooter();
+  // The plan is the thing to review; browsing all 178 models is the fallback.
+  setView('plan');
 }
 
 void boot();

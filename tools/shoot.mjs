@@ -15,6 +15,7 @@
  *
  * Usage:
  *   node tools/shoot.mjs <url> [--out name] [--wait ms] [--keys a,b] [--size WxH]
+ *                             [--click selector] [--scroll px]
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -30,6 +31,8 @@ const flag = (name, fallback) => {
 const out = flag('out', 'shot');
 const waitMs = Number(flag('wait', 2500));
 const keys = (flag('keys', '') || '').split(',').filter(Boolean);
+const click = flag('click', '');
+const scroll = Number(flag('scroll', 0));
 const [width, height] = (flag('size', '390x844') ?? '390x844').split('x').map(Number);
 
 const OUT_DIR = 'tools/shots';
@@ -87,9 +90,20 @@ try {
 
   await page.waitForTimeout(waitMs);
 
+  if (click) {
+    await page.click(click, { timeout: 5000 });
+    // Views that build a scene need a beat to load and draw before capture.
+    await page.waitForTimeout(waitMs);
+  }
+
   for (const key of keys) {
     await page.keyboard.press(key);
     await page.waitForTimeout(350);
+  }
+
+  if (scroll) {
+    await page.evaluate((y) => window.scrollTo(0, y), scroll);
+    await page.waitForTimeout(600);
   }
 
   // What the page thinks is going on, read straight from the DOM.

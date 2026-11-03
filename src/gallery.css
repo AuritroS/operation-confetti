@@ -67,6 +67,118 @@ body.gallery {
 .chip[data-on="1"] { background: var(--accent); border-color: var(--accent); color: #06101f; }
 .chip--picked[data-on="1"] { background: var(--gold); border-color: var(--gold); }
 
+.gal-tabs { display: flex; gap: 5px; margin-bottom: 9px; }
+
+/* ---- plan view ---- */
+.gal-plan { padding: 14px 16px; display: grid; gap: 18px; }
+
+.plan-group h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.plan-rows { display: grid; gap: 8px; }
+
+.plan-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--panel);
+  align-items: start;
+}
+
+.plan-row canvas {
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  background: linear-gradient(170deg, #1b2538, #0f1726);
+  cursor: pointer;
+}
+
+.plan-row__proc {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--edge);
+  border-radius: 8px;
+  color: var(--ink-dim);
+  font-size: 10px;
+  text-align: center;
+  padding: 6px;
+}
+
+.plan-row__role { font-weight: 700; font-size: 13px; }
+.plan-row__asset { color: var(--accent); font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+.plan-row__note { margin: 5px 0 0; color: var(--ink-dim); font-size: 11px; line-height: 1.5; }
+
+.plan-row__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+.tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+.tag--procedural { border-color: var(--gold); color: var(--gold); }
+.tag--clip { font-family: ui-monospace, Menlo, monospace; }
+
+/* ---- effects view ---- */
+.gal-fx { padding: 14px 16px; }
+.gal-fx .gal-note { max-width: 560px; margin-bottom: 12px; }
+.gal-fx code { color: var(--accent); }
+.gal-fx__row { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+
+.fx-card {
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.fx-card canvas { display: block; width: 100%; aspect-ratio: 1; background: #0b1119; }
+.fx-card__meta { padding: 9px 11px 11px; }
+.fx-card__name { font-weight: 700; font-size: 12px; }
+.fx-card__note { margin: 4px 0 0; color: var(--ink-dim); font-size: 11px; line-height: 1.45; }
+
+/* ---- recolour ---- */
+.gal-sub { margin: 14px 0 5px; font-size: 12px; }
+.gal-hint { margin: 0 0 9px; color: var(--ink-dim); font-size: 11px; line-height: 1.45; }
+.gal-swatches { display: grid; gap: 5px; margin-bottom: 10px; }
+
+.swatch-row {
+  display: grid;
+  grid-template-columns: 1fr 34px 46px;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+.swatch-row input[type="color"] {
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.swatch-row button {
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-dim);
+  font: 600 10px/1 inherit;
+  padding: 5px 0;
+  cursor: pointer;
+}
+.swatch-row code { color: var(--ink-dim); font-size: 10px; }
+
 /* ---- grid ---- */
 .gal-grid {
   display: grid;

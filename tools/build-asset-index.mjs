@@ -42,13 +42,18 @@ const PACKS = [
     note: 'Environment. One shared 1024² atlas, so these instance well.',
   },
   {
-    id: 'blasters',
-    label: 'Blaster Kit',
-    pack: 'Kenney Blaster Kit 2.1',
-    dir: 'assets/kenney_blaster-kit_2.1/Models/GLB format',
-    note: 'Confetti blaster candidates, plus crates and targets.',
+    id: 'holiday',
+    label: 'Holiday Bits',
+    pack: 'KayKit Holiday Bits 1.0',
+    dir: 'assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf',
+    note: 'Presents, the candy-cane hook and the snowball cannon. One shared atlas.',
   },
 ];
+
+// Kenney Blaster Kit is deliberately absent. Its 512px flat-shaded sci-fi
+// texture is a different visual language from KayKit's 1024px gradient-ramp
+// atlases, and Holiday Bits supplies a blaster (snowball_cannon) in the right
+// style, so the whole project now uses one art language.
 
 /** Coarse grouping within a pack, derived from the filename. */
 function categorise(packId, name) {
@@ -60,12 +65,14 @@ function categorise(packId, name) {
     if (/^(bench|bush|dumpster|firehydrant|trash|watertower|box)/.test(name)) return 'street props';
     return 'other';
   }
-  if (packId === 'blasters') {
-    if (/^blaster/.test(name)) return 'blasters';
-    if (/^bullet/.test(name)) return 'projectiles';
-    if (/^target/.test(name)) return 'targets';
-    if (/^crate/.test(name)) return 'crates';
-    if (/^(scope|silencer|clip)/.test(name)) return 'attachments';
+  if (packId === 'holiday') {
+    if (/^present/.test(name)) return 'presents';
+    if (/^christmas_tree/.test(name)) return 'trees';
+    if (/^(cookie|milk|hot_chocolate|plate|gingerbread)/.test(name)) return 'food';
+    if (/^(bell|wreath|mistletoe|lantern|candycane)/.test(name)) return 'decor';
+    if (/^(chair|footstool|stool|carpet)/.test(name)) return 'furniture';
+    if (/^(train|tracks)/.test(name)) return 'train';
+    if (/^(snowman|snowball)/.test(name)) return 'winter';
     return 'other';
   }
   if (packId === 'props') {
@@ -188,7 +195,10 @@ for (const pack of PACKS) {
 
 const index = {
   generated: new Date().toISOString(),
-  license: 'All three source packs are CC0. Attribution optional.',
+  license:
+    'Adventurers and City Builder Bits are CC0 with licence files retained. ' +
+    'Holiday Bits shipped without a License.txt — confirm CC0 from its itch ' +
+    'page and save the file before release.',
   packs,
   items,
 };

@@ -14,7 +14,13 @@
     </div>
     <p class="gal-note" id="note"></p>
 
-    <div class="gal-controls">
+    <div class="gal-tabs">
+      <button class="chip" id="tab-plan" data-on="1">Plan</button>
+      <button class="chip" id="tab-browse">Browse all</button>
+      <button class="chip" id="tab-effects">Effects</button>
+    </div>
+
+    <div class="gal-controls" id="browse-controls" hidden>
       <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
       <div class="gal-chips" id="packs"></div>
       <div class="gal-chips" id="cats"></div>
@@ -27,7 +33,17 @@
     </div>
   </header>
 
-  <main class="gal-grid" id="grid"></main>
+  <main class="gal-grid" id="grid" hidden></main>
+  <main class="gal-plan" id="plan"></main>
+
+  <main class="gal-fx" id="effects" hidden>
+    <p class="gal-note">
+      The three things no pack supplies, shown in four states. These are the
+      real implementations from <code>src/render/effects.ts</code>, not
+      mock-ups, so what you review is what ships.
+    </p>
+    <div class="gal-fx__row" id="fx-row"></div>
+  </main>
 
   <aside class="gal-detail" id="detail" hidden>
     <button class="gal-detail__close" id="detail-close" aria-label="Close">×</button>
@@ -35,6 +51,28 @@
     <h2 id="detail-name"></h2>
     <dl class="gal-stats" id="detail-stats"></dl>
     <div class="gal-clips" id="detail-clips"></div>
+
+    <div id="detail-recolour" hidden>
+      <h3 class="gal-sub">Recolour</h3>
+      <p class="gal-hint">
+        Each body part is its own mesh, so tinting is per-part and the skin can
+        be left alone. Tint multiplies the atlas, so it shifts and darkens
+        well but cannot brighten a dark base.
+      </p>
+      <div class="gal-swatches" id="recolour-rows"></div>
+      <div class="gal-chips">
+        <button class="chip" id="recolour-preset-matthew">Matthew blue/gold</button>
+        <button class="chip" id="recolour-preset-aurora">Aurora purple/gold</button>
+        <button class="chip" id="recolour-reset">Reset</button>
+        <button class="chip" id="recolour-copy">Copy palette</button>
+      </div>
+    </div>
+
+    <div class="gal-chips" style="margin:12px 0">
+      <button class="chip" id="toggle-scale">Compare to Matthew</button>
+      <button class="chip" id="toggle-sparkle">Add sparkle</button>
+    </div>
+
     <button class="gal-pick" id="detail-pick">Pick this</button>
   </aside>
 
