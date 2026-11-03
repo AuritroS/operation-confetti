@@ -1,0 +1,199 @@
+/* ---- tokens ---------------------------------------------------------- */
+:root {
+  --ink: #eef2fb;
+  --ink-dim: #9fb0cc;
+  --bg: #0d1320;
+  --panel: rgba(16, 24, 40, 0.86);
+  --edge: rgba(190, 212, 255, 0.18);
+  --accent: #4da3ff;   /* Matthew blue */
+  --gold: #ffc54d;     /* Matthew gold */
+  --villain: #a46bff;  /* Aurora purple */
+  --danger: #ff5d6c;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+
+/* ---- reset ----------------------------------------------------------- */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 500 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  /* dvh keeps the frame correct while mobile browser chrome collapses */
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+#stage { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* ---- gameplay input surface -----------------------------------------
+   Only this element suppresses browser gestures. UI controls sit above it
+   and keep normal behaviour.                                            */
+#surface {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- HUD ------------------------------------------------------------- */
+.hud {
+  position: absolute;
+  z-index: 20;
+  top: calc(var(--safe-t) + 10px);
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  pointer-events: none;
+  display: grid;
+  gap: 8px;
+}
+
+.hud__row { display: flex; align-items: center; gap: 8px; }
+
+.hud__chip {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  backdrop-filter: blur(6px);
+}
+
+.hud__btn {
+  margin-left: auto;
+  pointer-events: auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.hud__progress {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.hud__progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+  transition: width 120ms linear;
+}
+
+/* ---- overlays -------------------------------------------------------- */
+.overlay, .rotate {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(6, 10, 18, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.overlay__card, .rotate__card {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  padding: 24px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+}
+
+.overlay__title { margin: 0 0 8px; font-size: 22px; }
+.overlay__body { margin: 0 0 18px; color: var(--ink-dim); }
+
+.overlay__btn {
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #06101f;
+  font: 700 15px/1 inherit;
+  cursor: pointer;
+}
+
+/* Portrait-only gameplay: show the rotate prompt in landscape on phones. */
+.rotate { display: none; }
+@media (orientation: landscape) and (max-height: 540px) {
+  .rotate:not([hidden]) { display: grid; }
+}
+
+/* ---- debug ----------------------------------------------------------- */
+.debug {
+  position: absolute;
+  z-index: 30;
+  left: calc(var(--safe-l) + 12px);
+  bottom: calc(var(--safe-b) + 12px);
+  font: 500 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-dim);
+  background: rgba(6, 10, 18, 0.6);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 7px 9px;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.debug[hidden] { display: none; }
+
+/* ---- probe harness --------------------------------------------------- */
+.probe {
+  position: absolute;
+  z-index: 20;
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  bottom: calc(var(--safe-b) + 12px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.probe button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 11px/1 ui-monospace, Menlo, monospace;
+  cursor: pointer;
+}
+
+.probe button[data-on="1"] { background: var(--accent); color: #06101f; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hud__progress-fill { transition: none; }
+}

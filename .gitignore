@@ -1,0 +1,22 @@
+# secrets
+.env
+.env.*
+!.env.example
+supabase.txt
+.dev.vars
+
+# deps / build
+node_modules/
+dist/
+.wrangler/
+*.tsbuildinfo
+
+# generated runtime assets (rebuilt by npm run assets:build)
+public/models/
+public/story/
+
+# os / editor
+.DS_Store
+**/.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,36 @@
+{
+  "name": "operation-confetti",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "worker:dev": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "db:push": "node tools/db-push.mjs",
+    "db:check": "node tools/db-push.mjs --check",
+    "assets:inspect": "node tools/inspect-glb.mjs",
+    "assets:build": "node tools/build-assets.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.1.1",
+    "@types/three": "^0.180.0",
+    "jsdom": "^25.0.1",
+    "sharp": "^0.34.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.95.0"
+  }
+}

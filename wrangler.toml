@@ -1,0 +1,23 @@
+name = "operation-confetti"
+main = "worker/index.ts"
+compatibility_date = "2025-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static build output is served by the Worker, so the game and its API share
+# one origin. No CORS, and the service-role key never reaches the browser.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "404-page"
+
+[[routes]]
+pattern = "operation-confetti.auritro.com"
+custom_domain = true
+
+[vars]
+SCORING_VERSION = "1"
+
+# Secrets are NOT stored here. Set them once with:
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# For local `wrangler dev`, put the same keys in .dev.vars (gitignored).

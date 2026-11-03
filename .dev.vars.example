@@ -1,0 +1,4 @@
+# Copy to .dev.vars for `wrangler dev`. Gitignored.
+# These are the same values the deployed Worker holds as secrets.
+SUPABASE_URL=https://zzgiojqublxhbyipyapd.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=

@@ -1,0 +1,13 @@
+# Normalise text, but never touch binary asset formats.
+* text=auto
+
+*.glb   binary
+*.fbx   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+
+# Vendored CC0 asset packs ship with CRLF; leave them exactly as downloaded
+# so the pinned baseline stays byte-identical to the source.
+assets/** -text
