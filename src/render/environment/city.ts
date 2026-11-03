@@ -13,7 +13,14 @@
  * Two scroll clocks for one visual is a bug waiting to happen, and the atlas
  * was already doing the job.
  */
-import { Color, Group, Mesh, MeshStandardMaterial, type Object3D } from 'three';
+import {
+  Color,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  PlaneGeometry,
+  type Object3D,
+} from 'three';
 import { PALETTE } from '../palette';
 import type { EnvironmentLayer, LayerContext } from './layer';
 import { RingPlacer } from './ring';
@@ -24,12 +31,29 @@ const SHAPES: PropId[] = ['buildingE', 'buildingA', 'buildingF', 'buildingB'];
 const PER_SIDE = 4;
 const SPACING = 34;
 
+/**
+ * Where a building first appears, in units ahead.
+ *
+ * Must sit past the fog horizon. The previous value was 70, where fog left
+ * buildings 85% visible, so they snapped into view at near-full opacity.
+ * At the current exponential density, 130 units is about 95% fogged — a
+ * building arriving there is invisible and fades in.
+ *
+ * Capped by the pool's period (PER_SIDE * SPACING = 136), which is why no
+ * extra geometry was needed to fix the popping.
+ */
+export const SPAWN_DISTANCE = 130;
+
+/** Street level, well below the roof. */
+const STREET_Y = -12;
+
 export class CityLayer implements EnvironmentLayer {
   readonly id = 'city' as const;
   readonly object = new Group();
 
   private readonly rings: { ring: RingPlacer; items: Object3D[] }[] = [];
   private readonly owned: Object3D[] = [];
+  private readonly street: Mesh;
 
   constructor(ctx: LayerContext) {
     for (const sign of [-1, 1] as const) {
@@ -38,18 +62,31 @@ export class CityLayer implements EnvironmentLayer {
         const prop = ctx.prop(SHAPES[(i + (sign > 0 ? 2 : 0)) % SHAPES.length] as PropId);
         if (!prop) continue;
         litWindows(prop);
-        // Sunk below the rooftop so only their upper floors show past the
-        // parapet, which is what selling "you are on a roof" requires.
-        // Set well back and sunk deep, so only upper floors clear the
-        // parapet. Close buildings read as a street, not a rooftop.
-        prop.position.set(sign * (ctx.corridor.edge + 11 + (i % 2) * 4), -11.5, 0);
+        // Set well back and based below street level, so only upper floors
+        // clear the parapet and the facades meet the ground instead of
+        // ending in mid-air. Close buildings read as a street, not a roof.
+        prop.position.set(sign * (ctx.corridor.edge + 11 + (i % 2) * 4), STREET_Y - 0.5, 0);
         items.push(prop);
         this.object.add(prop);
         this.owned.push(prop);
       }
-      this.rings.push({ ring: new RingPlacer(items, SPACING, 70, 1), items });
+      this.rings.push({ ring: new RingPlacer(items, SPACING, SPAWN_DISTANCE, 1), items });
     }
 
+    /**
+     * The street.
+     *
+     * Everything below the roof was standing in void: building bases ended
+     * in mid-air, and the parked car and lamp posts floated. One dark plane
+     * grounds all of it, for one draw call and two triangles.
+     */
+    this.street = new Mesh(
+      new PlaneGeometry(190, 420),
+      new MeshStandardMaterial({ color: PALETTE.ink, roughness: 1 }),
+    );
+    this.street.rotation.x = -Math.PI / 2;
+    this.street.position.set(0, STREET_Y, -120);
+    this.object.add(this.street);
   }
 
   update(travelled: number): void {
@@ -62,6 +99,9 @@ export class CityLayer implements EnvironmentLayer {
 
   dispose(): void {
     disposeTree(this.owned);
+    this.street.geometry.dispose();
+    (this.street.material as MeshStandardMaterial).dispose();
+    this.street.removeFromParent();
     this.object.removeFromParent();
   }
 }

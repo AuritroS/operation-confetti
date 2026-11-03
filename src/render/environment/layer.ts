@@ -10,7 +10,15 @@
  */
 import type { Object3D } from 'three';
 
-export const LAYER_IDS = ['sky', 'skyline', 'city', 'rooftop', 'clutter', 'atmosphere'] as const;
+export const LAYER_IDS = [
+  'sky',
+  'clouds',
+  'skyline',
+  'city',
+  'rooftop',
+  'clutter',
+  'atmosphere',
+] as const;
 
 export type LayerId = (typeof LAYER_IDS)[number];
 

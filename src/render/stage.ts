@@ -7,7 +7,7 @@
 import {
   Color,
   DirectionalLight,
-  Fog,
+  FogExp2,
   HemisphereLight,
   PerspectiveCamera,
   Scene,
@@ -16,6 +16,9 @@ import {
 import { PALETTE } from './palette';
 
 export const MAX_PIXEL_RATIO = 1.5;
+
+/** Exponential fog density. Exported so spawn distances can be checked. */
+export const FOG_DENSITY = 0.013;
 
 export class Stage {
   readonly renderer: WebGLRenderer;
@@ -35,10 +38,20 @@ export class Stage {
 
     this.scene = new Scene();
     this.scene.background = new Color(PALETTE.ink);
-    // Far plane well past the skyline. At 64 the fog painted out the entire
-    // distant city and the CN Tower, deleting the depth cue the skyline layer
-    // exists to provide. Near stays close so the route still fades.
-    this.scene.fog = new Fog(PALETTE.ink, 45, 210);
+    /**
+     * Exponential rather than linear.
+     *
+     * Linear fog has a hard onset: nothing is fogged at 44 units and fog
+     * begins abruptly at 45, and that discontinuity is visible as a band
+     * where the world suddenly starts to fade. Exp2 falls off smoothly from
+     * the camera with no onset at all, for identical shader cost.
+     *
+     * At this density: ~35% fogged at 50 units, ~85% at 100, ~99% at 160 —
+     * so anything spawning past 130 is invisible when it appears and fades
+     * in rather than popping. The skyline opts out of fog entirely, because
+     * a backdrop this dense would erase it.
+     */
+    this.scene.fog = new FogExp2(PALETTE.ink, FOG_DENSITY);
 
     this.camera = new PerspectiveCamera(58, 1, 0.1, 160);
 
@@ -85,6 +98,11 @@ export class Stage {
   }
 
   readonly resize = (): void => {
+    // The parent is the portrait frame, which CSS letterboxes on wide
+    // screens, so these dimensions are already the playfield rather than the
+    // window. Desktop and phone therefore see an identical field of view —
+    // previously desktop saw 75 degrees horizontally against the phone's 32,
+    // which is why side content read as floating there and not on mobile.
     const parent = this.canvas.parentElement;
     const w = Math.max(1, Math.round(parent?.clientWidth ?? window.innerWidth));
     const h = Math.max(1, Math.round(parent?.clientHeight ?? window.innerHeight));

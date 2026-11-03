@@ -27,9 +27,20 @@ const SHAPES: PropId[] = ['buildingC', 'buildingD', 'buildingE', 'buildingF', 'b
  * Depth also does the parallax for free: at this range the band barely needs
  * to move to feel fixed, which is what makes it read as distance.
  */
-const BAND_NEAR = 70;
-const BAND_FAR = 205;
+export const BAND_NEAR = 70;
+export const BAND_FAR = 205;
 const COUNT = 16;
+
+/**
+ * Total drift across the whole route, so the band never has to wrap.
+ *
+ * The skyline used to vanish at 70 units — where fog still left it 85%
+ * visible — and reappear at 205. Sizing the band for the full journey
+ * removes the transition entirely rather than hiding it: 450 units of route
+ * at 0.12 parallax is 54 units of drift, so a band extended by that much
+ * carries the player to the vault without a single wrap.
+ */
+export const DRIFT_RATE = 0.12;
 
 export class SkylineLayer implements EnvironmentLayer {
   readonly id = 'skyline' as const;
@@ -53,6 +64,10 @@ export class SkylineLayer implements EnvironmentLayer {
       const x = side * spread;
 
       darken(prop, 0.3 + t * 0.14);
+      // Out of fog. Exponential fog dense enough to hide the city spawn
+      // would erase the skyline completely, so the backdrop handles its own
+      // distance falloff through the darkening above.
+      unfog(prop);
       prop.scale.multiplyScalar(0.9 + ((i * 11) % 5) * 0.2);
       prop.position.set(x, -4, z);
       this.items.push(prop);
@@ -65,22 +80,25 @@ export class SkylineLayer implements EnvironmentLayer {
     this.tower = buildCnTower(52);
     this.tower.position.set(-26, -4, -165);
     darken(this.tower, 0.5);
+    unfog(this.tower);
     this.object.add(this.tower);
   }
 
+  /**
+   * Slow drift, and deliberately no wrap.
+   *
+   * The band is far enough that full-speed scrolling would read as a wall
+   * rushing past rather than a distant city, and it is long enough that the
+   * route finishes before anything would need recycling.
+   */
   update(travelled: number): void {
-    // Slow drift only. The band is far enough that full-speed scrolling would
-    // read as a wall rushing past rather than a distant city.
+    const drift = travelled * DRIFT_RATE;
     for (const [i, item] of this.items.entries()) {
       const anchor = this.anchors[i];
       if (!anchor) continue;
-      const span = BAND_FAR - BAND_NEAR;
-      const drift = (travelled * 0.12) % span;
-      let z = anchor.z + drift;
-      if (z > -BAND_NEAR) z -= span;
-      item.position.z = z;
+      item.position.z = anchor.z + drift;
     }
-    this.tower.position.z = -165 + ((travelled * 0.05) % 90);
+    this.tower.position.z = -165 + travelled * 0.05;
   }
 
   dispose(): void {
@@ -101,6 +119,17 @@ export function darken(root: Object3D, amount: number): void {
     cloned.color.lerp(sky, 1 - amount);
     cloned.roughness = 1;
     mesh.material = cloned;
+  });
+}
+
+/** Opt a subtree out of scene fog, for anything acting as a backdrop. */
+export function unfog(root: Object3D): void {
+  root.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      (m as MeshStandardMaterial).fog = false;
+    }
   });
 }
 

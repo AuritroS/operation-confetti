@@ -12,6 +12,17 @@ import {
 } from '../src/render/environment/placement';
 import { PROPS, PROP_IDS } from '../src/render/environment/props';
 import { LAYER_IDS } from '../src/render/environment/layer';
+
+// Imported, never mirrored. A copied literal would drift from the source and
+// the assertion would quietly stop meaning anything.
+import { FOG_DENSITY } from '../src/render/stage';
+import { SPAWN_DISTANCE as CITY_SPAWN } from '../src/render/environment/city';
+import { SPAWN_DISTANCE as CLUTTER_SPAWN } from '../src/render/environment/clutter';
+import {
+  BAND_FAR as SKYLINE_BAND_FAR,
+  BAND_NEAR as SKYLINE_BAND_NEAR,
+  DRIFT_RATE as SKYLINE_DRIFT_RATE,
+} from '../src/render/environment/skyline';
 import { Environment, requestedLayers } from '../src/render/environment';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Object3D } from 'three';
@@ -232,4 +243,40 @@ describe('the environment stays inside its budget', () => {
     expect(env.layers.map((l) => l.id)).toEqual(['sky', 'rooftop']);
     env.dispose();
   }, 60_000);
+});
+
+describe('nothing appears or vanishes in plain view', () => {
+  /**
+   * Exponential fog factor, matching three's FogExp2:
+   *   1 - exp(-(density * distance)^2)
+   */
+  function fogged(distance: number, density = FOG_DENSITY): number {
+    return 1 - Math.exp(-Math.pow(density * distance, 2));
+  }
+
+  it('spawns every recycled layer past the fog horizon', () => {
+    // Every layer used to transition at 70 units, where the old linear fog
+    // left 85% visibility — so buildings and props snapped into view at near
+    // full opacity. A spawn is only invisible if the fog has already taken
+    // it, so assert that rather than trusting the tuned numbers to stay put.
+    const spawns: [string, number][] = [
+      ['city', CITY_SPAWN],
+      ['clutter', CLUTTER_SPAWN],
+    ];
+    for (const [layer, distance] of spawns) {
+      expect(fogged(distance), `${layer} spawns at ${distance} units`).toBeGreaterThan(0.92);
+    }
+  });
+
+  it('keeps the fog gentle where the player actually looks', () => {
+    // The near route must not be washed out just to hide the spawn.
+    expect(fogged(20)).toBeLessThan(0.1);
+    expect(fogged(40)).toBeLessThan(0.3);
+  });
+
+  it('sizes the skyline band so the route never forces a wrap', () => {
+    // A wrap is a pop by another name. The band only has to outlast the run.
+    const drift = LEVEL_1.routeLength * SKYLINE_DRIFT_RATE;
+    expect(drift).toBeLessThan(SKYLINE_BAND_FAR - SKYLINE_BAND_NEAR);
+  });
 });

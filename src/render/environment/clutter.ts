@@ -44,12 +44,19 @@ const ARRANGEMENT: ClutterSpec[] = [
 
 /** Street level, well below the roof: the Interpol nod and lamp posts. */
 const STREET: ClutterSpec[] = [
-  { prop: 'carPolice', placement: { side: 'left', beyond: 5.2, z: 36, y: -9.4 } },
-  { prop: 'streetlight', placement: { side: 'right', beyond: 4.6, z: 70, y: -9.4 } },
-  { prop: 'streetlight', placement: { side: 'left', beyond: 4.6, z: 128, y: -9.4 } },
+  // Standing on the street plane the city layer provides, at y = -12.
+  { prop: 'carPolice', placement: { side: 'left', beyond: 5.2, z: 36, y: -12 } },
+  { prop: 'streetlight', placement: { side: 'right', beyond: 4.6, z: 70, y: -12 } },
+  { prop: 'streetlight', placement: { side: 'left', beyond: 4.6, z: 128, y: -12 } },
 ];
 
 const PERIOD = 164;
+
+/**
+ * Where clutter first appears. Past the fog horizon, for the same reason as
+ * the city: at 70 units props snapped in at 85% visibility.
+ */
+export const SPAWN_DISTANCE = 150;
 
 export class ClutterLayer implements EnvironmentLayer {
   readonly id = 'clutter' as const;
@@ -84,7 +91,7 @@ export class ClutterLayer implements EnvironmentLayer {
     for (const [i, item] of this.items.entries()) {
       const base = this.baseZ[i] ?? 0;
       const ahead = ((base - travelled) % PERIOD + PERIOD) % PERIOD;
-      item.position.z = -(ahead > 70 ? ahead - PERIOD : ahead);
+      item.position.z = -(ahead > SPAWN_DISTANCE ? ahead - PERIOD : ahead);
     }
   }
 

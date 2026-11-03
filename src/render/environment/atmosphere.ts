@@ -18,6 +18,7 @@ import {
   PointsMaterial,
 } from 'three';
 import { PALETTE } from '../palette';
+import { dotTexture } from '../effects';
 import type { EnvironmentLayer } from './layer';
 
 const COUNT = 60;
@@ -55,11 +56,17 @@ export class AtmosphereLayer implements EnvironmentLayer {
       geometry,
       new PointsMaterial({
         color: new Color(PALETTE.gold),
-        size: 0.09,
+        size: 0.07,
+        // Without a map, points render as hard squares — a fleck near the
+        // camera read as a solid tan tile hanging in the sky. The shared soft
+        // dot gives them edges that fade.
+        map: dotTexture(),
         transparent: true,
         opacity: this.reduced ? 0.25 : 0.55,
         blending: AdditiveBlending,
         depthWrite: false,
+        // Backdrop-adjacent: dense fog would swallow the drift entirely.
+        fog: false,
       }),
     );
     this.points.frustumCulled = false;

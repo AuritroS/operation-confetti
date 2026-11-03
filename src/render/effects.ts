@@ -42,7 +42,7 @@ let sharedDot: Texture | null = null;
  * Generated rather than shipped: it is 64x64 of pure gradient, so a PNG would
  * cost a request and a decode for something a canvas draws in microseconds.
  */
-function dotTexture(): Texture {
+export function dotTexture(): Texture {
   if (sharedDot) return sharedDot;
   const size = 64;
   const canvas = document.createElement('canvas');

@@ -19,6 +19,7 @@ import { corridorOf, type CorridorGeometry } from './placement';
 import { PROPS, type PropId } from './props';
 import { LAYER_IDS, type EnvironmentLayer, type LayerContext, type LayerId } from './layer';
 import { SkyLayer } from './sky';
+import { CloudsLayer } from './clouds';
 import { SkylineLayer } from './skyline';
 import { CityLayer } from './city';
 import { RooftopLayer } from './rooftop';
@@ -74,7 +75,8 @@ export class Environment {
 
     // Only fetch what the enabled layers could ask for. With ?layers=sky this
     // skips every prop download, which keeps a single-layer review fast.
-    if (enabled.size > 0 && !(enabled.size === 1 && enabled.has('sky'))) {
+    const needsProps = [...enabled].some((id) => id !== 'sky' && id !== 'clouds' && id !== 'atmosphere');
+    if (needsProps) {
       await Promise.all(
         (Object.keys(PROPS) as PropId[]).map(async (id) => {
           try {
@@ -97,6 +99,7 @@ export class Environment {
 
     const factories: Record<LayerId, () => EnvironmentLayer> = {
       sky: () => new SkyLayer(),
+      clouds: () => new CloudsLayer(),
       skyline: () => new SkylineLayer(ctx),
       city: () => new CityLayer(ctx),
       rooftop: () => new RooftopLayer(ctx),
