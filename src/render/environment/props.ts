@@ -67,11 +67,9 @@ export const PROPS = {
    * legibility wins over strict scale for the one object the player has to
    * see and decide about.
    */
-  gift: P('present_A_blue', 1.05, [0.55, 0.9], 'scored collectible'),
+  gift: P('present_A_yellow', 1.05, [0.55, 0.9], 'scored collectible'),
   /** Dressing, so it keeps the honest proportion. */
   giftDecor: P('present_C_red', 0.72, [0.25, 0.5], 'non-interactive dressing'),
-  snowman: P('snowman_A', 0.61, [1.0, 1.6], 'physical hazard blocker'),
-  cannon: P('snowball_cannon', 1.41, [0.8, 1.3], 'turret hazard, confetti blaster'),
   bell: P('bell_decorated', 0.68, [0.6, 1.0], 'hit feedback'),
   candycane: P('candycane_small', 0.86, [0.4, 0.7], 'grapple hook'),
 } as const;

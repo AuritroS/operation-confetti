@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { Group, InstancedMesh, Points } from 'three';
+import { InstancedMesh, Points } from 'three';
 import { LevelRunner } from '../src/levels/runner';
 import { LEVEL_1 } from '../src/levels/level1';
-import { EntityVisuals } from '../src/render/entities';
+import { DRAW_DISTANCE, EntityVisuals } from '../src/render/entities';
+
+/** Mirrors the pool size in entities.ts; small and fixed by design. */
+const SPOTLIGHT_POOL = 3;
 
 /**
  * The gameplay visuals are batched on purpose, and these tests are what stop
@@ -41,15 +44,24 @@ describe('gameplay visuals are batched', () => {
     visuals.dispose();
   });
 
-  it('creates no object per laser beyond the shared batch', () => {
+  it('creates no object per batched hazard', () => {
     const { visuals } = build();
-    const lasers = LEVEL_1.entities.filter((e) => e.style === 'laser').length;
-    const others = LEVEL_1.entities.length - lasers;
+    const gifts = LEVEL_1.entities.filter((e) => e.kind === 'gift').length;
+    const batched = LEVEL_1.entities.filter(
+      (e) => e.style === 'laser' || e.style === 'fence',
+    ).length;
+    const spotlights = LEVEL_1.entities.filter((e) => e.style === 'spotlight').length;
 
-    // One child per non-laser entity, plus the laser batch and the sparkle
-    // field. Anything more means something stopped being pooled.
-    expect(visuals.group.children.length).toBe(others + 2);
-    visuals.dispose();
+    expect(batched, 'the level should contain batched hazards').toBeGreaterThan(2);
+    expect(spotlights, 'the level should contain spotlights').toBeGreaterThan(2);
+
+    // One child per gift, plus the shared bar batch, the sparkle field, and
+    // a fixed pool of cones. Crucially: nothing scales with the number of
+    // lasers, fences or spotlights.
+    const perEntity = visuals.group.children.length - gifts;
+    expect(perEntity, 'batched hazards must not add children').toBeLessThanOrEqual(
+      2 + SPOTLIGHT_POOL,
+    );
   });
 
   it('releases everything on dispose, so a replay cannot accumulate', () => {
@@ -85,6 +97,48 @@ describe('gameplay visuals are batched', () => {
       visuals.update(runner.tracked, 1 / 60);
     }
     expect(gift?.state).toBe('collected');
+    visuals.dispose();
+  });
+});
+
+describe('gameplay visuals track the simulation', () => {
+  it('places each drawn entity in its own lane', () => {
+    const { visuals, runner } = build();
+    visuals.update(runner.tracked, 1 / 60);
+
+    const laneX = (lane: number): number =>
+      (lane - (LEVEL_1.laneCount - 1) / 2) * LEVEL_1.laneWidth;
+
+    // Gifts are the entities that keep their own object; hazards are batched.
+    for (const t of runner.tracked.filter((x) => x.entity.kind === 'gift')) {
+      const object = visuals.objectFor(t.entity.id);
+      expect(object, `no visual for ${t.entity.id}`).not.toBeNull();
+      expect(object?.position.x, `${t.entity.id} lane`).toBeCloseTo(laneX(t.entity.lane), 6);
+    }
+    visuals.dispose();
+  });
+
+  it('brings an approaching gift closer as the route advances', () => {
+    const { visuals, runner } = build();
+    const gift = runner.tracked.find((t) => t.entity.kind === 'gift' && t.entity.z > 60);
+    expect(gift).toBeDefined();
+
+    // Advance until it is inside draw distance, then sample.
+    while ((gift?.relativeZ ?? 0) >= DRAW_DISTANCE && !runner.isComplete) {
+      runner.update(1 / 60);
+      visuals.update(runner.tracked, 1 / 60);
+    }
+    const mesh = visuals.objectFor(gift?.entity.id ?? '');
+    expect(mesh).not.toBeNull();
+    const startZ = mesh?.position.z ?? 0;
+
+    for (let i = 0; i < 60; i++) {
+      runner.update(1 / 60);
+      visuals.update(runner.tracked, 1 / 60);
+    }
+    // position.z is -relativeZ, so closing the distance raises it toward 0.
+    expect(mesh?.position.z ?? 0).toBeGreaterThan(startZ);
+    expect(gift?.relativeZ ?? 0).toBeLessThan(gift?.entity.z ?? 0);
     visuals.dispose();
   });
 });

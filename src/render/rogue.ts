@@ -112,6 +112,16 @@ class RogueVisual implements PlayerVisual {
   /** Seconds left of a one-shot, during which the movement clip is held off. */
   private oneShot = 0;
 
+  setLean(amount: number): void {
+    // Roll into the turn, with a little yaw so the shoulders lead it.
+    this.object.rotation.z = -amount * 0.26;
+    this.object.rotation.y = amount * 0.14;
+  }
+
+  setBlink(hidden: boolean): void {
+    this.object.visible = !hidden;
+  }
+
   playOneShot(clip: string): void {
     if (!this.actor.play(clip, { loop: false, clampWhenFinished: false, fade: 0.08 })) return;
     // Long enough to read, short enough not to fight the run cycle. The

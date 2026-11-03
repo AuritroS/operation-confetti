@@ -40,11 +40,9 @@ const COPY = [];
  * makes them self-contained and lets the atlas be embedded once per prop.
  */
 const CONVERT = [
-  `${HOLIDAY}/present_A_blue.gltf`,
+  `${HOLIDAY}/present_A_yellow.gltf`,
   `${HOLIDAY}/present_C_red.gltf`,
   `${HOLIDAY}/candycane_small.gltf`,
-  `${HOLIDAY}/snowball_cannon.gltf`,
-  `${HOLIDAY}/snowman_A.gltf`,
   `${HOLIDAY}/bell_decorated.gltf`,
   `${CITY}/watertower.gltf`,
   `${CITY}/streetlight.gltf`,

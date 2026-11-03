@@ -54,6 +54,20 @@ export class LaneRunner {
     return this.t < 1;
   }
 
+  /**
+   * Signed lean for the slide, -1 to 1, peaking mid-move and zero at rest.
+   *
+   * There is no strafe clip in the free animation tier, so the lane change is
+   * sold by banking the character into the turn. Derived here rather than
+   * differenced in the renderer so it is exact and can be tested — and like
+   * `renderX`, it is presentation only: collisions read `laneIndex`.
+   */
+  get lean(): number {
+    if (this.t >= 1) return 0;
+    const direction = Math.sign(this.index - this.from);
+    return direction * Math.sin(Math.PI * this.t);
+  }
+
   laneToX(lane: number): number {
     return (lane - (this.laneCount - 1) / 2) * this.laneWidth;
   }

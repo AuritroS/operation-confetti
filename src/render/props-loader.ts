@@ -11,7 +11,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PROPS, type PropId } from './environment/props';
 
 /** Props gameplay uses. Loading only these keeps the first run quick. */
-const NEEDED: PropId[] = ['gift', 'cannon', 'snowman', 'bell'];
+const NEEDED: PropId[] = ['gift', 'bell'];
 
 export type PropProvider = (id: PropId) => Object3D | null;
 

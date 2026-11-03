@@ -20,7 +20,6 @@ import { LEVEL_1 } from './levels/level1';
 import { Stage } from './render/stage';
 import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from './render/primitives';
 import { EntityVisuals } from './render/entities';
-import { GuardPool } from './render/guards';
 import { loadGameplayProps, type PropProvider } from './render/props-loader';
 import { buildVaultDoor } from './render/custom';
 import { CLIPS } from './assets/manifest';
@@ -62,7 +61,6 @@ let gameplayProps: PropProvider = () => null;
 
 let runner = new LevelRunner(LEVEL_1);
 let entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked, gameplayProps);
-let guards: GuardPool | null = null;
 
 /** The route endpoint, revealed as the vault comes into range. */
 const vault = buildVaultDoor(LEVEL_1.laneWidth * LEVEL_1.laneCount, 3.6);
@@ -147,8 +145,12 @@ function update(step: number): void {
 
   const snap = runner.snapshot;
   environment?.update(snap.travelled, step);
-  guards?.update(runner.tracked, step);
   player.setHitFlash(snap.invulnerable);
+  // Bank into the lane change; there is no strafe clip to play instead.
+  player.setLean(runner.lanes.lean);
+  // Blink while protected. An emissive flash alone was easy to miss, and the
+  // doc wants damage legible without sound (§12 Phase 4).
+  player.setBlink(snap.invulnerable && Math.floor(snap.travelled * 9) % 2 === 0);
   player.update(step, true);
 
   // The vault grows out of the fog as the route ends, so the run has a
@@ -298,6 +300,8 @@ function resetRun(): void {
 
   lastIncidents = 0;
   bellSwing = 0;
+  player.setBlink(false);
+  player.setLean(0);
   run.score = 0;
   run.events = [];
   run.finished = false;
@@ -377,15 +381,6 @@ void loadGameplayProps()
     console.info('[props] gameplay props ready');
   })
   .catch((e) => console.error('[props] load failed; keeping primitives', e));
-
-void GuardPool.load(LEVEL_1)
-  .then((pool) => {
-    if (!pool) return;
-    guards = pool;
-    world.add(pool.group);
-    console.info('[guards] pool ready');
-  })
-  .catch((e) => console.error('[guards] load failed', e));
 
 // Load the real character without blocking play.
 void loadRoguePlayer()

@@ -48,6 +48,10 @@ export interface PlayerVisual {
    * reaction. A no-op where there is no skeleton.
    */
   playOneShot(clip: string): void;
+  /** Bank into a lane change. -1 to 1; zero is upright. */
+  setLean(amount: number): void;
+  /** Blink during invulnerability — the standard i-frame read. */
+  setBlink(hidden: boolean): void;
   dispose(): void;
 }
 
@@ -237,6 +241,12 @@ export function makeCapsulePlayer(): PlayerVisual {
     },
     playOneShot(): void {
       /* a capsule has no skeleton to react with */
+    },
+    setLean(amount: number): void {
+      group.rotation.z = -amount * 0.3;
+    },
+    setBlink(hidden: boolean): void {
+      group.visible = !hidden;
     },
     dispose(): void {
       mesh.geometry.dispose();

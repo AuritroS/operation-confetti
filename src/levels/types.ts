@@ -8,25 +8,44 @@
  */
 
 /**
- * `guard` is a hazard like `obstacle`, with identical collision semantics.
- * The difference is presentational: a guard telegraphs its lane with a
- * searchlight before the player reaches it.
+ * Two kinds only.
  *
- * Its lane is authored, never chosen at runtime. The doc forbids targeting a
- * lane on hidden last-millisecond input (§7), and the simplest way to be
- * certain of that is to give the simulation no way to decide.
+ * Guards were removed: a pool of skinned characters cost up to 16 draw calls
+ * and two mixers to deliver a threat the searchlight already conveys on its
+ * own — and a spotlight is the more iconic thief-game danger anyway. Every
+ * hazard is now procedural and magenta, which is what makes the "avoid"
+ * signal unambiguous.
  */
-export type EntityKind = 'gift' | 'obstacle' | 'guard';
+export type EntityKind = 'gift' | 'hazard';
 
-/** Hazard kinds, which cost an incident on contact. */
-export const HAZARD_KINDS: readonly EntityKind[] = ['obstacle', 'guard'];
+/**
+ * How a hazard is drawn. Purely presentational: all three share one collider
+ * and one penalty, so the shape can never change the difficulty.
+ *
+ *   laser     two horizontal beams across the lane
+ *   fence     vertical pillars filling the lane
+ *   spotlight a cone that sweeps, locks to the lane, then strikes
+ *
+ * Distinct silhouettes in one colour, so the kind is readable at a glance
+ * while the meaning never is in doubt. An earlier turret used a pack mesh and
+ * failed exactly that test: a small beige object on a dark roof reads as
+ * scenery.
+ */
+export type HazardStyle = 'laser' | 'fence' | 'spotlight';
 
-export function isHazard(kind: EntityKind): boolean {
-  return HAZARD_KINDS.includes(kind);
-}
-
-/** How a hazard is presented. Gameplay reads none of this. */
-export type HazardStyle = 'laser' | 'turret' | 'blocker';
+/** Hazard collision half-depths along the route, in world units. */
+/**
+ * Collision half-depths along the route axis, in world units.
+ *
+ * Contact is |entityZ - travelled| < playerHalfDepth + the kind's half-depth.
+ * At 7.5 u/s a 60 Hz step advances 0.125 units, so the window is eight steps
+ * wide and nothing passes through untested — no swept test needed.
+ */
+export const HALF_DEPTH = {
+  player: 0.45,
+  gift: 0.55,
+  hazard: 0.55,
+} as const;
 
 export interface RouteEntity {
   /** Stable id. Used to mark an entity resolved so it cannot score twice. */
@@ -41,12 +60,13 @@ export interface RouteEntity {
    * tutorial demonstration and must stay outside the four scored gifts (§5).
    */
   readonly scored: boolean;
-  /**
-   * Visual treatment for a hazard. Purely presentational: every style has the
-   * same collider and the same penalty, so changing one cannot alter
-   * difficulty.
-   */
   readonly style?: HazardStyle;
+  /**
+   * Spotlights only: how far ahead the cone commits to its lane, in units.
+   * Shorter means less warning, which is the difficulty dial for act three.
+   * Never below the reaction floor; a test enforces that.
+   */
+  readonly lockLead?: number;
 }
 
 export interface LevelConfig {
@@ -63,19 +83,12 @@ export interface LevelConfig {
 }
 
 /**
- * Collision half-depths along the route axis, in world units.
+ * Minimum reaction time, in seconds (design doc §5).
  *
- * Contact is tested as |entityZ - travelled| < playerHalfDepth + half-depth
- * for the kind. At 7.5 u/s a 60 Hz step advances 0.125 units, so the smallest
- * window here is still eight steps wide and nothing can pass through
- * untested — no swept test or physics engine needed.
+ * Every gap between encounters and every spotlight lock lead is checked
+ * against this, so tightening the ramp cannot quietly make the level unfair.
  */
-export const HALF_DEPTH = {
-  player: 0.45,
-  gift: 0.55,
-  obstacle: 0.55,
-  guard: 0.6,
-} as const;
+export const MIN_REACTION_SECONDS = 1.2;
 
 /** Number of scored gifts expected per level, for HUD and validation. */
 export function scoredGiftCount(level: LevelConfig): number {

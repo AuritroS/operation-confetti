@@ -360,6 +360,8 @@ export class Searchlight {
   private state: SearchlightState = 'sweeping';
   private time = 0;
   private lane = 0;
+  /** 0 fully faded, 1 full strength. Set by distance to the player. */
+  private proximity = 1;
 
   constructor(
     private readonly laneCount = 3,
@@ -420,6 +422,16 @@ export class Searchlight {
     this.time = 0;
   }
 
+  /**
+   * Scale the cone's strength by how close it is.
+   *
+   * A light cone at full opacity a couple of units from the camera is a flat
+   * magenta wall that hides the very lane the player is trying to reach.
+   */
+  setProximityFade(amount: number): void {
+    this.proximity = Math.min(1, Math.max(0, amount));
+  }
+
   private laneX(lane: number): number {
     return (lane - (this.laneCount - 1) / 2) * this.laneWidth;
   }
@@ -432,8 +444,8 @@ export class Searchlight {
       // settles anywhere.
       const span = ((this.laneCount - 1) / 2) * this.laneWidth;
       this.group.position.x = Math.sin(this.time * 1.1) * span;
-      this.material.opacity = 0.15;
-      this.poolMaterial.opacity = 0.26;
+      this.material.opacity = 0.13 * this.proximity;
+      this.poolMaterial.opacity = 0.24 * this.proximity;
       return;
     }
 
@@ -443,11 +455,13 @@ export class Searchlight {
 
     if (this.state === 'locked') {
       const pulse = 0.5 + Math.sin(this.time * 16) * 0.5;
-      this.material.opacity = 0.2 + pulse * 0.16;
-      this.poolMaterial.opacity = 0.34 + pulse * 0.3;
+      this.material.opacity = (0.16 + pulse * 0.12) * this.proximity;
+      this.poolMaterial.opacity = (0.3 + pulse * 0.26) * this.proximity;
     } else {
-      this.material.opacity = 0.52;
-      this.poolMaterial.opacity = 0.85;
+      // Striking. The pool on the ground carries the hit, not the cone:
+      // the floor marker says which lane without blinding the player.
+      this.material.opacity = 0.26 * this.proximity;
+      this.poolMaterial.opacity = 0.8 * this.proximity;
     }
   }
 

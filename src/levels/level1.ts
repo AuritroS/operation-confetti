@@ -25,50 +25,55 @@ import type { LevelConfig, RouteEntity } from './types';
 const LANES = { left: 0, middle: 1, right: 2 } as const;
 
 /**
- * Authored route.
+ * Authored route, built as three acts that ramp.
  *
- * Teaching comes first: an unscored demonstration gift in the lane the player
- * already occupies, then an unscored one requiring a single sideways move, and
- * only then the first hazard (§5). Neither counts toward the four scored
- * gifts.
+ * The levers are variety, spacing, telegraph length and how many lanes a
+ * single encounter closes. No new mechanic is introduced partway through —
+ * the player learns one verb and the level keeps finding new questions to
+ * ask with it.
  *
- * Gifts sit in lanes that often differ from the safe line, so collecting one
- * is a decision rather than something that happens automatically.
+ *   ACT 1  0-150   learn      one hazard type, 33-35u gaps (4.5s)
+ *   ACT 2  150-320 combine    all three types, 27-32u gaps (4s), 30u locks
+ *   ACT 3  320-487 pressure   two lanes closed at once, 23-26u gaps (3.2s),
+ *                             20u locks
  *
- * Guard lanes are fixed here and never chosen at runtime. The searchlight
- * locks to the authored lane well before contact, which is what satisfies
- * "telegraphs commit to a lane before impact" by construction.
+ * Even at the tightest, 2.7 seconds of warning is well past the 1.2s floor.
+ * Two invariants are enforced by test rather than inspection: no encounter
+ * ever closes all three lanes, and no gap or lock lead falls under the floor.
+ *
+ * Teaching comes first: two unscored gifts, the second needing a sideways
+ * move, before any hazard exists (§5). Neither counts toward the four scored
+ * gifts, so the 600-point maximum is unchanged.
  */
 const entities: RouteEntity[] = [
-  // --- teaching: free, unscored, no hazards yet -------------------------
+  // ===== ACT 1 — learn ==================================================
   { id: 't1', kind: 'gift', z: 26, lane: LANES.middle, scored: false },
   { id: 't2', kind: 'gift', z: 53, lane: LANES.right, scored: false },
-
-  // --- first scored gift, still no hazard -------------------------------
   { id: 'g1', kind: 'gift', z: 83, lane: LANES.middle, scored: true },
+  // First hazard, and the only kind in this act.
+  { id: 'h1', kind: 'hazard', z: 120, lane: LANES.left, scored: false, style: 'laser' },
 
-  // --- first hazard: a laser on the left, gift waiting right ------------
-  { id: 'h1', kind: 'obstacle', z: 120, lane: LANES.left, scored: false, style: 'laser' },
+  // ===== ACT 2 — combine ================================================
   { id: 'g2', kind: 'gift', z: 153, lane: LANES.right, scored: true },
+  // First spotlight, with the longest warning it ever gives.
+  { id: 'h2', kind: 'hazard', z: 185, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 30 },
+  { id: 'h3', kind: 'hazard', z: 218, lane: LANES.middle, scored: false, style: 'fence' },
+  { id: 'g3', kind: 'gift', z: 248, lane: LANES.left, scored: true },
+  { id: 'h4', kind: 'hazard', z: 278, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 30 },
+  { id: 'h5', kind: 'hazard', z: 305, lane: LANES.right, scored: false, style: 'laser' },
 
-  // --- first guard: commits to the right, so the gift above costs a move -
-  { id: 'd1', kind: 'guard', z: 187, lane: LANES.right, scored: false },
-
-  // --- turret in the middle; either side is safe ------------------------
-  { id: 'h2', kind: 'obstacle', z: 222, lane: LANES.middle, scored: false, style: 'turret' },
-  { id: 'g3', kind: 'gift', z: 251, lane: LANES.left, scored: true },
-
-  // --- guard on the left, forcing a move off the gift lane --------------
-  { id: 'd2', kind: 'guard', z: 284, lane: LANES.left, scored: false },
-
-  // --- blocker, then a laser, then the last gift behind them ------------
-  { id: 'h3', kind: 'obstacle', z: 316, lane: LANES.right, scored: false, style: 'blocker' },
-  { id: 'd3', kind: 'guard', z: 347, lane: LANES.middle, scored: false },
-  { id: 'h4', kind: 'obstacle', z: 380, lane: LANES.left, scored: false, style: 'laser' },
-  { id: 'g4', kind: 'gift', z: 411, lane: LANES.middle, scored: true },
-
-  // --- final guard before the vault -------------------------------------
-  { id: 'd4', kind: 'guard', z: 444, lane: LANES.right, scored: false },
+  // ===== ACT 3 — pressure ===============================================
+  // Two lanes closed: only the right is open.
+  { id: 'h6', kind: 'hazard', z: 335, lane: LANES.left, scored: false, style: 'laser' },
+  { id: 'h7', kind: 'hazard', z: 335, lane: LANES.middle, scored: false, style: 'spotlight', lockLead: 22 },
+  // The reward sits in the lane that pinch forced them into.
+  { id: 'g4', kind: 'gift', z: 360, lane: LANES.right, scored: true },
+  // ...and is immediately threatened, so holding it costs a decision.
+  { id: 'h8', kind: 'hazard', z: 385, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 20 },
+  { id: 'h9', kind: 'hazard', z: 408, lane: LANES.left, scored: false, style: 'fence' },
+  // Final pinch: only the middle is open.
+  { id: 'h10', kind: 'hazard', z: 432, lane: LANES.right, scored: false, style: 'laser' },
+  { id: 'h11', kind: 'hazard', z: 432, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 20 },
 ];
 
 export const LEVEL_1: LevelConfig = {

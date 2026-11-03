@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { LevelRunner } from '../src/levels/runner';
 import { LEVEL_1 } from '../src/levels/level1';
-import { HALF_DEPTH, type LevelConfig, type RouteEntity } from '../src/levels/types';
+import {
+  HALF_DEPTH,
+  MIN_REACTION_SECONDS,
+  type LevelConfig,
+  type RouteEntity,
+} from '../src/levels/types';
 import { scoreRun, POINTS } from '../src/core/scoring';
 import { STEP_S } from '../src/core/loop';
 
@@ -28,10 +33,11 @@ const gift = (z: number, lane: number, scored = true): RouteEntity => ({
 });
 const crate = (z: number, lane: number): RouteEntity => ({
   id: `o${z}`,
-  kind: 'obstacle',
+  kind: 'hazard',
   z,
   lane,
   scored: false,
+  style: 'laser',
 });
 
 /** Run until complete, or until a step budget is exhausted. */
@@ -194,20 +200,96 @@ describe('no tunnelling at the configured speed', () => {
 
   it('keeps the step advance well inside the contact window', () => {
     const advancePerStep = LEVEL_1.forwardSpeed * STEP_S;
-    const window = HALF_DEPTH.player + HALF_DEPTH.obstacle;
+    const window = HALF_DEPTH.player + HALF_DEPTH.hazard;
     // The margin is what makes a 1D test sufficient instead of a swept one.
     expect(advancePerStep).toBeLessThan(window / 4);
   });
 });
 
 describe('the authored level 1 route', () => {
-  it('offers four scored gifts, four obstacles and four guard encounters', () => {
+  it('offers four scored gifts and all three hazard styles', () => {
     const gifts = LEVEL_1.entities.filter((e) => e.kind === 'gift' && e.scored);
-    const crates = LEVEL_1.entities.filter((e) => e.kind === 'obstacle');
-    const guards = LEVEL_1.entities.filter((e) => e.kind === 'guard');
+    const styles = new Set(
+      LEVEL_1.entities.filter((e) => e.kind === 'hazard').map((e) => e.style),
+    );
     expect(gifts, 'scored gifts').toHaveLength(4);
-    expect(crates, 'obstacles').toHaveLength(4);
-    expect(guards, 'guard encounters').toHaveLength(4);
+    expect(styles, 'every hazard style should appear').toEqual(
+      new Set(['laser', 'fence', 'spotlight']),
+    );
+  });
+
+  it('ramps: later acts pack encounters closer together', () => {
+    // The difficulty curve is spacing, not new verbs. Compare the average
+    // gap in the opening third against the closing third.
+    const zs = [...LEVEL_1.entities.map((e) => e.z)].sort((a, b) => a - b);
+    const gaps: number[] = [];
+    for (let i = 1; i < zs.length; i++) gaps.push((zs[i] as number) - (zs[i - 1] as number));
+    const third = Math.floor(gaps.length / 3);
+    const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
+
+    const opening = mean(gaps.slice(0, third));
+    const closing = mean(gaps.slice(-third));
+    expect(closing, `opening ${opening.toFixed(1)}u vs closing ${closing.toFixed(1)}u`).toBeLessThan(
+      opening,
+    );
+  });
+
+  it('never closes all three lanes at once', () => {
+    const hazards = LEVEL_1.entities.filter((e) => e.kind === 'hazard');
+    for (const e of hazards) {
+      const together = hazards.filter((x) => Math.abs(x.z - e.z) < 2 * HALF_DEPTH.hazard);
+      const lanes = new Set(together.map((x) => x.lane));
+      expect(lanes.size, `hazards at z=${e.z} close ${lanes.size} lanes`).toBeLessThan(
+        LEVEL_1.laneCount,
+      );
+    }
+  });
+
+  it('keeps every gap and every telegraph above the reaction floor', () => {
+    // Tightening the ramp must never cross into unfair. Both the distance
+    // between encounters and a spotlight's commit lead are warnings.
+    const zs = [...LEVEL_1.entities.map((e) => e.z)].sort((a, b) => a - b);
+    for (let i = 1; i < zs.length; i++) {
+      const gap = (zs[i] as number) - (zs[i - 1] as number);
+      // Simultaneous hazards legitimately share a z; they are one encounter.
+      if (gap === 0) continue;
+      expect(gap / LEVEL_1.forwardSpeed, `gap before z=${zs[i]}`).toBeGreaterThan(
+        MIN_REACTION_SECONDS,
+      );
+    }
+
+    for (const e of LEVEL_1.entities.filter((x) => x.style === 'spotlight')) {
+      const lead = (e.lockLead ?? 30) / LEVEL_1.forwardSpeed;
+      expect(lead, `spotlight at z=${e.z} commits ${lead.toFixed(1)}s ahead`).toBeGreaterThan(
+        MIN_REACTION_SECONDS,
+      );
+    }
+  });
+
+  it('keeps the safe lane reachable from the previous encounter', () => {
+    // A pinch that closes two lanes has exactly one answer, and the test for
+    // "a safe lane exists" cannot tell whether the player could get there.
+    // Every encounter's safe set must be within one swipe of the last one's.
+    const byZ = new Map<number, number[]>();
+    for (const e of LEVEL_1.entities.filter((x) => x.kind === 'hazard')) {
+      byZ.set(e.z, [...(byZ.get(e.z) ?? []), e.lane]);
+    }
+    const encounters = [...byZ.entries()].sort((a, b) => a[0] - b[0]);
+    const all = [0, 1, 2];
+    let reachable = all;
+
+    for (const [z, blocked] of encounters) {
+      const safe = all.filter((lane) => !blocked.includes(lane));
+      // One swipe from anywhere currently reachable.
+      const canReach = new Set<number>();
+      for (const from of reachable) {
+        for (const to of [from - 1, from, from + 1]) {
+          if (safe.includes(to)) canReach.add(to);
+        }
+      }
+      expect(canReach.size, `no safe lane reachable at z=${z}`).toBeGreaterThan(0);
+      reachable = [...canReach];
+    }
   });
 
   it('teaches before it threatens', () => {
@@ -235,19 +317,11 @@ describe('the authored level 1 route', () => {
     // could close two lanes between them, and three would be unavoidable.
     const hazards = LEVEL_1.entities.filter((e) => e.kind !== 'gift');
     for (const e of hazards) {
-      const overlapping = hazards.filter((x) => Math.abs(x.z - e.z) < 2 * HALF_DEPTH.guard);
+      const overlapping = hazards.filter((x) => Math.abs(x.z - e.z) < 2 * HALF_DEPTH.hazard);
       const lanes = new Set(overlapping.map((x) => x.lane));
       expect(lanes.size, `hazards near z=${e.z} close ${lanes.size} lanes`).toBeLessThan(
         LEVEL_1.laneCount,
       );
-    }
-  });
-
-  it('leaves time to react between encounters', () => {
-    const zs = [...LEVEL_1.entities.map((e) => e.z)].sort((a, b) => a - b);
-    for (let i = 1; i < zs.length; i++) {
-      const seconds = ((zs[i] as number) - (zs[i - 1] as number)) / LEVEL_1.forwardSpeed;
-      expect(seconds).toBeGreaterThan(1.2);
     }
   });
 
@@ -264,11 +338,13 @@ describe('the authored level 1 route', () => {
     const line = [
       { at: 30, lane: 2 }, //  after t1, over for the t2 teaching gift
       { at: 58, lane: 1 }, //  back for g1 (lane 1) at 83
-      { at: 125, lane: 2 }, // past h1 (lane 0), over for g2 at 153
-      { at: 158, lane: 0 }, // clear of guard d1 (lane 2) and h2 (lane 1)
-      { at: 256, lane: 1 }, // after g3, clear of guard d2 (lane 0)
-      { at: 320, lane: 2 }, // past h3, clear of guard d3 (lane 1)
-      { at: 385, lane: 1 }, // past h4 (lane 0), on for g4 at 411
+      { at: 125, lane: 2 }, // past h1 laser (lane 0), on for g2 at 153
+      { at: 158, lane: 0 }, // clear of h2 spotlight (lane 2) and h3 fence (lane 1)
+      { at: 252, lane: 1 }, // after g3, clear of h4 spotlight (lane 0)
+      { at: 310, lane: 2 }, // past h5 laser (lane 2)? no — clear of the pinch
+      { at: 340, lane: 2 }, // the 335 pinch closes left and middle
+      { at: 365, lane: 1 }, // after g4, clear of h8 spotlight (lane 2)
+      { at: 412, lane: 1 }, // h9 fence is lane 0; middle stays safe
     ];
 
     const r = new LevelRunner(LEVEL_1);
