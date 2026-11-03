@@ -48,8 +48,21 @@ const CONVERT = [
   `${HOLIDAY}/bell_decorated.gltf`,
   `${CITY}/watertower.gltf`,
   `${CITY}/streetlight.gltf`,
-  `${CITY}/building_A.gltf`,
   `${CITY}/car_police.gltf`,
+  // Skyline silhouettes. Six shapes is enough variety for a scrolling city;
+  // more would cost transfer for repeats nobody reads at distance.
+  `${CITY}/building_A.gltf`,
+  `${CITY}/building_B.gltf`,
+  `${CITY}/building_C.gltf`,
+  `${CITY}/building_D.gltf`,
+  `${CITY}/building_E.gltf`,
+  `${CITY}/building_F.gltf`,
+  // Rooftop clutter.
+  `${CITY}/box_A.gltf`,
+  `${CITY}/box_B.gltf`,
+  `${CITY}/dumpster.gltf`,
+  `${CITY}/trash_A.gltf`,
+  `${CITY}/bush.gltf`,
 ];
 
 const PROPS_OUT = 'public/models/props';

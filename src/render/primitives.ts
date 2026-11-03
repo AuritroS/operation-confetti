@@ -48,25 +48,47 @@ export interface PlayerVisual {
 
 // ---------------------------------------------------------------- route ----
 
-export function buildRoute(level: LevelConfig): Group {
+export interface RouteOptions {
+  /**
+   * Draw the ground plane. False when the rooftop environment layer supplies
+   * its own surface, which would otherwise z-fight with this one.
+   */
+  readonly surface?: boolean;
+  /**
+   * Dim the lane dividers. With parapets present the play area is already
+   * bounded visually, so loud stripes are redundant and compete with hazards.
+   */
+  readonly dimDividers?: boolean;
+}
+
+export function buildRoute(level: LevelConfig, options: RouteOptions = {}): Group {
+  const { surface = true, dimDividers = false } = options;
   const group = new Group();
   const width = level.laneWidth * level.laneCount;
 
-  const ground = new Mesh(
-    new PlaneGeometry(width, DRAW_DISTANCE * 2),
-    new MeshStandardMaterial({ color: ROLE.ground, roughness: 0.95 }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  group.add(ground);
+  if (surface) {
+    const ground = new Mesh(
+      new PlaneGeometry(width, DRAW_DISTANCE * 2),
+      new MeshStandardMaterial({ color: ROLE.ground, roughness: 0.95 }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    group.add(ground);
+  }
 
   // Lane dividers make the result of a swipe legible without any art.
   for (let i = 0; i <= level.laneCount; i++) {
     const stripe = new Mesh(
       new PlaneGeometry(0.05, DRAW_DISTANCE * 2),
-      new MeshStandardMaterial({ color: ROLE.laneDivider, roughness: 1 }),
+      new MeshStandardMaterial({
+        color: ROLE.laneDivider,
+        roughness: 1,
+        transparent: dimDividers,
+        opacity: dimDividers ? 0.35 : 1,
+      }),
     );
     stripe.rotation.x = -Math.PI / 2;
-    stripe.position.set((i - level.laneCount / 2) * level.laneWidth, 0.01, 0);
+    // Lift clear of the rooftop surface so the two never z-fight.
+    stripe.position.set((i - level.laneCount / 2) * level.laneWidth, surface ? 0.01 : 0.02, 0);
     group.add(stripe);
   }
 

@@ -26,6 +26,7 @@ import {
   type PlayerVisual,
 } from './render/primitives';
 import { loadRoguePlayer } from './render/rogue';
+import { Environment, requestedLayers } from './render/environment';
 import { DebugPanel, Hud } from './ui/hud';
 import { health } from './net/scoreClient';
 
@@ -47,12 +48,22 @@ const debug = new DebugPanel();
 const world = new Group();
 stage.scene.add(world);
 
+const enabledLayers = requestedLayers();
+const hasRooftop = enabledLayers.has('rooftop');
+
 let runner = new LevelRunner(LEVEL_1);
 let entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked);
 const markers = new RouteMarkers(LEVEL_1);
-const route = buildRoute(LEVEL_1);
+// The rooftop layer brings its own surface and parapets, so the primitive
+// ground would z-fight with it, and the dividers can drop right back once the
+// parapets bound the play area visually.
+const route = buildRoute(LEVEL_1, { surface: !hasRooftop, dimDividers: hasRooftop });
 
-world.add(route, markers.group, entityVisuals.group);
+world.add(route, entityVisuals.group);
+if (!hasRooftop) world.add(markers.group);
+
+/** Built asynchronously; gameplay never waits on decoration. */
+let environment: Environment | null = null;
 
 let player: PlayerVisual = makeCapsulePlayer();
 let playerSource = 'capsule';
@@ -93,6 +104,7 @@ function update(step: number): void {
   runner.update(step);
 
   const snap = runner.snapshot;
+  environment?.update(snap.travelled, step);
   player.setHitFlash(snap.invulnerable);
   player.update(step, true);
 
@@ -106,7 +118,9 @@ function update(step: number): void {
 function render(): void {
   const snap = runner.snapshot;
 
-  markers.update(snap.travelled);
+  // Cross markers only earn their place on a bare surface; the rooftop
+  // layer's gravel and parapets already convey speed.
+  if (!hasRooftop) markers.update(snap.travelled);
   entityVisuals.update(runner.tracked, 1 / 60);
 
   const x = runner.lanes.renderX;
@@ -132,6 +146,7 @@ function render(): void {
     invuln: snap.invulnerable ? 'yes' : 'no',
     score: run.score,
     player: `${playerSource}${clipCount ? ` (${clipCount} clips)` : ''}`,
+    layers: environment ? environment.layers.map((l) => l.id).join(',') || 'none' : 'loading',
     draws: stage.drawCalls,
     tris: stage.triangles,
   });
@@ -202,6 +217,8 @@ function resume(): void {
 }
 
 function resetRun(): void {
+  // The environment is independent of run state, so a replay keeps it rather
+  // than rebuilding — which also means a replay cannot leak its meshes.
   // Rebuild the level cleanly rather than mutating it, so no resolved flag,
   // event or mesh survives into the next run.
   entityVisuals.dispose();
@@ -242,6 +259,20 @@ const hint = document.getElementById('hint');
 if (hint) hint.hidden = isTouchDevice();
 
 loop.start();
+
+// Build the environment without blocking play. ?layers= selects which parts
+// render, so each can be reviewed alone: ?layers=sky, ?layers=none, etc.
+void Environment.build(LEVEL_1, enabledLayers)
+  .then((env) => {
+    environment = env;
+    world.add(env.object);
+    const { triangles, materials } = env.measure();
+    console.info(
+      `[environment] ${env.layers.length} layers, ${triangles.toLocaleString()} triangles, ` +
+        `${materials} materials`,
+    );
+  })
+  .catch((e) => console.error('[environment] build failed', e));
 
 // Load the real character without blocking play.
 void loadRoguePlayer()

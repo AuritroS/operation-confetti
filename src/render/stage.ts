@@ -35,7 +35,10 @@ export class Stage {
 
     this.scene = new Scene();
     this.scene.background = new Color(PALETTE.ink);
-    this.scene.fog = new Fog(PALETTE.ink, 26, 64);
+    // Far plane well past the skyline. At 64 the fog painted out the entire
+    // distant city and the CN Tower, deleting the depth cue the skyline layer
+    // exists to provide. Near stays close so the route still fades.
+    this.scene.fog = new Fog(PALETTE.ink, 45, 210);
 
     this.camera = new PerspectiveCamera(58, 1, 0.1, 160);
 
