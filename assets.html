@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Asset Gallery — Operation Confetti</title>
+  <link rel="stylesheet" href="/src/gallery.css" />
+</head>
+<body class="gallery">
+  <header class="gal-head">
+    <div class="gal-head__row">
+      <h1>Asset Gallery</h1>
+      <span class="gal-count" id="count">loading…</span>
+    </div>
+    <p class="gal-note" id="note"></p>
+
+    <div class="gal-controls">
+      <input id="search" type="search" placeholder="Search by name…" autocomplete="off" />
+      <div class="gal-chips" id="packs"></div>
+      <div class="gal-chips" id="cats"></div>
+      <div class="gal-chips">
+        <button class="chip" id="sort-name" data-on="1">name</button>
+        <button class="chip" id="sort-tris">triangles</button>
+        <button class="chip" id="sort-bytes">size</button>
+        <button class="chip chip--picked" id="show-picks">picked only</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="gal-grid" id="grid"></main>
+
+  <aside class="gal-detail" id="detail" hidden>
+    <button class="gal-detail__close" id="detail-close" aria-label="Close">×</button>
+    <canvas id="detail-canvas" width="420" height="420"></canvas>
+    <h2 id="detail-name"></h2>
+    <dl class="gal-stats" id="detail-stats"></dl>
+    <div class="gal-clips" id="detail-clips"></div>
+    <button class="gal-pick" id="detail-pick">Pick this</button>
+  </aside>
+
+  <footer class="gal-foot" id="foot" hidden>
+    <span id="pick-count"></span>
+    <button class="chip" id="copy-picks">Copy pick list</button>
+    <button class="chip" id="clear-picks">Clear</button>
+  </footer>
+
+  <script type="module" src="/src/gallery.ts"></script>
+</body>
+</html>

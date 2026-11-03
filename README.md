@@ -41,8 +41,24 @@ npm run worker:dev   # terminal 1 — Worker + API on :8787
 npm run dev          # terminal 2 — Vite on :5173, proxies /api to the Worker
 ```
 
-Open `http://localhost:5173` for the game and `/probe.html` for the asset
-harness.
+Three pages in dev:
+
+| Path | What it is |
+|---|---|
+| `/` | the game |
+| `/assets` | asset gallery — browse all 120 models, pick the ones to use |
+| `/probe.html` | character harness — play any clip, attach props |
+
+The gallery needs an index first:
+
+```bash
+npm run assets:index   # writes .asset-index.json
+```
+
+It is a **development tool only**. The source packs are 42 MB, so they are
+streamed off disk by a dev-only Vite plugin rather than copied into `public/`,
+which would inflate the deployed game from 2.9 MB to nearly 45 MB. `/assets`
+is therefore not part of `npm run build`.
 
 ### Desktop controls
 

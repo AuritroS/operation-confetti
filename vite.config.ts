@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+// @ts-expect-error -- plain JS dev plugin, no types needed
+import { assetServer } from './tools/vite-asset-server.mjs';
 
 const entry = (f: string) => fileURLToPath(new URL(f, import.meta.url));
 
@@ -12,12 +14,19 @@ const host = process.env['HOST'] ?? '127.0.0.1';
 
 export default defineConfig({
   base: '/',
+  plugins: [assetServer()],
   build: {
     target: 'es2022',
     outDir: 'dist',
+    // Bundle output goes to /static, leaving /assets free for the gallery
+    // route and avoiding a collision with the source-pack directory name.
+    assetsDir: 'static',
     assetsInlineLimit: 0,
     rollupOptions: {
       input: {
+        // assets.html is deliberately absent: the gallery reads /asset-src,
+        // which only the dev middleware provides, so a built copy would be a
+        // broken page at a public URL. It is a development tool only.
         main: entry('./index.html'),
         probe: entry('./probe.html'),
       },
