@@ -35,7 +35,7 @@ export const PLAN: readonly PlannedAsset[] = [
     level: 'all',
     assetId: 'recoloured/matthew',
     status: 'proposed',
-    note: 'Hood and cape give the thief silhouette. Mask is already a separate mesh, so the doc’s "custom bandit mask" is done. Recolour: body and legs blue, trim gold, skin untouched.',
+    note: 'Hood and cape give the thief silhouette, and the mask is already a separate mesh, so the doc’s "custom bandit mask" needs no work. Body and legs the saturated navy, trim gold, skin recoloured to the tone sampled from his reference.',
     clips: ['Running_A', 'Idle_A', 'Hit_A', 'Jump_Idle', 'Idle_B', 'Throw', 'Jump_Full_Short'],
   },
   {
@@ -51,7 +51,7 @@ export const PLAN: readonly PlannedAsset[] = [
     level: 1,
     assetId: 'recoloured/guard',
     status: 'proposed',
-    note: 'Navy uniform with a gold badge. Hide the cape — that silhouette belongs to Matthew — and keep the helmet, which reads as security rather than knight once it is dark.',
+    note: 'Desaturated steel with magenta trim and deliberately no gold: navy-and-gold guards read as Matthew at a glance, and gold is his, while magenta is Aurora’s and these are her guards. Cape hidden, helmet kept.',
     clips: ['Idle_A', 'Walking_A', 'Hit_B'],
   },
 

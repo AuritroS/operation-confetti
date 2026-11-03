@@ -91,6 +91,20 @@ export const CLIPS = {
  */
 export const CHARACTER_HEIGHT = 1.45;
 
+/**
+ * Meshes hidden at load, per character.
+ *
+ * Each body part is its own mesh, so removing one is a visibility toggle
+ * rather than an export. The guard loses its cape because that silhouette
+ * belongs to Matthew, and Aurora loses the Mage hat because the reference
+ * gives her a crown, which `buildCrown` supplies instead.
+ */
+export const HIDDEN_MESHES: Record<string, readonly string[]> = {
+  matthew: [],
+  aurora: ['Mage_Hat'],
+  guard: ['Knight_Cape'],
+};
+
 /** Attachment node names present in every character GLB. */
 export const ATTACH_NODES = {
   handRight: 'handslot.r',

@@ -14,6 +14,7 @@
   --cyan: #53a6f9;
   --slate: #1a1f2e;
   --slate-line: #2b3450;
+  --steel: #46506b;
 
   /* Roles, named for what they do rather than what colour they are. */
   --bg: var(--ink);

@@ -27,7 +27,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PLAN, type PlannedAsset } from './assets/plan';
-import { CHARACTER_HEIGHT, SOURCES } from './assets/manifest';
+import { CHARACTER_HEIGHT, HIDDEN_MESHES, SOURCES } from './assets/manifest';
 import { LaserBarrier, Searchlight, Sparkle } from './render/effects';
 import {
   buildCake,
@@ -81,9 +81,12 @@ const renderer = new WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(THUMB, THUMB, false);
-// Mid-tone, not near-black: Matthew is dark navy once recoloured, and a
-// dark backdrop hides exactly the asset most in need of review.
-renderer.setClearColor(new Color('#2b3450'), 1);
+// Neutral mid-grey, deliberately not a navy. The backdrop was first near-black
+// and then #2b3450, and both landed within a point of the recoloured Matthew's
+// own luminance, so the asset most in need of review was the one that
+// disappeared. A neutral well above every garment colour keeps dark characters
+// readable as silhouettes without blowing out the bright props.
+renderer.setClearColor(new Color('#5a6378'), 1);
 
 const scene = new Scene();
 const camera = new PerspectiveCamera(32, 1, 0.01, 200);
@@ -106,9 +109,24 @@ async function loadModel(url: string): Promise<{ object: Object3D; clips: Animat
   const cached = modelCache.get(url);
   if (cached) return { object: cached, clips: clipCache.get(url) ?? [] };
   const gltf = await loader.loadAsync(url);
+  applyHiddenMeshes(url, gltf.scene);
   modelCache.set(url, gltf.scene);
   clipCache.set(url, gltf.animations);
   return { object: gltf.scene, clips: gltf.animations };
+}
+
+/**
+ * Hide the same meshes the game hides, so a review shows what actually ships
+ * rather than the raw pack model — the guard's cape in particular.
+ */
+function applyHiddenMeshes(url: string, scene: Object3D): void {
+  const id = url.match(/\/models\/(\w+)\.glb$/)?.[1];
+  const hidden = id ? HIDDEN_MESHES[id] : undefined;
+  if (!hidden?.length) return;
+  const wanted = new Set(hidden);
+  scene.traverse((o) => {
+    if (wanted.has(o.name)) o.visible = false;
+  });
 }
 
 /**
@@ -160,17 +178,23 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
 /**
  * Copy the shared renderer's output into a 2D canvas.
  *
- * `gl.finish()` is required before the copy, not optional. drawImage reads the
- * drawing buffer, and without a flush the GPU may not have finished presenting
- * — which showed up as the FIRST thumbnail being blank regardless of which
- * model it was, because a freshly created context needs the sync most.
- * preserveDrawingBuffer alone does not cover it: that stops the buffer being
- * cleared, it does not guarantee it has been written.
+ * `preserveDrawingBuffer` on the renderer is what makes this safe: without it
+ * the drawing buffer may be cleared once the compositor runs, and drawImage
+ * would copy an empty frame.
+ *
+ * A blank first tile sent me through serialising the renders, adding
+ * gl.finish(), and swapping to readPixels, none of which helped — the cause
+ * was tools/shoot.mjs acquiring a WebGL context on the page's first canvas,
+ * which made getContext('2d') return null for exactly that tile. Worth
+ * recording: four plausible fixes to the wrong layer, and the measurement
+ * that found it took one step.
  */
 function copyToCanvas(target: HTMLCanvasElement, size: number): void {
-  renderer.getContext().finish();
   const ctx = target.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) {
+    console.warn('[gallery] no 2d context; is something holding a WebGL context on this canvas?');
+    return;
+  }
   target.width = size;
   target.height = size;
   ctx.drawImage(renderer.domElement, 0, 0, size, size);
@@ -346,6 +370,8 @@ let scaleRef: Object3D | null = null;
 let showScale = false;
 let detailSparkle: Sparkle | null = null;
 let showSparkle = false;
+/** Set while a procedural asset is open, so its update runs and it disposes. */
+let detailCustom: { update: (d: number) => void; dispose: () => void } | null = null;
 
 function stopDetail(): void {
   cancelAnimationFrame(detailRaf);
@@ -357,6 +383,9 @@ function stopDetail(): void {
   // asset opened.
   detailSparkle?.dispose();
   detailSparkle = null;
+  // A procedural asset is built fresh per open, so it must be released.
+  detailCustom?.dispose();
+  detailCustom = null;
   scaleRef?.removeFromParent();
 }
 
@@ -936,16 +965,16 @@ const FX: FxPreview[] = [
   },
   {
     name: 'Vault door',
-    note: 'The level 1 route endpoint, carrying the emblem so the payoff is legible.',
+    note: 'The level 1 route endpoint. The emblem is sized against the door and the dial stands proud of the wall \u2014 the first version buried the dial and used a postage-stamp emblem on a blank slab.',
     build: () => {
+      // buildVaultDoor places its own emblem, sized to the door.
       const vault = buildVaultDoor(2.4, 1.7);
-      vault.add(buildMaskEmblem(0.8)).children.at(-1)!.position.set(0, 0.85, 0.25);
       return { object: vault, update: () => {}, dispose: () => vault.removeFromParent() };
     },
   },
   {
     name: 'Grapple cable',
-    note: 'Gold cable from a wrist gadget, as in the reference. One cylinder restretched per frame rather than rebuilt, so swinging allocates nothing.',
+    note: 'Gold cable from a wrist gadget, as in the reference, with the candy-cane crook at the anchor end. A chain of tapered segments bowed along a parabola, so it reads as one curved cable; scratch vectors mean a swing allocates nothing.',
     build: () => {
       const group = new Group();
       const gadget = new Object3D();
@@ -953,7 +982,7 @@ const FX: FxPreview[] = [
       anchor.position.set(1.1, 1.3, 0);
       group.add(gadget, anchor);
       const cable = new GrappleCable();
-      group.add(cable.mesh);
+      group.add(cable.group);
       let t = 0;
       return {
         object: group,
@@ -1009,8 +1038,11 @@ function renderEffects(): void {
   const cards: { canvas: HTMLCanvasElement; object: Object3D }[] = [];
 
   for (const fx of FX) {
-    const card = document.createElement('div');
+    const card = document.createElement('button');
+    card.type = 'button';
     card.className = 'fx-card';
+    card.title = 'Open larger, with the scale comparison';
+    card.addEventListener('click', () => void openCustomDetail(fx));
     const canvas = document.createElement('canvas');
     canvas.width = 300;
     canvas.height = 300;
@@ -1053,6 +1085,71 @@ function renderEffects(): void {
     fxRaf = requestAnimationFrame(tick);
   };
   fxRaf = requestAnimationFrame(tick);
+}
+
+/**
+ * Open a procedural asset in the detail panel.
+ *
+ * Custom assets were previously only viewable as small static cards you had
+ * to scroll past, which is not enough to judge one. This gives them the same
+ * treatment as a pack asset: a large auto-rotating view, the scale comparison
+ * against Matthew, and the sparkle toggle.
+ */
+async function openCustomDetail(fx: FxPreview): Promise<void> {
+  stopDetail();
+  el.detail.hidden = false;
+  el.detailName.textContent = fx.name;
+  el.detailClips.replaceChildren();
+  el.recolour.hidden = true;
+
+  const built = fx.build();
+  detailObject = built.object;
+  detailCustom = built;
+
+  el.detailStats.replaceChildren();
+  for (const [k, v] of [
+    ['kind', 'procedural'],
+    ['source', 'src/render/custom.ts or effects.ts'],
+    ['note', fx.note],
+  ] as [string, string][]) {
+    const dt = document.createElement('dt');
+    dt.textContent = k;
+    const dd = document.createElement('dd');
+    dd.textContent = v;
+    el.detailStats.append(dt, dd);
+  }
+
+  el.detailPick.textContent = 'Built in code';
+  el.detailPick.onclick = null;
+
+  if (showScale) await scaleReference();
+
+  detailLast = performance.now();
+  const spin = (now: number): void => {
+    if (!detailObject) return;
+    const dt = Math.min((now - detailLast) / 1000, 0.1);
+    detailLast = now;
+    detailCustom?.update(dt);
+
+    holder.clear();
+    holder.add(detailObject);
+    if (showScale && scaleRef) {
+      const box = new Box3().setFromObject(detailObject);
+      const size = box.getSize(new Vector3());
+      scaleRef.position.x = box.max.x + Math.max(size.x * 0.2, 0.4) + 0.4;
+      holder.add(scaleRef);
+    }
+
+    const px = Math.min(el.detailCanvas.clientWidth || 420, 560);
+    renderer.setSize(px, px, false);
+    frame(detailObject, (now / 4000) % (Math.PI * 2), 0.22);
+    renderer.render(scene, camera);
+    holder.clear();
+
+    copyToCanvas(el.detailCanvas, px);
+    detailRaf = requestAnimationFrame(spin);
+  };
+  detailRaf = requestAnimationFrame(spin);
 }
 
 // ---- view switching ----------------------------------------------------

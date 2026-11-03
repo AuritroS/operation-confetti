@@ -97,7 +97,7 @@ body.gallery {
   width: 96px;
   height: 96px;
   border-radius: 8px;
-  background: linear-gradient(170deg, #3a4668, #141c2c);
+  background: linear-gradient(170deg, #6b7488, #434b60);
   cursor: pointer;
 }
 
@@ -141,8 +141,17 @@ body.gallery {
   border-radius: 10px;
   background: var(--panel);
   overflow: hidden;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: block;
+  width: 100%;
 }
-.fx-card canvas { display: block; width: 100%; aspect-ratio: 1; background: #0b1119; }
+
+.fx-card:hover { border-color: var(--accent); }
+.fx-card canvas { display: block; width: 100%; aspect-ratio: 1; background: #4d566b; }
 .fx-card__meta { padding: 9px 11px 11px; }
 .fx-card__name { font-weight: 700; font-size: 12px; }
 .fx-card__note { margin: 4px 0 0; color: var(--ink-dim); font-size: 11px; line-height: 1.45; }
@@ -207,7 +216,7 @@ body.gallery {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background: linear-gradient(170deg, #3a4668, #141c2c);
+  background: linear-gradient(170deg, #6b7488, #434b60);
 }
 
 .tile__meta { padding: 7px 8px 8px; }
@@ -272,7 +281,7 @@ body.gallery {
   height: auto;
   aspect-ratio: 1;
   border-radius: 10px;
-  background: linear-gradient(170deg, #3a4668, #141c2c);
+  background: linear-gradient(170deg, #6b7488, #434b60);
 }
 
 .gal-detail h2 { margin: 12px 0 8px; font-size: 15px; word-break: break-word; }

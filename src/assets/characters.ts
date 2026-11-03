@@ -119,6 +119,18 @@ export class Actor {
   }
 
   /**
+   * Hide meshes by name. Used to drop parts the design does not want — a
+   * cape, a hat — without re-exporting the model.
+   */
+  hideMeshes(names: readonly string[]): void {
+    if (names.length === 0) return;
+    const wanted = new Set(names);
+    this.root.traverse((o) => {
+      if (wanted.has(o.name)) o.visible = false;
+    });
+  }
+
+  /**
    * Cross-fade to a clip by name. Returns false if the clip is missing, so a
    * bad manifest entry surfaces as a visible no-op rather than a crash.
    */

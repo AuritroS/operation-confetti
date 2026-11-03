@@ -36,6 +36,7 @@ const GRID_Y = 4;
 // Palette, mirrored from src/render/palette.ts. Kept as literals here because
 // this is a build script and must not import TypeScript.
 const P = {
+  slateLine: '#2b3450',
   ink: '#18101a',
   navyDeep: '#1b275c',
   navy: '#12368f',
@@ -44,6 +45,20 @@ const P = {
   purpleDeep: '#5c175c',
   magenta: '#cc29c3',
   plumBlack: '#210916',
+  steel: '#46506b',
+};
+
+/**
+ * Skin ramps, sampled from the reference art rather than derived.
+ *
+ * A single target colour will not do here: the ramp helper lightens toward
+ * white, which desaturates, and skin that desaturates at its highlight reads
+ * as grey plastic. These give the ends explicitly, taken from cheek and
+ * shadow samples of each PNG.
+ */
+const SKIN = {
+  matthew: { light: '#c97a5c', dark: '#6b2f23' },
+  aurora: { light: '#f0a070', dark: '#a85334' },
 };
 
 /**
@@ -72,6 +87,7 @@ const RECIPES = [
       F1: P.gold,       // arm bracers
       H3: P.gold,       // arm straps
       H2: P.gold,       // belt
+      A1: SKIN.matthew, // face and hands
     },
   },
   {
@@ -86,19 +102,25 @@ const RECIPES = [
       D3: P.plumBlack,  // legs and boots
       H2: P.plumBlack,  // leg accents
       F1: P.gold,       // body trim
+      A1: SKIN.aurora,  // face and hands
     },
   },
   {
     id: 'guard',
     source: 'Knight',
     texture: 'knight_texture.png',
-    note: 'Navy uniform with a gold badge. D1 is the armour across every part.',
+    note:
+      'Desaturated steel with magenta trim, and deliberately no gold. Navy ' +
+      'and gold guards read as Matthew at a glance, and gold is his; magenta ' +
+      'is Aurora\u2019s, and these are her guards. D1 is the armour across ' +
+      'every part.',
     cells: {
-      D1: P.navyDeep,   // armour, helmet and visor
-      H1: P.navy,       // secondary plates
+      D1: P.steel,      // armour, helmet and visor
+      H1: P.slateLine,  // secondary plates
       H2: P.ink,        // dark steel
       G1: P.ink,        // leather
-      E2: P.gold,       // badge and trim
+      E2: P.magenta,    // badge and trim
+      A2: P.steel,      // cape swatch, hidden at runtime but kept consistent
     },
   },
 ];
@@ -128,6 +150,9 @@ function mix(a, b, t) {
  * hex in a recipe yields a gradient with the same character as the original.
  */
 function rampEnds(target) {
+  if (typeof target === 'object') {
+    return { light: parseHex(target.light), dark: parseHex(target.dark) };
+  }
   const c = parseHex(target);
   const light = mix(c, [255, 255, 255], 0.3);
   const dark = mix(c, [0, 0, 0], 0.45);
@@ -180,7 +205,7 @@ async function recolourAtlas(texturePath, cells) {
       }
     }
 
-    changed.push(`${cell}->${target}`);
+    changed.push(`${cell}->${typeof target === 'object' ? target.light : target}`);
   }
 
   const png = await sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();

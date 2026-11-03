@@ -12,7 +12,7 @@
  */
 import { Box3, Group, Mesh, MeshStandardMaterial, Vector3, type Object3D } from 'three';
 import { AssetBundle, type Actor } from '../assets/characters';
-import { CHARACTER_HEIGHT, CLIPS, SOURCES } from '../assets/manifest';
+import { CHARACTER_HEIGHT, CLIPS, HIDDEN_MESHES, SOURCES } from '../assets/manifest';
 import type { PlayerVisual } from './primitives';
 
 /** The Rogue faces +Z in source; the camera looks down -Z, so turn it around. */
@@ -30,6 +30,7 @@ export async function loadRoguePlayer(): Promise<RogueLoadResult> {
 
   const actor = bundle.actor(SOURCES.characters.matthew);
   actor.root.rotation.y = FACING_Y;
+  actor.hideMeshes(HIDDEN_MESHES['matthew'] ?? []);
   fitToHeight(actor.root, CHARACTER_HEIGHT);
 
   // Running is the resting state on an auto-scrolling route.

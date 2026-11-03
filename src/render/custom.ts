@@ -12,6 +12,10 @@
 import {
   BoxGeometry,
   CylinderGeometry,
+  ExtrudeGeometry,
+  Path,
+  Quaternion,
+  Shape,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -164,48 +168,122 @@ export function buildCnTower(height = 14): Group {
 // ------------------------------------------------------ grapple gadget ----
 
 /**
- * The gold cable in Matthew's reference arcs from a wrist gadget.
+ * The gold cable in Matthew's reference, arcing from a wrist gadget.
  *
- * The cable is one cylinder restretched each frame rather than rebuilt, so
- * swinging costs no allocation. `setSpan` points it from the gadget to the
- * anchor; the geometry is a unit-length cylinder scaled along Y.
+ * A chain of straight segments bowed along a parabola, which reads as one
+ * curved cable while staying cheap. Scratch vectors mean a swing allocates
+ * nothing per frame.
  */
 export class GrappleCable {
-  readonly mesh: Mesh;
+  readonly group = new Group();
 
-  // Scratch vectors, so setSpan allocates nothing per frame.
+  private readonly segments: Mesh[] = [];
+  private readonly hook: Group;
+
+  private static readonly _from = new Vector3();
+  private static readonly _to = new Vector3();
   private static readonly _a = new Vector3();
   private static readonly _b = new Vector3();
+  private static readonly _up = new Vector3(0, 1, 0);
+  private static readonly _quat = new Quaternion();
 
-  constructor(thickness = 0.022) {
-    const geometry = new CylinderGeometry(thickness, thickness, 1, 6, 1, true);
-    // Move the origin to one end so scaling stretches toward the anchor.
-    geometry.translate(0, 0.5, 0);
-    this.mesh = new Mesh(geometry, matte(PALETTE.gold, 0.4));
-    this.mesh.visible = false;
+  constructor(segmentCount = 6, thickness = 0.018) {
+    const material = matte(PALETTE.gold, 0.4);
+    for (let i = 0; i < segmentCount; i++) {
+      // Taper toward the hook so it reads as cable rather than rod.
+      const t = 1 - (i / segmentCount) * 0.35;
+      const geometry = new CylinderGeometry(thickness * t, thickness * t, 1, 5, 1, true);
+      geometry.translate(0, 0.5, 0);
+      const seg = new Mesh(geometry, material);
+      this.segments.push(seg);
+      this.group.add(seg);
+    }
+
+    this.hook = buildGrappleHook(thickness);
+    this.group.add(this.hook);
+    this.group.visible = false;
   }
 
-  /** Point the cable from `from` to `to`, both in world space. */
-  setSpan(from: Object3D, to: Object3D): void {
-    const start = from.getWorldPosition(GrappleCable._a);
-    const end = to.getWorldPosition(GrappleCable._b);
-    this.mesh.position.copy(start);
-    this.mesh.scale.set(1, start.distanceTo(end), 1);
-    this.mesh.lookAt(end);
-    // lookAt aims -Z; the cylinder runs along +Y, so rotate into place.
-    this.mesh.rotateX(Math.PI / 2);
-    this.mesh.visible = true;
+  /**
+   * Point the cable from `from` to `to`, both in world space.
+   *
+   * Orientation comes from a quaternion built off the direction vector. The
+   * first version used `lookAt` then `rotateX(+90deg)`, which aims -Z at the
+   * target and then maps +Y onto +Z — pointing the cable directly AWAY from
+   * the anchor. That sign error is invisible in code and obvious only once
+   * rendered, so the direction is explicit now.
+   *
+   * `sag` bows the cable downward as a fraction of its span; 0 is taut.
+   */
+  setSpan(from: Object3D, to: Object3D, sag = 0.12): void {
+    const start = from.getWorldPosition(GrappleCable._from);
+    const end = to.getWorldPosition(GrappleCable._to);
+    const span = start.distanceTo(end);
+    if (span < 1e-4) {
+      this.group.visible = false;
+      return;
+    }
+
+    const n = this.segments.length;
+    const droop = sag * span;
+
+    for (let i = 0; i < n; i++) {
+      const seg = this.segments[i];
+      if (!seg) continue;
+
+      const t0 = i / n;
+      const t1 = (i + 1) / n;
+      const p0 = GrappleCable._a.copy(start).lerp(end, t0);
+      p0.y -= droop * 4 * t0 * (1 - t0);
+      const p1 = GrappleCable._b.copy(start).lerp(end, t1);
+      p1.y -= droop * 4 * t1 * (1 - t1);
+
+      seg.position.copy(p0);
+      seg.scale.set(1, p0.distanceTo(p1), 1);
+      // Rotate the cylinder's +Y axis onto the segment direction.
+      GrappleCable._quat.setFromUnitVectors(GrappleCable._up, p1.sub(p0).normalize());
+      seg.quaternion.copy(GrappleCable._quat);
+    }
+
+    // Seat the hook at the anchor, aligned with the last segment.
+    this.hook.position.copy(end);
+    this.hook.quaternion.copy(GrappleCable._quat);
+    this.group.visible = true;
   }
 
   hide(): void {
-    this.mesh.visible = false;
+    this.group.visible = false;
   }
 
   dispose(): void {
-    this.mesh.geometry.dispose();
-    (this.mesh.material as MeshStandardMaterial).dispose();
-    this.mesh.removeFromParent();
+    for (const seg of this.segments) seg.geometry.dispose();
+    (this.segments[0]?.material as MeshStandardMaterial | undefined)?.dispose();
+    this.segments.length = 0;
+    this.group.removeFromParent();
   }
+}
+
+/**
+ * The hook on the end of the cable: a candy cane, which is both a hooked cane
+ * — the Sly signature — and birthday-appropriate rather than borrowed. The
+ * pack's `candycane_small` is the runtime asset; this is the procedural form.
+ */
+function buildGrappleHook(thickness: number): Group {
+  const hook = new Group();
+  const gold = matte(PALETTE.gold, 0.35);
+  const r = thickness * 4.5;
+
+  const shank = new Mesh(new CylinderGeometry(thickness * 1.3, thickness * 1.3, r * 1.8, 6), gold);
+  shank.position.y = r * 0.9;
+  hook.add(shank);
+
+  // Most of a torus makes the crook.
+  const crook = new Mesh(new TorusGeometry(r, thickness * 1.3, 6, 14, Math.PI * 1.15), gold);
+  crook.rotation.y = Math.PI / 2;
+  crook.rotation.z = Math.PI * 0.42;
+  hook.add(crook);
+
+  return hook;
 }
 
 // ---------------------------------------------------------- magic orb ----
@@ -257,55 +335,111 @@ export class MagicOrb {
   }
 }
 
+
 // ------------------------------------------------------- mask emblem -----
 
 /**
- * Matthew's gold bandit-mask logo, which appears as the title treatment in his
- * reference and on a banner in Aurora's. Reused on the vault door, and
- * available for the HUD and loading screen.
+ * Matthew's gold bandit-mask logo — his title treatment, and a banner in
+ * Aurora's image. Reused on the vault door, available for the HUD.
  *
- * Built as two eye holes cut visually into a bar, rather than true CSG, which
- * keeps it to a handful of triangles.
+ * An extruded `Shape` with two hole paths, which is the only way to get
+ * genuine cut-out eyes and a real mask outline. The first attempt stacked
+ * boxes and spheres and read as a gold plank with two dots: the silhouette
+ * was a rectangle and the eyes sat on the surface rather than through it.
+ *
+ * The outline is what carries it — wide, dipped at the brow, with swept-up
+ * outer points.
  */
 export function buildMaskEmblem(width = 1): Group {
   const emblem = new Group();
-  const gold = matte(PALETTE.gold, 0.35);
-  const h = width * 0.34;
+  const w = width / 2;
+  const h = width * 0.3;
 
-  const bar = new Mesh(new BoxGeometry(width, h, width * 0.06), gold);
-  emblem.add(bar);
+  const outline = new Shape();
+  outline.moveTo(-w * 1.18, h * 0.42);
+  outline.quadraticCurveTo(-w * 0.72, h * 1.02, -w * 0.3, h * 0.66);
+  outline.quadraticCurveTo(0, h * 0.26, w * 0.3, h * 0.66);
+  outline.quadraticCurveTo(w * 0.72, h * 1.02, w * 1.18, h * 0.42);
+  outline.lineTo(w * 0.92, -h * 0.26);
+  outline.quadraticCurveTo(w * 0.52, -h * 1.0, 0, -h * 0.72);
+  outline.quadraticCurveTo(-w * 0.52, -h * 1.0, -w * 0.92, -h * 0.26);
+  outline.closePath();
 
-  // Swept points at each outer edge give it the mask silhouette.
+  // Angled almond eyes, cut clean through.
   for (const side of [-1, 1]) {
-    const point = new Mesh(new CylinderGeometry(0.001, h * 0.5, width * 0.26, 3), gold);
-    point.rotation.z = side * -Math.PI / 2;
-    point.position.x = side * (width * 0.5 + width * 0.11);
-    emblem.add(point);
+    const eye = new Path();
+    const cx = side * w * 0.46;
+    const rx = w * 0.23;
+    const ry = h * 0.3;
+    eye.moveTo(cx - rx, 0);
+    eye.quadraticCurveTo(cx - rx * 0.3, ry * 1.3, cx + rx, ry * 0.3);
+    eye.quadraticCurveTo(cx + rx * 0.3, -ry * 1.0, cx - rx, 0);
+    outline.holes.push(eye);
   }
 
-  // Eye holes punched with the background colour, so the shape reads at size.
-  for (const side of [-1, 1]) {
-    const eye = new Mesh(new SphereGeometry(h * 0.26, 10, 8), matte(PALETTE.ink, 1));
-    eye.scale.set(1.5, 1, 0.6);
-    eye.position.set(side * width * 0.21, 0, width * 0.035);
-    emblem.add(eye);
-  }
+  const geometry = new ExtrudeGeometry(outline, {
+    depth: width * 0.05,
+    bevelEnabled: true,
+    bevelThickness: width * 0.014,
+    bevelSize: width * 0.012,
+    bevelSegments: 2,
+    curveSegments: 10,
+  });
+  geometry.center();
 
+  emblem.add(new Mesh(geometry, matte(PALETTE.gold, 0.32)));
   return emblem;
 }
 
 // -------------------------------------------------------- vault door -----
 
-/** The level 1 route endpoint. Carries the emblem so the payoff is legible. */
+/**
+ * The level 1 route endpoint, carrying the emblem so the payoff is legible.
+ *
+ * The emblem is sized against the door rather than fixed, and the dial stands
+ * proud of the frame — the first version buried the dial halfway into the wall
+ * and put a postage-stamp emblem on a large blank slab.
+ */
 export function buildVaultDoor(width = 4.8, height = 3.4): Group {
   const vault = new Group();
 
-  const frame = new Mesh(new BoxGeometry(width, height, 0.4), matte(0x2a3354, 0.8));
-  frame.position.y = height / 2;
+  const wall = matte(PALETTE.slate, 0.85);
+  const steel = matte(PALETTE.steel, 0.5);
+
+  // Surrounding wall, recessed behind the door.
+  const frame = new Mesh(new BoxGeometry(width, height, 0.35), wall);
+  frame.position.set(0, height / 2, -0.2);
   vault.add(frame);
 
-  const door = new Mesh(new CylinderGeometry(height * 0.36, height * 0.36, 0.28, 24), matte(0x3b4766, 0.6));
+  // Door face: a disc proud of the wall, so it reads as a vault.
+  const radius = Math.min(width, height) * 0.38;
+  const door = new Mesh(new CylinderGeometry(radius, radius, 0.3, 32), steel);
+  door.rotation.x = Math.PI / 2;
+  door.position.set(0, height * 0.5, 0);
   vault.add(door);
+
+  // Rim, a touch wider, to catch the light along the edge.
+  const rim = new Mesh(new TorusGeometry(radius * 1.04, 0.07, 8, 36), matte(PALETTE.gold, 0.35));
+  rim.position.set(0, height * 0.5, 0.08);
+  vault.add(rim);
+
+  // Spokes radiating from the centre, the locking-bolt read.
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const spoke = new Mesh(new BoxGeometry(radius * 0.78, 0.05, 0.06), steel);
+    spoke.position.set(
+      Math.cos(angle) * radius * 0.48,
+      height * 0.5 + Math.sin(angle) * radius * 0.48,
+      0.17,
+    );
+    spoke.rotation.z = angle;
+    vault.add(spoke);
+  }
+
+  // The emblem sized to the door, centred on it, standing off the face.
+  const emblem = buildMaskEmblem(radius * 1.15);
+  emblem.position.set(0, height * 0.5, 0.22);
+  vault.add(emblem);
 
   return vault;
 }

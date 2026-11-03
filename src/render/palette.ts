@@ -51,6 +51,16 @@ export const PALETTE = {
    */
   slate: 0x1a1f2e,
   slateLine: 0x2b3450,
+
+  /**
+   * Guard armour. Desaturated blue-grey, deliberately NOT navy-and-gold:
+   * guards dressed like Matthew read as the same character at a glance, and
+   * gold is his. Guards wear Aurora's magenta instead, because they are hers.
+   *
+   * Luminance tiers this produces, floor to foreground: slate 31, Matthew 53,
+   * guard 80 — three clear steps, in three different hue families.
+   */
+  steel: 0x46506b,
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
@@ -75,4 +85,6 @@ export const ROLE = {
   laneDivider: PALETTE.slateLine,
   windowLight: PALETTE.orangeWarm,
   neon: PALETTE.cyan,
+  guardArmour: PALETTE.steel,
+  guardTrim: PALETTE.magenta,
 } as const;

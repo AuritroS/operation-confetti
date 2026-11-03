@@ -83,16 +83,40 @@ describe('recoloured atlases', () => {
       .toBeLessThan(30);
   });
 
-  it('leaves the skin swatch untouched', async () => {
-    // A1 is skin on every character. Recolouring clothing alongside skin is
-    // the specific failure the design doc warns about, so assert it is still
-    // the pack's original peach rather than any palette colour.
+  it('keeps the skin swatch a skin tone, never a clothing colour', async () => {
+    // A1 is skin on every character. It IS deliberately recoloured now — to
+    // tones sampled from each reference face — but recolouring skin with a
+    // clothing colour is the specific failure design.md section 10 warns
+    // about, so assert it still reads as skin: warm, with red above green
+    // above blue, and nowhere near any garment hue in the palette.
+    const garments = [PALETTE.navy, PALETTE.navyDeep, PALETTE.purpleDeep, PALETTE.magenta, PALETTE.steel];
+
     for (const id of ['matthew', 'aurora', 'guard']) {
       const [r, g, b] = await sampleCell(ATLAS(id), 'A1');
-      expect(r, `${id} skin red`).toBeGreaterThan(200);
-      expect(g, `${id} skin green`).toBeGreaterThan(140);
-      expect(b, `${id} skin blue`).toBeGreaterThan(90);
+      expect(r, `${id} skin should be warm`).toBeGreaterThan(g);
+      expect(g, `${id} skin should be warm`).toBeGreaterThan(b);
+      expect(r, `${id} skin should not be dark`).toBeGreaterThan(120);
+
+      const skinHue = hue([r, g, b]);
+      for (const garment of garments) {
+        expect(
+          hueGap(skinHue, hue(toRgb(garment))),
+          `${id} skin must not take garment colour #${garment.toString(16)}`,
+        ).toBeGreaterThan(40);
+      }
     }
+  });
+
+  it('gives Matthew and Aurora the skin tones from their references', async () => {
+    const [mr, mg, mb] = await sampleCell(ATLAS('matthew'), 'A1');
+    const [ar, ag, ab] = await sampleCell(ATLAS('aurora'), 'A1');
+
+    const luma = (r: number, g: number, b: number): number =>
+      0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    // Aurora's reference face is lighter and warmer than Matthew's, and the
+    // bake must preserve that difference rather than flattening both.
+    expect(luma(ar, ag, ab)).toBeGreaterThan(luma(mr, mg, mb));
   });
 
   it('keeps the character silhouette readable against the floor', () => {

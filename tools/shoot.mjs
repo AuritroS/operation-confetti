@@ -75,18 +75,23 @@ try {
   const response = await page.goto(url, { waitUntil: 'load', timeout: 25_000 });
   logs.push({ level: 'nav', text: `HTTP ${response?.status() ?? '?'} ${url}` });
 
-  // Wait for a real frame rather than a fixed sleep where possible.
+  // Wait for a canvas that has been sized, which means something rendered.
+  //
+  // Deliberately PASSIVE: an earlier version called getContext('webgl2') on
+  // the first canvas to probe for a frame, which permanently bound a WebGL
+  // context to it. On the gallery the first canvas is an asset tile that needs
+  // a 2D context, so getContext('2d') then returned null forever and that one
+  // tile silently stayed blank — a bug in the measuring tool that looked for
+  // all the world like a bug in the page. Never acquire a context here.
   await page
     .waitForFunction(
       () => {
         const c = document.querySelector('canvas');
-        if (!c) return false;
-        const gl = c.getContext('webgl2') ?? c.getContext('webgl');
-        return !!gl || c.width > 1;
+        return !!c && c.width > 1 && c.height > 1;
       },
       { timeout: 15_000 },
     )
-    .catch(() => logs.push({ level: 'warn', text: 'no canvas detected' }));
+    .catch(() => logs.push({ level: 'warn', text: 'no sized canvas detected' }));
 
   await page.waitForTimeout(waitMs);
 
