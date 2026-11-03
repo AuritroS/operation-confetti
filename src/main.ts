@@ -1,139 +1,154 @@
 /**
- * Phase 0 vertical slice (design doc §12).
+ * Level 1 slice (design doc §5, §12 Phase 2 partial).
  *
- * Proves the environment end to end: portrait frame with safe areas, a
- * non-scrolling gameplay surface, the gesture recogniser, the fixed-step loop,
- * pause/resume on focus loss and rotation, and a live API round trip.
+ * What this covers: the full route loop with gifts and static obstacles —
+ * travel, lane movement, collisions, one-shot penalties, invulnerability,
+ * score events into the reducer, and route completion. The player visual is
+ * the real Rogue, loaded non-blockingly over a capsule stand-in, which proves
+ * the asset seam against live gameplay.
  *
- * Deliberately primitives only. No level content yet.
+ * Not yet built: guards, the tutorial beat, levels 2 and 3, story panels,
+ * name entry and the leaderboard.
  */
-import { BoxGeometry, CapsuleGeometry, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three';
+import { Group } from 'three';
 import { FixedLoop } from './core/loop';
 import { InputRecogniser } from './core/input';
-import { LaneRunner } from './core/lanes';
-import { Stage } from './render/stage';
-import { DebugPanel, Hud, Overlay } from './ui/hud';
-import { health } from './net/scoreClient';
 import { isTouchDevice, Lifecycle } from './core/lifecycle';
-
-const LANE_COUNT = 3;
-const LANE_WIDTH = 1.6;
-const ROUTE_LENGTH = 90;
-const FORWARD_SPEED = 7.5;
+import { scoreRun, type RunEvent } from './core/scoring';
+import { LevelRunner } from './levels/runner';
+import { LEVEL_1 } from './levels/level1';
+import { Stage } from './render/stage';
+import {
+  buildRoute,
+  EntityVisuals,
+  makeCapsulePlayer,
+  RouteMarkers,
+  type PlayerVisual,
+} from './render/primitives';
+import { loadRoguePlayer } from './render/rogue';
+import { DebugPanel, Hud } from './ui/hud';
+import { health } from './net/scoreClient';
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const surface = document.getElementById('surface') as HTMLElement;
 const rotatePrompt = document.getElementById('rotate') as HTMLElement;
+const pausePill = document.getElementById('pause') as HTMLElement;
+const pauseNote = document.getElementById('pause-note') as HTMLElement;
 const pauseBtn = document.getElementById('btn-pause') as HTMLButtonElement;
 
 const stage = new Stage(canvas);
 stage.observe();
 
 const hud = new Hud();
-const overlay = new Overlay();
 const debug = new DebugPanel();
-const lanes = new LaneRunner(LANE_COUNT, LANE_WIDTH);
 
-// ---- primitive scene ---------------------------------------------------
+// ---- scene -------------------------------------------------------------
 
-const ground = new Mesh(
-  new PlaneGeometry(LANE_WIDTH * LANE_COUNT, ROUTE_LENGTH + 40),
-  new MeshStandardMaterial({ color: 0x27354f, roughness: 0.95 }),
-);
-ground.rotation.x = -Math.PI / 2;
-ground.position.z = -ROUTE_LENGTH / 2;
-stage.scene.add(ground);
+const world = new Group();
+stage.scene.add(world);
 
-// Lane dividers make the swipe result legible without any art.
-for (let i = 0; i <= LANE_COUNT; i++) {
-  const stripe = new Mesh(
-    new PlaneGeometry(0.05, ROUTE_LENGTH + 40),
-    new MeshStandardMaterial({ color: 0x3c4e73, roughness: 1 }),
-  );
-  stripe.rotation.x = -Math.PI / 2;
-  stripe.position.set((i - LANE_COUNT / 2) * LANE_WIDTH, 0.01, -ROUTE_LENGTH / 2);
-  stage.scene.add(stripe);
+let runner = new LevelRunner(LEVEL_1);
+let entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked);
+const markers = new RouteMarkers(LEVEL_1);
+const route = buildRoute(LEVEL_1);
+
+world.add(route, markers.group, entityVisuals.group);
+
+let player: PlayerVisual = makeCapsulePlayer();
+let playerSource = 'capsule';
+let clipCount = 0;
+world.add(player.object);
+
+/** Swap the capsule for the Rogue once it is ready, preserving run state. */
+function installPlayer(next: PlayerVisual, source: string): void {
+  player.dispose();
+  player = next;
+  playerSource = source;
+  world.add(player.object);
 }
 
-const player = new Mesh(
-  new CapsuleGeometry(0.33, 0.72, 6, 12),
-  new MeshStandardMaterial({ color: 0x4da3ff, roughness: 0.5 }),
-);
-player.position.set(0, 0.69, 0);
-stage.scene.add(player);
+// ---- run state ---------------------------------------------------------
 
-// Markers every 10 units give an unmistakable read on forward travel speed.
-const markers: Mesh[] = [];
-for (let z = -10; z > -ROUTE_LENGTH; z -= 10) {
-  const m = new Mesh(
-    new BoxGeometry(LANE_WIDTH * LANE_COUNT, 0.08, 0.25),
-    new MeshStandardMaterial({ color: 0xffc54d, roughness: 0.6 }),
-  );
-  m.position.set(0, 0.04, z);
-  stage.scene.add(m);
-  markers.push(m);
-}
-
-// ---- simulation state --------------------------------------------------
-
-const state = {
-  distance: 0,
-  swipes: 0,
-  taps: 0,
-  holds: 0,
+const run = {
+  score: 0,
+  events: [] as RunEvent[],
   finished: false,
 };
 
+function onEvent(event: RunEvent): void {
+  run.events.push(event);
+  // The reducer is the single source of truth for score, exactly as the
+  // Worker will recompute it, so the HUD can never drift from the server.
+  run.score = scoreRun(run.events).total;
+  hud.setScore(run.score);
+}
+
+runner.onEvent(onEvent);
+
+// ---- simulation --------------------------------------------------------
+
 function update(step: number): void {
-  if (state.finished) return;
+  if (run.finished) return;
 
-  state.distance = Math.min(state.distance + FORWARD_SPEED * step, ROUTE_LENGTH);
-  lanes.update(step);
+  runner.update(step);
 
-  if (state.distance >= ROUTE_LENGTH) {
-    state.finished = true;
-    loop.stop();
+  const snap = runner.snapshot;
+  player.setHitFlash(snap.invulnerable);
+  player.update(step, true);
+
+  if (snap.complete && !run.finished) {
+    run.finished = true;
     input.setEnabled(false);
-    overlay.show(
-      'Route complete',
-      `Phase 0 slice finished. ${state.swipes} swipes, ${state.taps} taps.`,
-      'Run again',
-      resetRun,
-    );
+    showBanner('Vault reached', `Score ${run.score}  ·  press R to run again`);
   }
 }
 
 function render(): void {
-  player.position.x = lanes.renderX;
-  // Travel the world past a stationary player so the camera stays fixed.
-  ground.position.z = -ROUTE_LENGTH / 2 + state.distance;
-  for (const [i, m] of markers.entries()) m.position.z = -10 - i * 10 + state.distance;
+  const snap = runner.snapshot;
 
-  stage.camera.position.set(lanes.renderX * 0.25, 2.5, 5.2);
-  stage.camera.lookAt(lanes.renderX * 0.1, 1.0, -5);
+  markers.update(snap.travelled);
+  entityVisuals.update(runner.tracked, 1 / 60);
+
+  const x = runner.lanes.renderX;
+  player.object.position.x = x;
+
+  // Camera trails the lane slightly, which reads as weight without taking
+  // the next hazard out of frame.
+  stage.camera.position.set(x * 0.3, 2.5, 5.2);
+  stage.camera.lookAt(x * 0.12, 1.0, -6);
   stage.render();
 
-  hud.setProgress(state.distance / ROUTE_LENGTH);
+  hud.setProgress(snap.progress);
+  hud.setGifts(snap.giftsCollected, snap.giftsTotal);
+
   debug.set({
     fps: loop.stats.fps,
     steps: loop.stats.stepsLastFrame,
     dropped: loop.stats.droppedSteps,
-    lane: `${lanes.laneIndex + 1}/${LANE_COUNT}`,
-    dist: state.distance.toFixed(1),
-    gestures: `s${state.swipes} t${state.taps} h${state.holds}`,
+    lane: `${snap.laneIndex + 1}/${LEVEL_1.laneCount}`,
+    dist: `${snap.travelled.toFixed(0)}/${LEVEL_1.routeLength}`,
+    gifts: `${snap.giftsCollected}/${snap.giftsTotal}`,
+    hits: snap.incidents,
+    invuln: snap.invulnerable ? 'yes' : 'no',
+    score: run.score,
+    player: `${playerSource}${clipCount ? ` (${clipCount} clips)` : ''}`,
     draws: stage.drawCalls,
     tris: stage.triangles,
-    dpr: stage.renderer.getPixelRatio().toFixed(2),
   });
 }
 
 const loop = new FixedLoop({ update, render });
 
-let flashTimer = 0;
-function flashPlayer(): void {
-  player.material.color.setHex(0xffc54d);
-  window.clearTimeout(flashTimer);
-  flashTimer = window.setTimeout(() => player.material.color.setHex(0x4da3ff), 90);
+// ---- banner (never blocks input) ---------------------------------------
+
+function showBanner(title: string, note: string): void {
+  pausePill.firstChild!.textContent = `${title} `;
+  pauseNote.textContent = note;
+  pausePill.hidden = false;
+}
+
+function hideBanner(): void {
+  pausePill.hidden = true;
 }
 
 // ---- input -------------------------------------------------------------
@@ -142,24 +157,17 @@ const input = new InputRecogniser(surface);
 input.onGesture((g) => {
   switch (g.type) {
     case 'swipe':
-      state.swipes++;
-      lanes.swipe(g.dir);
-      hud.setScore(state.swipes * 10);
+      runner.swipe(g.dir);
       break;
     case 'tap':
-      state.taps++;
-      flashPlayer();
-      break;
-    case 'holdStart':
-      state.holds++;
+      // Tapping resumes from pause. Level 1 has no tap action of its own.
+      if (lifecycle.isPaused) resume();
       break;
     case 'pauseToggle':
-      // Keyboard pause works even while gameplay input is disabled.
-      if (overlay.isVisible) resumeFromOverlay();
-      else lifecycle.toggleUserPause();
+      if (lifecycle.isPaused) resume();
+      else lifecycle.pause('user');
       break;
     case 'restart':
-      overlay.hide();
       resetRun();
       break;
     default:
@@ -171,18 +179,13 @@ input.attach();
 // ---- lifecycle ---------------------------------------------------------
 
 const lifecycle = new Lifecycle({
-  onPause: (reason) => {
+  onPause: () => {
     loop.stop();
-    input.setEnabled(false);
     input.clearHeld();
-    if (reason !== 'orientation' && !state.finished) {
-      overlay.show('Paused', pauseCopy(reason), 'Resume', resumeFromOverlay);
-    }
+    if (!run.finished) showBanner('Paused', 'Tap or press P to resume');
   },
   onResumeRequested: () => {
-    // Resume is explicit. Rotating back still requires the Resume button.
-    if (state.finished) return;
-    if (!overlay.isVisible) overlay.show('Paused', 'Ready when you are.', 'Resume', resumeFromOverlay);
+    if (!run.finished) showBanner('Paused', 'Tap or press P to resume');
   },
   onOrientation: (isLandscape) => {
     rotatePrompt.hidden = !isLandscape;
@@ -190,51 +193,65 @@ const lifecycle = new Lifecycle({
 });
 lifecycle.attach();
 
-function pauseCopy(reason: string): string {
-  return reason === 'hidden'
-    ? 'The game paused while the tab was in the background.'
-    : 'The game paused because the window lost focus.';
-}
-
-function resumeFromOverlay(): void {
-  // Held inputs were cleared on pause, so a fresh gesture is required.
+function resume(): void {
+  for (const reason of lifecycle.pauseReasons) lifecycle.clear(reason);
+  if (lifecycle.isPaused) return;
+  hideBanner();
   input.setEnabled(true);
-  if (!state.finished) loop.start();
+  if (!run.finished) loop.start();
 }
 
 function resetRun(): void {
-  state.distance = 0;
-  state.swipes = 0;
-  state.taps = 0;
-  state.holds = 0;
-  state.finished = false;
-  lanes.reset();
+  // Rebuild the level cleanly rather than mutating it, so no resolved flag,
+  // event or mesh survives into the next run.
+  entityVisuals.dispose();
+  entityVisuals.group.removeFromParent();
+
+  runner = new LevelRunner(LEVEL_1);
+  runner.onEvent(onEvent);
+  entityVisuals = new EntityVisuals(LEVEL_1, runner.tracked);
+  world.add(entityVisuals.group);
+
+  run.score = 0;
+  run.events = [];
+  run.finished = false;
+
   hud.setScore(0);
+  hideBanner();
   input.setEnabled(true);
   loop.start();
 }
 
 pauseBtn.addEventListener('click', () => {
   pauseBtn.blur();
-  lifecycle.toggleUserPause();
+  if (lifecycle.isPaused) resume();
+  else lifecycle.pause('user');
 });
 
 // ---- boot --------------------------------------------------------------
 
-hud.setStage(0);
+hud.setStage(1);
 hud.setScore(0);
-hud.setGifts(0, 4);
+hud.setGifts(0, runner.snapshot.giftsTotal);
 debug.setVisible(true);
 
-// Desktop players have no swipe affordance, so state the bindings outright.
 const hint = document.getElementById('hint');
 if (hint) hint.hidden = isTouchDevice();
 
 loop.start();
 
-// End-to-end check that the Worker and Supabase are reachable from the page.
+// Load the real character without blocking play.
+void loadRoguePlayer()
+  .then(({ visual, clipCount: clips }) => {
+    clipCount = clips;
+    installPlayer(visual, 'rogue');
+    console.info(`[player] Rogue installed with ${clips} clips`);
+  })
+  .catch((e) => {
+    playerSource = 'capsule (rogue failed)';
+    console.error('[player] Rogue load failed, keeping capsule:', e);
+  });
+
 void health().then((h) => {
-  const el = document.getElementById('hud-stage');
-  if (el) el.textContent = h.ok && h.db ? 'api ok' : h.ok ? 'db down' : 'no api';
   console.info('[health]', h);
 });

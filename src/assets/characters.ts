@@ -6,7 +6,15 @@
  * AnimationClip from a library plays on a character with no retargeting — the
  * track names resolve against identically named bones.
  */
-import { AnimationClip, AnimationMixer, Group, LoopOnce, LoopRepeat, Object3D } from 'three';
+import {
+  AnimationClip,
+  AnimationMixer,
+  Group,
+  LoopOnce,
+  LoopRepeat,
+  Object3D,
+  PropertyBinding,
+} from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -82,9 +90,20 @@ export class Actor {
     this.mixer = new AnimationMixer(root);
   }
 
-  /** Find an attachment node such as `handslot.r`. */
+  /**
+   * Find an attachment node such as `handslot.r`.
+   *
+   * glTF node names are sanitized on import — three strips characters it
+   * reserves for animation paths, so `handslot.r` becomes `handslotr` in the
+   * scene graph. The manifest keeps the authentic names from the asset pack,
+   * so look up both spellings using three's own sanitizer rather than a
+   * hand-rolled copy of its rules.
+   */
   node(name: string): Object3D | null {
-    return this.root.getObjectByName(name) ?? null;
+    const direct = this.root.getObjectByName(name);
+    if (direct) return direct;
+    const sanitized = PropertyBinding.sanitizeNodeName(name);
+    return sanitized === name ? null : this.root.getObjectByName(sanitized) ?? null;
   }
 
   /** Parent a prop to an attachment node, preserving the node's transform. */
