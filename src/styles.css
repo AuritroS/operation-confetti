@@ -70,7 +70,18 @@ html, body {
  * the same thing. The HUD and input surface live inside the frame too, so
  * nothing drifts out to the window edges.
  */
-:root { --portrait-aspect: 0.5; }
+:root {
+  /* Frame aspect used only once a viewport is too wide to be a phone. */
+  --portrait-aspect: 0.52;
+  /*
+   * Letterboxing starts here. Real phones in portrait run 0.43 to 0.562 —
+   * iPhone SE at 375x667 is the widest in circulation — so the threshold has
+   * to sit above that. An earlier value of 0.5 fell in the middle of the
+   * range and letterboxed the SE to 334 of its 375 px, measured.
+   * See tools/devices.mjs, which checks the whole matrix.
+   */
+  --letterbox-from: 0.7;
+}
 
 #app {
   position: fixed;
@@ -79,8 +90,19 @@ html, body {
   transform: translateX(-50%);
   /* dvh keeps the frame correct while mobile browser chrome collapses */
   height: 100dvh;
-  width: min(100vw, calc(100dvh * var(--portrait-aspect)));
+  /* Phones fill the screen. Always. */
+  width: 100vw;
   overflow: hidden;
+}
+
+/*
+ * Only viewports wider than any phone get the portrait frame: tablets,
+ * desktop, and a phone turned sideways (which also shows the rotate prompt).
+ */
+@media (min-aspect-ratio: 7 / 10) {
+  #app {
+    width: min(100vw, calc(100dvh * var(--portrait-aspect)));
+  }
 }
 
 #stage { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }

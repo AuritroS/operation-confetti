@@ -23,7 +23,8 @@
     "dev:lan": "HOST=0.0.0.0 vite",
     "assets:index": "node tools/build-asset-index.mjs",
     "shoot": "node tools/shoot.mjs",
-    "assets:recolour": "node tools/recolour.mjs"
+    "assets:recolour": "node tools/recolour.mjs",
+    "check:devices": "node tools/devices.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"
