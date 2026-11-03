@@ -253,7 +253,9 @@ export function makeCapsulePlayer(): PlayerVisual {
       /* nor to celebrate with */
     },
     setLean(amount: number): void {
-      group.rotation.z = -amount * 0.3;
+      // The capsule has no update hook of its own, so this stays direct.
+      // It is a load-time stand-in; the Rogue carries the real envelope.
+      group.rotation.z = -amount * 0.42;
     },
     setBlink(hidden: boolean): void {
       group.visible = !hidden;

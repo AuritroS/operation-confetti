@@ -18,6 +18,13 @@ import type { PlayerVisual } from './primitives';
 /** The Rogue faces +Z in source; the camera looks down -Z, so turn it around. */
 const FACING_Y = Math.PI;
 
+/**
+ * Lean angles in radians. 0.26 roll measured correctly but read as nothing
+ * in play; a lane change at speed needs a bank you can actually see.
+ */
+const LEAN_ROLL = 0.42;
+const LEAN_YAW = 0.2;
+
 export interface RogueLoadResult {
   visual: PlayerVisual;
   /** Clip names actually present, for the debug panel. */
@@ -112,11 +119,38 @@ class RogueVisual implements PlayerVisual {
   /** Seconds left of a one-shot, during which the movement clip is held off. */
   private oneShot = 0;
 
+  /**
+   * Target lean for this frame, -1 to 1. Applied through an envelope in
+   * `update` rather than directly.
+   */
   setLean(amount: number): void {
-    // Roll into the turn, with a little yaw so the shoulders lead it.
-    this.object.rotation.z = -amount * 0.26;
-    this.object.rotation.y = amount * 0.14;
+    this.leanTarget = amount;
   }
+
+  /**
+   * Fast attack, slow release.
+   *
+   * Following the slide directly made the lean rise and fall inside 0.11
+   * seconds — nine frames — which measured correctly and was invisible in
+   * play, especially once the route reached 15 u/s. Holding the peak and
+   * easing out over a quarter second gives the eye time to read it without
+   * delaying the slide itself, which still governs where the character is.
+   */
+  private applyLean(step: number): void {
+    const target = this.leanTarget;
+    if (Math.abs(target) > Math.abs(this.lean)) {
+      this.lean = target;
+    } else {
+      this.lean += (0 - this.lean) * (1 - Math.exp(-step / 0.18));
+      if (Math.abs(this.lean) < 0.002) this.lean = 0;
+    }
+    // Roll into the turn, with a little yaw so the shoulders lead it.
+    this.object.rotation.z = -this.lean * LEAN_ROLL;
+    this.object.rotation.y = this.lean * LEAN_YAW;
+  }
+
+  private leanTarget = 0;
+  private lean = 0;
 
   setBlink(hidden: boolean): void {
     this.object.visible = !hidden;
@@ -141,6 +175,7 @@ class RogueVisual implements PlayerVisual {
   }
 
   update(step: number, moving: boolean): void {
+    this.applyLean(step);
     if (this.oneShot > 0) {
       this.oneShot -= step;
     } else {

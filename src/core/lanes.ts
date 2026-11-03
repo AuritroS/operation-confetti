@@ -25,8 +25,15 @@ export class LaneRunner {
   constructor(
     readonly laneCount: number,
     readonly laneWidth: number,
-    /** Seconds the visual slide takes, start to finish. */
-    private readonly settle = 0.11,
+    /**
+     * Seconds the visual slide takes, start to finish.
+     *
+     * Kept short because the logical lane commits instantly — collisions
+     * read `laneIndex` — so a long slide widens the gap between where the
+     * player looks and where they actually are. At 15 u/s even this is 2
+     * units of lag.
+     */
+    private readonly settle = 0.14,
     startIndex = Math.floor(laneCount / 2),
   ) {
     this.index = clamp(startIndex, 0, laneCount - 1);
