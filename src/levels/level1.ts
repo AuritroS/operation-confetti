@@ -4,8 +4,9 @@
  * Three lanes on a straight rooftop route with automatic forward travel.
  * Swipe is the only required action.
  *
- * Pacing: 487 units at 7.5 u/s is 65 seconds, at the top of the doc's 55-65s
- * window. Adding the teaching beats and four guard encounters first pushed
+ * Pacing: speed ramps 7 to 11 u/s across 487 units, which integrates to
+ * about 55 seconds — the bottom of the doc's 55-65s window, where a flat
+ * 7.5 u/s sat at the top. Adding the teaching beats and four guard encounters first pushed
  * this to 75s; the route was compressed rather than the target widened,
  * since the window is a stated pacing goal and 75s is a long first run for
  * a party guest. Spacing stayed proportional, so reaction time is unchanged
@@ -32,10 +33,14 @@ const LANES = { left: 0, middle: 1, right: 2 } as const;
  * the player learns one verb and the level keeps finding new questions to
  * ask with it.
  *
- *   ACT 1  0-150   learn      one hazard type, 33-35u gaps (4.5s)
- *   ACT 2  150-320 combine    all three types, 27-32u gaps (4s), 30u locks
- *   ACT 3  320-487 pressure   two lanes closed at once, 23-26u gaps (3.2s),
- *                             20u locks
+ *   ACT 1  0-150   learn      one hazard type, wide gaps, ~7.5 u/s
+ *   ACT 2  150-320 combine    all three types, 30u locks, ~9 u/s
+ *   ACT 3  320-487 pressure   two lanes closed at once, 24-26u locks, ~10.5 u/s
+ *
+ * Act three's locks were lengthened when the speed ramp went in: 20 units at
+ * 10.5 u/s is 1.9 seconds, which clears the floor but leaves little room,
+ * and the warning should not shrink just because the player is moving
+ * faster.
  *
  * Even at the tightest, 2.7 seconds of warning is well past the 1.2s floor.
  * Two invariants are enforced by test rather than inspection: no encounter
@@ -65,15 +70,15 @@ const entities: RouteEntity[] = [
   // ===== ACT 3 — pressure ===============================================
   // Two lanes closed: only the right is open.
   { id: 'h6', kind: 'hazard', z: 335, lane: LANES.left, scored: false, style: 'laser' },
-  { id: 'h7', kind: 'hazard', z: 335, lane: LANES.middle, scored: false, style: 'spotlight', lockLead: 22 },
+  { id: 'h7', kind: 'hazard', z: 335, lane: LANES.middle, scored: false, style: 'spotlight', lockLead: 26 },
   // The reward sits in the lane that pinch forced them into.
   { id: 'g4', kind: 'gift', z: 360, lane: LANES.right, scored: true },
   // ...and is immediately threatened, so holding it costs a decision.
-  { id: 'h8', kind: 'hazard', z: 385, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 20 },
+  { id: 'h8', kind: 'hazard', z: 385, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 24 },
   { id: 'h9', kind: 'hazard', z: 408, lane: LANES.left, scored: false, style: 'fence' },
   // Final pinch: only the middle is open.
   { id: 'h10', kind: 'hazard', z: 432, lane: LANES.right, scored: false, style: 'laser' },
-  { id: 'h11', kind: 'hazard', z: 432, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 20 },
+  { id: 'h11', kind: 'hazard', z: 432, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 26 },
 ];
 
 export const LEVEL_1: LevelConfig = {
@@ -81,7 +86,8 @@ export const LEVEL_1: LevelConfig = {
   laneCount: 3,
   laneWidth: 1.6,
   routeLength: 487,
-  forwardSpeed: 7.5,
+  forwardSpeed: 7,
+  endForwardSpeed: 11,
   invulnerabilitySeconds: 1,
   entities,
 };

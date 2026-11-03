@@ -16,7 +16,13 @@
  */
 import { LaneRunner } from '../core/lanes';
 import type { RunEvent } from '../core/scoring';
-import { HALF_DEPTH, scoredGiftCount, type LevelConfig, type RouteEntity } from './types';
+import {
+  HALF_DEPTH,
+  scoredGiftCount,
+  speedAt,
+  type LevelConfig,
+  type RouteEntity,
+} from './types';
 
 export type EntityState = 'pending' | 'collected' | 'hit' | 'missed';
 
@@ -76,6 +82,11 @@ export class LevelRunner {
     return this.complete;
   }
 
+  /** Current forward speed, for the debug panel. */
+  get speed(): number {
+    return speedAt(this.config, this.travelled);
+  }
+
   get snapshot(): RunnerSnapshot {
     return {
       travelled: this.travelled,
@@ -103,7 +114,11 @@ export class LevelRunner {
   update(step: number): void {
     if (this.complete) return;
 
-    this.travelled = Math.min(this.travelled + this.config.forwardSpeed * step, this.config.routeLength);
+    // Speed ramps with progress, so the route gets faster as it gets tighter.
+    this.travelled = Math.min(
+      this.travelled + speedAt(this.config, this.travelled) * step,
+      this.config.routeLength,
+    );
     this.lanes.update(step);
 
     if (this.invulnerableFor > 0) {

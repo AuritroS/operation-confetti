@@ -75,8 +75,18 @@ export interface LevelConfig {
   readonly laneWidth: number;
   /** Total route distance in world units. */
   readonly routeLength: number;
-  /** Constant forward travel, world units per second. */
+  /** Forward travel at the start of the route, world units per second. */
   readonly forwardSpeed: number;
+  /**
+   * Forward travel at the route end. Omit for a constant-speed level.
+   *
+   * Speed ramps linearly with distance, which compounds with the spacing
+   * ramp: later encounters are both closer together and arriving faster.
+   * Every reaction-time check therefore has to use the speed at that point
+   * in the route, not the starting speed — a test that divides by
+   * `forwardSpeed` would quietly understate the difficulty of act three.
+   */
+  readonly endForwardSpeed?: number;
   /** Seconds of invulnerability after a collision (§5). */
   readonly invulnerabilitySeconds: number;
   readonly entities: readonly RouteEntity[];
@@ -89,6 +99,29 @@ export interface LevelConfig {
  * against this, so tightening the ramp cannot quietly make the level unfair.
  */
 export const MIN_REACTION_SECONDS = 1.2;
+
+/**
+ * Forward speed at a point along the route.
+ *
+ * The single source of truth for the ramp, shared by the runner and by the
+ * tests that check reaction time, so the two can never disagree.
+ */
+export function speedAt(level: LevelConfig, travelled: number): number {
+  const end = level.endForwardSpeed ?? level.forwardSpeed;
+  if (end === level.forwardSpeed) return level.forwardSpeed;
+  const t = Math.min(1, Math.max(0, travelled / level.routeLength));
+  return level.forwardSpeed + (end - level.forwardSpeed) * t;
+}
+
+/**
+ * Seconds a player has between two points, accounting for the ramp.
+ *
+ * Uses the speed at the later point, which is the conservative reading: that
+ * is how fast they will actually be moving when the decision lands.
+ */
+export function secondsBetween(level: LevelConfig, fromZ: number, toZ: number): number {
+  return (toZ - fromZ) / speedAt(level, toZ);
+}
 
 /** Number of scored gifts expected per level, for HUD and validation. */
 export function scoredGiftCount(level: LevelConfig): number {

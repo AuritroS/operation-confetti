@@ -4,6 +4,8 @@ import { LEVEL_1 } from '../src/levels/level1';
 import {
   HALF_DEPTH,
   MIN_REACTION_SECONDS,
+  secondsBetween,
+  speedAt,
   type LevelConfig,
   type RouteEntity,
 } from '../src/levels/types';
@@ -199,7 +201,9 @@ describe('no tunnelling at the configured speed', () => {
   });
 
   it('keeps the step advance well inside the contact window', () => {
-    const advancePerStep = LEVEL_1.forwardSpeed * STEP_S;
+    // Checked at the FASTEST point of the route, which is where tunnelling
+    // would happen if it ever could.
+    const advancePerStep = (LEVEL_1.endForwardSpeed ?? LEVEL_1.forwardSpeed) * STEP_S;
     const window = HALF_DEPTH.player + HALF_DEPTH.hazard;
     // The margin is what makes a 1D test sufficient instead of a swept one.
     expect(advancePerStep).toBeLessThan(window / 4);
@@ -246,21 +250,25 @@ describe('the authored level 1 route', () => {
   });
 
   it('keeps every gap and every telegraph above the reaction floor', () => {
-    // Tightening the ramp must never cross into unfair. Both the distance
-    // between encounters and a spotlight's commit lead are warnings.
+    // Measured at the LOCAL speed, not the starting speed. Act three is both
+    // tighter and faster, so dividing by forwardSpeed would understate its
+    // difficulty by about a third and the floor would not actually be
+    // guarded where it matters most.
     const zs = [...LEVEL_1.entities.map((e) => e.z)].sort((a, b) => a - b);
     for (let i = 1; i < zs.length; i++) {
-      const gap = (zs[i] as number) - (zs[i - 1] as number);
+      const from = zs[i - 1] as number;
+      const to = zs[i] as number;
       // Simultaneous hazards legitimately share a z; they are one encounter.
-      if (gap === 0) continue;
-      expect(gap / LEVEL_1.forwardSpeed, `gap before z=${zs[i]}`).toBeGreaterThan(
+      if (to === from) continue;
+      const seconds = secondsBetween(LEVEL_1, from, to);
+      expect(seconds, `gap before z=${to} is ${seconds.toFixed(2)}s`).toBeGreaterThan(
         MIN_REACTION_SECONDS,
       );
     }
 
     for (const e of LEVEL_1.entities.filter((x) => x.style === 'spotlight')) {
-      const lead = (e.lockLead ?? 30) / LEVEL_1.forwardSpeed;
-      expect(lead, `spotlight at z=${e.z} commits ${lead.toFixed(1)}s ahead`).toBeGreaterThan(
+      const lead = (e.lockLead ?? 30) / speedAt(LEVEL_1, e.z);
+      expect(lead, `spotlight at z=${e.z} commits ${lead.toFixed(2)}s ahead`).toBeGreaterThan(
         MIN_REACTION_SECONDS,
       );
     }
@@ -326,9 +334,24 @@ describe('the authored level 1 route', () => {
   });
 
   it('runs for roughly a minute, matching the pacing target', () => {
-    const seconds = LEVEL_1.routeLength / LEVEL_1.forwardSpeed;
-    expect(seconds).toBeGreaterThanOrEqual(55);
-    expect(seconds).toBeLessThanOrEqual(65);
+    // Measured by simulating, not computed from a formula. Speed ramps with
+    // distance, so length divided by the starting speed overstates the run
+    // by a quarter — which is exactly the mistake the old version made.
+    const r = new LevelRunner(LEVEL_1);
+    const steps = runToEnd(r);
+    const seconds = steps * STEP_S;
+    expect(seconds, `${seconds.toFixed(1)}s`).toBeGreaterThanOrEqual(55);
+    expect(seconds, `${seconds.toFixed(1)}s`).toBeLessThanOrEqual(65);
+  });
+
+  it('ramps the forward speed across the route', () => {
+    const r = new LevelRunner(LEVEL_1);
+    const atStart = r.speed;
+    runToEnd(r);
+    const atEnd = r.speed;
+    expect(atStart).toBeCloseTo(LEVEL_1.forwardSpeed, 1);
+    expect(atEnd).toBeGreaterThan(atStart);
+    expect(atEnd).toBeCloseTo(LEVEL_1.endForwardSpeed ?? 0, 1);
   });
 
   it('awards the documented level maximum on the intended racing line', () => {

@@ -51,7 +51,7 @@ html, body {
   /* Surround outside the portrait frame, a shade darker than the game. */
   background: #0a0a0f;
   color: var(--ink-fg);
-  font: 500 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 500 var(--text-body) / 1.45 var(--font-ui);
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
 }
@@ -121,28 +121,60 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- HUD ------------------------------------------------------------- */
+/* ---- type ------------------------------------------------------------
+   One family for everything the player reads, monospace reserved for the
+   developer panel. Sizes come from a single scale so nothing is arbitrary. */
+:root {
+  --font-ui: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-score: 30px;
+  --text-title: 19px;
+  --text-body: 14px;
+  --text-small: 11px;
+}
+
+/* ---- HUD -------------------------------------------------------------
+   Score and pause only. */
 .hud {
   position: absolute;
   z-index: 20;
-  top: calc(var(--safe-t) + 10px);
-  left: calc(var(--safe-l) + 12px);
-  right: calc(var(--safe-r) + 12px);
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 16px);
+  right: calc(var(--safe-r) + 16px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
   pointer-events: none;
-  display: grid;
-  gap: 8px;
 }
 
-.hud__row { display: flex; align-items: center; gap: 8px; }
-
-.hud__chip {
-  background: var(--panel);
-  border: 1px solid var(--edge);
-  border-radius: 999px;
-  padding: 5px 11px;
+.hud__score {
+  font-family: var(--font-ui);
+  font-size: var(--text-score);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-fg);
+  /* Tabular figures: without them the score jitters as digits change. */
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
-  backdrop-filter: blur(6px);
+  letter-spacing: -0.01em;
+  /* Legible over both the bright moon and the dark roof. */
+  text-shadow: 0 2px 10px rgba(8, 10, 20, 0.85);
+}
+
+/* The cost of a hit, so a dropping number is connected to a cause. */
+.hud__delta {
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--magenta);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 8px rgba(8, 10, 20, 0.9);
+  animation: delta-rise 900ms ease-out forwards;
+}
+
+@keyframes delta-rise {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-14px); }
 }
 
 .hud__btn {
@@ -154,24 +186,34 @@ html, body {
   border: 1px solid var(--edge);
   background: var(--panel);
   color: var(--ink-fg);
-  font-weight: 700;
+  font: 700 13px/1 var(--font-ui);
   letter-spacing: 1px;
   cursor: pointer;
+  backdrop-filter: blur(6px);
 }
 
-.hud__progress {
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
+/* ---- hit vignette ----------------------------------------------------
+   Replaces a half-built 3D bell that was never given a mesh. An edge pulse
+   reads at any screen size, follows no world position, and costs nothing to
+   draw. */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  box-shadow: inset 0 0 90px 24px var(--magenta);
+  opacity: 0;
+  animation: vignette-pulse 420ms ease-out forwards;
 }
 
-.hud__progress-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), var(--gold));
-  transition: width 120ms linear;
+@keyframes vignette-pulse {
+  0% { opacity: 0.75; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud__delta { animation-duration: 1400ms; }
+  .vignette { animation: none; opacity: 0.3; }
 }
 
 /* ---- pause pill -------------------------------------------------------
@@ -232,7 +274,7 @@ html, body {
   z-index: 30;
   left: calc(var(--safe-l) + 12px);
   bottom: calc(var(--safe-b) + 12px);
-  font: 500 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 500 var(--text-small) / 1.55 var(--font-mono);
   color: var(--ink-dim);
   background: rgba(6, 10, 18, 0.6);
   border: 1px solid var(--edge);

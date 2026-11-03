@@ -64,6 +64,9 @@ export type PropProvider = (id: PropId) => Object3D | null;
 const FENCE_PILLARS = 3;
 const PILLAR_HEIGHT = 1.15;
 
+/** How long a collected gift takes to pop and vanish. */
+const POP_SECONDS = 0.25;
+
 /** Spotlights in flight at once. Encounters are 23+ units apart. */
 const SPOTLIGHT_POOL = 3;
 
@@ -80,7 +83,10 @@ export class EntityVisuals {
   private readonly barIndex = new Map<string, { base: number; count: number }>();
   private readonly lasers: InstancedMesh;
   private readonly lights: { light: Searchlight; id: string | null }[] = [];
+  /** Seconds since each gift was taken, driving its pop. */
   private readonly collected = new Map<string, number>();
+  /** Authored scale per object, so a pop multiplies rather than replaces it. */
+  private readonly baseScale = new Map<string, number>();
   private readonly sparkle: SparkleField;
   private readonly matrix = new Matrix4();
   private readonly scratch = new Vector3();
@@ -155,7 +161,21 @@ export class EntityVisuals {
       const object = this.makeEntity(t, prop);
       object.position.x = this.laneX(t.entity.lane);
       this.objects.set(t.entity.id, object);
+      // The registry already scaled this prop; remember it so the pop can
+      // multiply rather than overwrite, which made a taken gift balloon to
+      // nearly twice its intended size.
+      this.baseScale.set(t.entity.id, object.scale.x);
       this.group.add(object);
+
+      // Seed the pop as already finished for anything taken before this
+      // instance existed. The visuals are rebuilt when props finish loading,
+      // and without this every gift collected up to that point replayed its
+      // pickup animation — a giant present appearing over the player seconds
+      // after it was actually collected.
+      if (t.state !== 'pending') {
+        this.collected.set(t.entity.id, POP_SECONDS);
+        object.visible = false;
+      }
     }
 
     // A small pool of cones, assigned to whichever spotlights are closest.
@@ -203,6 +223,9 @@ export class EntityVisuals {
       // ---- lasers and fences: transforms into the shared batch ---------
       const slot = this.barIndex.get(t.entity.id);
       if (slot) {
+        // A struck hazard stops drawing entirely rather than dimming in
+        // place: it is spent, and leaving it lit reads as a threat that is
+        // still live.
         if (inRange && t.state !== 'hit') {
           bars += this.writeBars(t, bars);
         }
@@ -216,11 +239,16 @@ export class EntityVisuals {
       if (t.entity.kind === 'gift' && t.state === 'collected') {
         // A short pop on pickup, then gone. Feedback lives on the gift so
         // Matthew's run cycle is never interrupted by a collection.
-        const age = (this.collected.get(t.entity.id) ?? 0) + step;
-        this.collected.set(t.entity.id, age);
-        const pop = 1 - Math.min(1, age / 0.25);
-        object.visible = pop > 0;
-        object.scale.setScalar(1 + (1 - pop) * 0.9);
+        const age = this.collected.get(t.entity.id) ?? 0;
+        if (age >= POP_SECONDS) {
+          object.visible = false;
+          continue;
+        }
+        this.collected.set(t.entity.id, age + step);
+        const pop = 1 - age / POP_SECONDS;
+        const base = this.baseScale.get(t.entity.id) ?? 1;
+        object.visible = true;
+        object.scale.setScalar(base * (1 + (1 - pop) * 0.9));
         object.position.y = 0.42 + (1 - pop) * 0.8;
         continue;
       }
@@ -336,6 +364,7 @@ export class EntityVisuals {
     for (const { light } of this.lights) light.dispose();
     this.lights.length = 0;
     this.collected.clear();
+    this.baseScale.clear();
     this.lasers.geometry.dispose();
     (this.lasers.material as MeshBasicMaterial).dispose();
     this.lasers.removeFromParent();

@@ -14,7 +14,7 @@ import { Group } from 'three';
 import { FixedLoop, STEP_S } from './core/loop';
 import { InputRecogniser } from './core/input';
 import { isTouchDevice, Lifecycle } from './core/lifecycle';
-import { scoreRun, type RunEvent } from './core/scoring';
+import { POINTS, scoreRun, type RunEvent } from './core/scoring';
 import { LevelRunner } from './levels/runner';
 import { LEVEL_1 } from './levels/level1';
 import { Stage } from './render/stage';
@@ -75,11 +75,6 @@ const route = buildRoute(LEVEL_1, { surface: !hasRooftop, dimDividers: hasRoofto
 world.add(route, entityVisuals.group);
 if (!hasRooftop) world.add(markers.group);
 
-/** Hit feedback bell, parked above the player and shown only on impact. */
-const bell = new Group();
-bell.position.set(0, 2.1, -1.4);
-bell.visible = false;
-world.add(bell);
 
 /** Built asynchronously; gameplay never waits on decoration. */
 let environment: Environment | null = null;
@@ -108,6 +103,11 @@ const run = {
 /** Rises when the runner reports a collision, which drives hit feedback. */
 let lastIncidents = 0;
 
+/** Seconds of the current protection window, for a time-based blink. */
+let invulnClock = 0;
+
+const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+
 /**
  * Hit feedback.
  *
@@ -119,12 +119,9 @@ let lastIncidents = 0;
  * the time this runs.
  */
 function onHit(): void {
-  bellSwing = 1;
   player.playOneShot(CLIPS.matthew.hit);
+  hud.showPenalty(POINTS.incident);
 }
-
-/** Decays to zero after a hit; drives the bell's swing. */
-let bellSwing = 0;
 
 function onEvent(event: RunEvent): void {
   run.events.push(event);
@@ -139,7 +136,13 @@ runner.onEvent(onEvent);
 // ---- simulation --------------------------------------------------------
 
 function update(step: number): void {
-  if (run.finished) return;
+  if (run.finished) {
+    // Keep animating after the run ends, or the celebration never plays and
+    // Matthew freezes mid-stride at the vault.
+    player.update(step, false);
+    environment?.update(runner.snapshot.travelled, step);
+    return;
+  }
 
   runner.update(step);
 
@@ -148,9 +151,18 @@ function update(step: number): void {
   player.setHitFlash(snap.invulnerable);
   // Bank into the lane change; there is no strafe clip to play instead.
   player.setLean(runner.lanes.lean);
-  // Blink while protected. An emissive flash alone was easy to miss, and the
-  // doc wants damage legible without sound (§12 Phase 4).
-  player.setBlink(snap.invulnerable && Math.floor(snap.travelled * 9) % 2 === 0);
+  // Blink while protected.
+  //
+  // Driven by TIME, not distance. Tying it to travelled distance made the
+  // parity flip 1.13 times per frame — a 34 Hz strobe that read as the run
+  // breaking, and a genuine photosensitivity hazard. It would also have got
+  // worse with the speed ramp. Reduced motion holds a steady dim instead of
+  // flashing at all.
+  invulnClock = snap.invulnerable ? invulnClock + step : 0;
+  player.setBlink(
+    snap.invulnerable && (reducedMotion ? false : Math.floor(invulnClock * 12) % 2 === 0),
+  );
+  player.setDimmed(snap.invulnerable && reducedMotion);
   player.update(step, true);
 
   // The vault grows out of the fog as the route ends, so the run has a
@@ -163,15 +175,12 @@ function update(step: number): void {
     onHit();
   }
 
-  if (bellSwing > 0) {
-    bellSwing = Math.max(0, bellSwing - step * 1.6);
-    bell.rotation.z = Math.sin(bellSwing * 34) * bellSwing * 0.5;
-  }
-  bell.visible = bellSwing > 0;
 
   if (snap.complete && !run.finished) {
     run.finished = true;
     input.setEnabled(false);
+    player.setBlink(false);
+    player.celebrate();
     showBanner('Vault reached', `Score ${run.score}  ·  press R to run again`);
   }
 }
@@ -193,15 +202,15 @@ function render(): void {
   stage.camera.lookAt(x * 0.12, 1.0, -6);
   stage.render();
 
-  hud.setProgress(snap.progress);
-  hud.setGifts(snap.giftsCollected, snap.giftsTotal);
-
   debug.set({
     fps: loop.stats.fps,
     steps: loop.stats.stepsLastFrame,
     dropped: loop.stats.droppedSteps,
     lane: `${snap.laneIndex + 1}/${LEVEL_1.laneCount}`,
     dist: `${snap.travelled.toFixed(0)}/${LEVEL_1.routeLength}`,
+    progress: `${Math.round(snap.progress * 100)}%`,
+    speed: runner.speed.toFixed(1),
+    stage: '1/3',
     gifts: `${snap.giftsCollected}/${snap.giftsTotal}`,
     hits: snap.incidents,
     invuln: snap.invulnerable ? 'yes' : 'no',
@@ -299,14 +308,13 @@ function resetRun(): void {
   rebuildEntities();
 
   lastIncidents = 0;
-  bellSwing = 0;
   player.setBlink(false);
   player.setLean(0);
   run.score = 0;
   run.events = [];
   run.finished = false;
 
-  hud.setScore(0);
+  hud.reset();
   hideBanner();
   input.setEnabled(true);
   loop.start();
@@ -320,9 +328,7 @@ pauseBtn.addEventListener('click', () => {
 
 // ---- boot --------------------------------------------------------------
 
-hud.setStage(1);
-hud.setScore(0);
-hud.setGifts(0, runner.snapshot.giftsTotal);
+hud.reset();
 // ?clean hides the debug panel, so a review screenshot shows only what a
 // player sees. The panel otherwise overlaps the character.
 const params = new URLSearchParams(location.search);

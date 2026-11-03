@@ -1,26 +1,53 @@
-/** DOM HUD (design doc §3). No timer is ever displayed. */
+/**
+ * The player-facing HUD (design doc §3).
+ *
+ * Score and pause, nothing else. The doc also proposes gift count and route
+ * progress; those moved to the debug panel on the view that a clean frame
+ * reads better in one hand than a complete one, and that neither number
+ * changes a decision mid-run. No timer is ever displayed, which the doc does
+ * require.
+ */
 export class Hud {
-  private readonly stage = document.getElementById('hud-stage') as HTMLElement;
   private readonly score = document.getElementById('hud-score') as HTMLElement;
-  private readonly gifts = document.getElementById('hud-gifts') as HTMLElement;
-  private readonly progress = document.getElementById('hud-progress') as HTMLElement;
-
-  setStage(n: number, of = 3): void {
-    this.stage.textContent = `${n}/${of}`;
-  }
+  private readonly delta = document.getElementById('hud-delta') as HTMLElement;
+  private readonly vignette = document.getElementById('vignette') as HTMLElement;
+  private shown = 0;
 
   setScore(points: number): void {
+    if (points === this.shown) return;
+    this.shown = points;
     this.score.textContent = String(points);
   }
 
-  setGifts(collected: number, total: number): void {
-    this.gifts.textContent = `${collected} / ${total}`;
+  /**
+   * Show what a hit cost, and pulse the screen edge.
+   *
+   * Without this the score simply drops and nothing connects the number to
+   * the cause. Re-triggering restarts both animations, which is why each
+   * element is removed from the flow and re-added rather than just having a
+   * class toggled.
+   */
+  showPenalty(points: number): void {
+    this.delta.textContent = `${points}`;
+    restartAnimation(this.delta);
+    restartAnimation(this.vignette);
   }
 
-  /** `t` is 0..1 route progress. */
-  setProgress(t: number): void {
-    this.progress.style.width = `${Math.round(Math.min(1, Math.max(0, t)) * 100)}%`;
+  reset(): void {
+    this.shown = -1;
+    this.setScore(0);
+    this.delta.hidden = true;
+    this.vignette.hidden = true;
   }
+}
+
+/** Re-run a CSS animation on an element that may already be showing. */
+function restartAnimation(el: HTMLElement): void {
+  el.hidden = true;
+  // Reading offsetWidth forces a reflow, so the browser treats the next
+  // frame as a fresh start rather than continuing the previous animation.
+  void el.offsetWidth;
+  el.hidden = false;
 }
 
 export class Overlay {
@@ -57,6 +84,10 @@ export class Overlay {
   }
 }
 
+/**
+ * Developer readout. Everything the HUD no longer shows lives here, so the
+ * information is still one key away without crowding the player's frame.
+ */
 export class DebugPanel {
   private readonly el = document.getElementById('debug') as HTMLElement;
 

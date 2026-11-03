@@ -122,6 +122,17 @@ class RogueVisual implements PlayerVisual {
     this.object.visible = !hidden;
   }
 
+  setDimmed(dimmed: boolean): void {
+    if (this.dimmed === dimmed) return;
+    this.dimmed = dimmed;
+    for (const { material } of this.materials) {
+      material.transparent = dimmed;
+      material.opacity = dimmed ? 0.5 : 1;
+    }
+  }
+
+  private dimmed = false;
+
   playOneShot(clip: string): void {
     if (!this.actor.play(clip, { loop: false, clampWhenFinished: false, fade: 0.08 })) return;
     // Long enough to read, short enough not to fight the run cycle. The
@@ -136,6 +147,12 @@ class RogueVisual implements PlayerVisual {
       this.actor.play(moving ? CLIPS.matthew.run : CLIPS.matthew.idle);
     }
     this.actor.update(step);
+  }
+
+  /** Settle into a celebration at the end of a run. */
+  celebrate(): void {
+    this.oneShot = 0;
+    this.actor.play(CLIPS.matthew.cheer, { loop: false, clampWhenFinished: true, fade: 0.2 });
   }
 
   dispose(): void {
