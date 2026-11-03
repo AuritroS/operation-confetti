@@ -33,7 +33,7 @@ export const PLAN: readonly PlannedAsset[] = [
   {
     role: 'Matthew',
     level: 'all',
-    assetId: 'characters/Rogue_Hooded',
+    assetId: 'recoloured/matthew',
     status: 'proposed',
     note: 'Hood and cape give the thief silhouette. Mask is already a separate mesh, so the doc’s "custom bandit mask" is done. Recolour: body and legs blue, trim gold, skin untouched.',
     clips: ['Running_A', 'Idle_A', 'Hit_A', 'Jump_Idle', 'Idle_B', 'Throw', 'Jump_Full_Short'],
@@ -41,7 +41,7 @@ export const PLAN: readonly PlannedAsset[] = [
   {
     role: 'Aurora',
     level: 3,
-    assetId: 'characters/Mage',
+    assetId: 'recoloured/aurora',
     status: 'proposed',
     note: 'Hat retained per the doc. Recolour: robe purple, trim gold.',
     clips: ['Idle_B', 'Use_Item', 'Throw', 'Hit_A', 'Death_A', 'Death_A_Pose'],
@@ -49,9 +49,9 @@ export const PLAN: readonly PlannedAsset[] = [
   {
     role: 'Guard',
     level: 1,
-    assetId: 'characters/Knight',
+    assetId: 'recoloured/guard',
     status: 'proposed',
-    note: 'Reads as a uniformed guard and is the cheapest character at 5,800 tris. Recolour to slate/navy.',
+    note: 'Navy uniform with a gold badge. Hide the cape — that silhouette belongs to Matthew — and keep the helmet, which reads as security rather than knight once it is dark.',
     clips: ['Idle_A', 'Walking_A', 'Hit_B'],
   },
 
@@ -145,9 +145,9 @@ export const PLAN: readonly PlannedAsset[] = [
   {
     role: 'Moving hazard',
     level: 2,
-    assetId: 'holiday/lantern_mini',
-    status: 'proposed',
-    note: 'Floating orb hazard at 286 tris. Reads as a magic light rather than a drone, which suits Aurora.',
+    assetId: null,
+    status: 'procedural',
+    note: 'A magenta magic orb Aurora throws during the chase. Procedural rather than a prop: it is her magic, so it should be her colour and share the sparkle system. Replaces the earlier lantern_mini pick, which read as set dressing rather than a threat.',
   },
   {
     role: 'Interpol nod',

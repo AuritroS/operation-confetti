@@ -22,9 +22,10 @@ import {
 } from 'three';
 import type { LevelConfig } from '../levels/types';
 import type { TrackedEntity } from '../levels/runner';
+import { PALETTE, ROLE } from './palette';
 
-const PLAYER_BLUE = 0x4da3ff;
-const GOLD = 0xffc54d;
+const PLAYER_BLUE = ROLE.collectible;
+const GOLD = PALETTE.gold;
 const CRATE = 0x8a6a4a;
 
 /**
@@ -53,7 +54,7 @@ export function buildRoute(level: LevelConfig): Group {
 
   const ground = new Mesh(
     new PlaneGeometry(width, DRAW_DISTANCE * 2),
-    new MeshStandardMaterial({ color: 0x27354f, roughness: 0.95 }),
+    new MeshStandardMaterial({ color: ROLE.ground, roughness: 0.95 }),
   );
   ground.rotation.x = -Math.PI / 2;
   group.add(ground);
@@ -62,7 +63,7 @@ export function buildRoute(level: LevelConfig): Group {
   for (let i = 0; i <= level.laneCount; i++) {
     const stripe = new Mesh(
       new PlaneGeometry(0.05, DRAW_DISTANCE * 2),
-      new MeshStandardMaterial({ color: 0x3c4e73, roughness: 1 }),
+      new MeshStandardMaterial({ color: ROLE.laneDivider, roughness: 1 }),
     );
     stripe.rotation.x = -Math.PI / 2;
     stripe.position.set((i - level.laneCount / 2) * level.laneWidth, 0.01, 0);
@@ -85,7 +86,7 @@ export class RouteMarkers {
     for (let i = 0; i < count; i++) {
       const m = new Mesh(
         new BoxGeometry(level.laneWidth * level.laneCount, 0.06, 0.2),
-        new MeshStandardMaterial({ color: 0x3c4e73, roughness: 0.8 }),
+        new MeshStandardMaterial({ color: ROLE.laneDivider, roughness: 0.8 }),
       );
       this.group.add(m);
       this.meshes.push(m);
@@ -170,7 +171,7 @@ function makeEntity(t: TrackedEntity): Object3D {
       new MeshStandardMaterial({
         color: GOLD,
         roughness: 0.35,
-        emissive: new Color(0x5a4000),
+        emissive: new Color(PALETTE.gold).multiplyScalar(0.25),
       }),
     );
     mesh.rotation.x = Math.PI / 2;

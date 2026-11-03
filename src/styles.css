@@ -1,14 +1,29 @@
-/* ---- tokens ---------------------------------------------------------- */
+/* ---- tokens -----------------------------------------------------------
+   Mirrors src/render/palette.ts, which is the source of truth and carries the
+   provenance notes. A test asserts these stay in sync.                      */
 :root {
-  --ink: #eef2fb;
+  --ink: #18101a;
+  --navy-deep: #1b275c;
+  --navy: #12368f;
+  --blue: #234ca8;
+  --blue-light: #6295e1;
+  --gold: #eaac5b;
+  --purple-deep: #5c175c;
+  --magenta: #cc29c3;
+  --orange-warm: #f29e59;
+  --cyan: #53a6f9;
+  --slate: #1a1f2e;
+  --slate-line: #2b3450;
+
+  /* Roles, named for what they do rather than what colour they are. */
+  --bg: var(--ink);
+  --panel: rgba(27, 39, 92, 0.82);
+  --edge: rgba(98, 149, 225, 0.22);
+  --accent: var(--blue-light);
+  --villain: var(--magenta);
+  --danger: var(--magenta);
+  --ink-fg: #eef2fb;
   --ink-dim: #9fb0cc;
-  --bg: #0d1320;
-  --panel: rgba(16, 24, 40, 0.86);
-  --edge: rgba(190, 212, 255, 0.18);
-  --accent: #4da3ff;   /* Matthew blue */
-  --gold: #ffc54d;     /* Matthew gold */
-  --villain: #a46bff;  /* Aurora purple */
-  --danger: #ff5d6c;
 
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -33,7 +48,7 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: var(--bg);
-  color: var(--ink);
+  color: var(--ink-fg);
   font: 500 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
@@ -96,7 +111,7 @@ html, body {
   border-radius: 50%;
   border: 1px solid var(--edge);
   background: var(--panel);
-  color: var(--ink);
+  color: var(--ink-fg);
   font-weight: 700;
   letter-spacing: 1px;
   cursor: pointer;
@@ -130,7 +145,7 @@ html, body {
   border: 1px solid var(--edge);
   border-radius: 999px;
   background: var(--panel);
-  color: var(--ink);
+  color: var(--ink-fg);
   font-weight: 650;
   text-align: center;
   pointer-events: none;
@@ -212,7 +227,7 @@ html, body {
   border-bottom-width: 2px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.07);
-  color: var(--ink);
+  color: var(--ink-fg);
   font: 600 10px/1.4 ui-monospace, Menlo, monospace;
   text-align: center;
 }
@@ -235,7 +250,7 @@ html, body {
   border-radius: 8px;
   border: 1px solid var(--edge);
   background: var(--panel);
-  color: var(--ink);
+  color: var(--ink-fg);
   font: 600 11px/1 ui-monospace, Menlo, monospace;
   cursor: pointer;
 }

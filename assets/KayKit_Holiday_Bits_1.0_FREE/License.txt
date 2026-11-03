@@ -1,0 +1,19 @@
+
+
+	KayKit : Holiday Bits (1.0)
+
+	Created/distributed by Kay Lousberg (www.kaylousberg.com)
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+
+			------------------------------
+
+	NOTE: this pack was downloaded without a License.txt. The licence above was
+	confirmed as Creative Commons Zero v1.0 Universal by the project owner on
+	3 November 2026 and recorded here so the project keeps a licence file for
+	every source pack, as design.md section 10 requires.

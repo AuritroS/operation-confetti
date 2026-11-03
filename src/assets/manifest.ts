@@ -8,7 +8,7 @@
  * PINNED BASELINE — do not silently mix with other releases:
  *   KayKit Adventurers           2.0 FREE  (CC0, dated 2025-10-22)
  *   KayKit City Builder Bits     1.0 FREE  (CC0)
- *   Kenney Blaster Kit           2.1       (CC0)
+ *   KayKit Holiday Bits          1.0 FREE  (CC0)
  *
  * NOTE: this baseline differs from the 1.0 GitHub pack audited in the design
  * doc. The 2.0 character GLBs contain ZERO embedded animations; all clips come
@@ -22,16 +22,22 @@ export const ASSET_VERSION = '2.0.0-free+city1.0+blaster2.1';
 /** Paths are relative to the Vite public root. */
 export const SOURCES = {
   characters: {
-    matthew: '/models/src/Rogue_Hooded.glb',
-    aurora: '/models/src/Mage.glb',
-    guard: '/models/src/Knight.glb',
+    // Recoloured exports from `npm run assets:recolour`, which bakes the
+    // project palette into each atlas. The pristine source packs stay in
+    // assets/ and are never modified.
+    matthew: '/models/matthew.glb',
+    aurora: '/models/aurora.glb',
+    guard: '/models/guard.glb',
   },
   animationLibraries: [
     '/models/src/Rig_Medium_General.glb',
     '/models/src/Rig_Medium_MovementBasic.glb',
   ],
   props: {
-    blaster: '/models/src/blaster-f.glb',
+    /** Confetti blaster. The Kenney blaster is gone — see plan.ts. */
+    blaster: '/models/props/snowball_cannon.glb',
+    gift: '/models/props/present_A_blue.glb',
+    grappleHook: '/models/props/candycane_small.glb',
   },
 } as const;
 

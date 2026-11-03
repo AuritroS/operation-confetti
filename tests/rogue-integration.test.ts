@@ -27,6 +27,13 @@ import { AssetBundle } from '../src/assets/characters';
  * GLTFLoader degrades without it, and nothing below depends on texture data.
  */
 
+/**
+ * The runtime character is the recoloured export, not the raw pack model: the
+ * sources are never staged any more, because shipping both would duplicate
+ * 1.1 MB of superseded geometry. Testing what actually ships also means the
+ * recolour is covered.
+ */
+const RUNTIME = 'public/models';
 const STAGED = 'public/models/src';
 
 /**
@@ -56,7 +63,7 @@ function findNode(root: Object3D, name: string): Object3D | undefined {
 
 describe('Rogue asset pipeline', () => {
   it('parses the staged Rogue and both animation libraries', async () => {
-    const rogue = await parseGlb(`${STAGED}/Rogue_Hooded.glb`);
+    const rogue = await parseGlb(`${RUNTIME}/matthew.glb`);
     const general = await parseGlb(`${STAGED}/Rig_Medium_General.glb`);
     const movement = await parseGlb(`${STAGED}/Rig_Medium_MovementBasic.glb`);
 
@@ -66,7 +73,7 @@ describe('Rogue asset pipeline', () => {
   }, 30_000);
 
   it('plays every clip the manifest names on a cloned Rogue skeleton', async () => {
-    const rogue = await parseGlb(`${STAGED}/Rogue_Hooded.glb`);
+    const rogue = await parseGlb(`${RUNTIME}/matthew.glb`);
     const general = await parseGlb(`${STAGED}/Rig_Medium_General.glb`);
     const movement = await parseGlb(`${STAGED}/Rig_Medium_MovementBasic.glb`);
 
@@ -102,7 +109,7 @@ describe('Rogue asset pipeline', () => {
   }, 30_000);
 
   it('actually moves the skeleton when the run clip advances', async () => {
-    const rogue = await parseGlb(`${STAGED}/Rogue_Hooded.glb`);
+    const rogue = await parseGlb(`${RUNTIME}/matthew.glb`);
     const movement = await parseGlb(`${STAGED}/Rig_Medium_MovementBasic.glb`);
 
     const root = cloneSkinned(rogue.scene);
@@ -127,7 +134,7 @@ describe('Rogue asset pipeline', () => {
   }, 30_000);
 
   it('gives each clone an independent skeleton', async () => {
-    const rogue = await parseGlb(`${STAGED}/Rogue_Hooded.glb`);
+    const rogue = await parseGlb(`${RUNTIME}/matthew.glb`);
     const movement = await parseGlb(`${STAGED}/Rig_Medium_MovementBasic.glb`);
     const run = movement.animations.find((c) => c.name === CLIPS.matthew.run) as AnimationClip;
 
@@ -148,7 +155,7 @@ describe('Rogue asset pipeline', () => {
   it('resolves attachment nodes through the production Actor lookup', async () => {
     // The manifest stores authentic glTF names with dots; Actor.node has to
     // bridge to the sanitized graph or the blaster silently never attaches.
-    const rogue = await parseGlb(`${STAGED}/Rogue_Hooded.glb`);
+    const rogue = await parseGlb(`${RUNTIME}/matthew.glb`);
     const bundle = new AssetBundle();
     // Inject the parsed result so this exercises Actor, not the network.
     (bundle as unknown as { gltfs: Map<string, unknown> }).gltfs.set('x', rogue);
@@ -160,7 +167,7 @@ describe('Rogue asset pipeline', () => {
   }, 30_000);
 
   it('exposes the attachment nodes the blaster needs', async () => {
-    const rogue = await parseGlb(`${STAGED}/Rogue_Hooded.glb`);
+    const rogue = await parseGlb(`${RUNTIME}/matthew.glb`);
     const root = cloneSkinned(rogue.scene);
     for (const node of ['handslot.r', 'handslot.l', 'head']) {
       expect(findNode(root, node), `${node} must survive cloning`).toBeDefined();

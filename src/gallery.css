@@ -97,7 +97,7 @@ body.gallery {
   width: 96px;
   height: 96px;
   border-radius: 8px;
-  background: linear-gradient(170deg, #1b2538, #0f1726);
+  background: linear-gradient(170deg, #3a4668, #141c2c);
   cursor: pointer;
 }
 
@@ -207,7 +207,7 @@ body.gallery {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background: linear-gradient(170deg, #1b2538, #0f1726);
+  background: linear-gradient(170deg, #3a4668, #141c2c);
 }
 
 .tile__meta { padding: 7px 8px 8px; }
@@ -272,7 +272,7 @@ body.gallery {
   height: auto;
   aspect-ratio: 1;
   border-radius: 10px;
-  background: linear-gradient(170deg, #1b2538, #0f1726);
+  background: linear-gradient(170deg, #3a4668, #141c2c);
 }
 
 .gal-detail h2 { margin: 12px 0 8px; font-size: 15px; word-break: break-word; }

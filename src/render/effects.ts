@@ -9,6 +9,7 @@
  * postprocessing, and particle counts capped. Confetti and sparkle are
  * decorative and never participate in collision (§11).
  */
+import { ROLE } from './palette';
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -25,9 +26,13 @@ import {
   type Texture,
 } from 'three';
 
-/** Blue means take it; red means avoid it. The whole colour language. */
-export const SPARKLE_BLUE = 0x6fd4ff;
-export const HAZARD_RED = 0xff4a5c;
+/**
+ * Colours come from the project palette, which is derived from the reference
+ * art. Blue is Matthew's and means take it; magenta is Aurora's and means
+ * avoid it — her magic, her orbs, her guards' searchlights.
+ */
+export const SPARKLE_BLUE = ROLE.collectible;
+export const HAZARD_RED = ROLE.hazard;
 
 let sharedDot: Texture | null = null;
 
@@ -263,7 +268,7 @@ export class Searchlight {
     height = 5,
   ) {
     this.material = new MeshBasicMaterial({
-      color: new Color(0xfff0c4),
+      color: new Color(ROLE.hazard),
       transparent: true,
       opacity: 0.17,
       blending: AdditiveBlending,
@@ -277,7 +282,7 @@ export class Searchlight {
     this.group.add(this.cone);
 
     this.poolMaterial = new MeshBasicMaterial({
-      color: new Color(0xfff0c4),
+      color: new Color(ROLE.hazard),
       transparent: true,
       opacity: 0.3,
       blending: AdditiveBlending,

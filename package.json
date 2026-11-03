@@ -18,11 +18,12 @@
     "db:push": "node tools/db-push.mjs",
     "db:check": "node tools/db-push.mjs --check",
     "assets:inspect": "node tools/inspect-glb.mjs",
-    "assets:build": "node tools/build-assets.mjs && node tools/build-asset-index.mjs",
+    "assets:build": "node tools/build-assets.mjs && node tools/recolour.mjs && node tools/build-asset-index.mjs",
     "tunnel": "node tools/tunnel.mjs",
     "dev:lan": "HOST=0.0.0.0 vite",
     "assets:index": "node tools/build-asset-index.mjs",
-    "shoot": "node tools/shoot.mjs"
+    "shoot": "node tools/shoot.mjs",
+    "assets:recolour": "node tools/recolour.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

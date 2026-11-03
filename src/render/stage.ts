@@ -13,6 +13,7 @@ import {
   Scene,
   WebGLRenderer,
 } from 'three';
+import { PALETTE } from './palette';
 
 export const MAX_PIXEL_RATIO = 1.5;
 
@@ -30,20 +31,29 @@ export class Stage {
       powerPreference: 'high-performance',
       alpha: false,
     });
-    this.renderer.setClearColor(new Color('#0d1320'), 1);
+    this.renderer.setClearColor(new Color(PALETTE.ink), 1);
 
     this.scene = new Scene();
-    this.scene.background = new Color('#0d1320');
-    this.scene.fog = new Fog('#0d1320', 26, 64);
+    this.scene.background = new Color(PALETTE.ink);
+    this.scene.fog = new Fog(PALETTE.ink, 26, 64);
 
     this.camera = new PerspectiveCamera(58, 1, 0.1, 160);
 
-    const hemi = new HemisphereLight(0xcfe0ff, 0x1b2436, 1.05);
+    const hemi = new HemisphereLight(PALETTE.cyan, PALETTE.navyDeep, 0.85);
     this.scene.add(hemi);
 
-    const dir = new DirectionalLight(0xfff2d6, 1.5);
-    dir.position.set(4, 9, 5);
-    this.scene.add(dir);
+    // Warm key, standing in for the city's window light.
+    const key = new DirectionalLight(PALETTE.orangeWarm, 1.15);
+    key.position.set(4, 9, 5);
+    this.scene.add(key);
+
+    // Rim light from behind. Matthew is dark navy on a dark navy world once
+    // recoloured, so without an edge highlight his silhouette disappears into
+    // the ground. The reference art solves this the same way, by backlighting
+    // him against the city.
+    const rim = new DirectionalLight(PALETTE.blueLight, 2.2);
+    rim.position.set(-5, 5, -9);
+    this.scene.add(rim);
 
     this.resize();
   }

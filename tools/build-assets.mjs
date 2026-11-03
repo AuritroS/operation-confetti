@@ -22,15 +22,37 @@ const STORY_OUT = 'public/story';
 
 const A = 'assets/KayKit_Adventurers_2.0_FREE';
 const CITY = 'assets/KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf';
-const BLASTER = 'assets/kenney_blaster-kit_2.1/Models/GLB format';
+const HOLIDAY = 'assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf';
 
-/** Character and prop GLBs copied as-is. */
-const COPY = [
-  `${A}/Characters/gltf/Rogue_Hooded.glb`,
-  `${A}/Characters/gltf/Mage.glb`,
-  `${A}/Characters/gltf/Knight.glb`,
-  `${BLASTER}/blaster-f.glb`,
+/**
+ * Copied as-is.
+ *
+ * The three characters are deliberately absent: `npm run assets:recolour`
+ * produces matthew/aurora/guard.glb with the palette baked in, and staging
+ * the originals too would ship 1.1 MB of superseded models. Kenney is gone
+ * entirely — one art language now.
+ */
+const COPY = [];
+
+/**
+ * Holiday and city props arrive as .gltf with a sidecar .bin and a shared
+ * atlas, which would mean three requests each at runtime. Converting to GLB
+ * makes them self-contained and lets the atlas be embedded once per prop.
+ */
+const CONVERT = [
+  `${HOLIDAY}/present_A_blue.gltf`,
+  `${HOLIDAY}/present_C_red.gltf`,
+  `${HOLIDAY}/candycane_small.gltf`,
+  `${HOLIDAY}/snowball_cannon.gltf`,
+  `${HOLIDAY}/snowman_A.gltf`,
+  `${HOLIDAY}/bell_decorated.gltf`,
+  `${CITY}/watertower.gltf`,
+  `${CITY}/streetlight.gltf`,
+  `${CITY}/building_A.gltf`,
+  `${CITY}/car_police.gltf`,
 ];
+
+const PROPS_OUT = 'public/models/props';
 
 /** Animation libraries: copied, then stripped of their mannequin mesh. */
 const PRUNE = [
@@ -63,7 +85,10 @@ function copy(src, destDir) {
 }
 
 // ---- 1. clean -----------------------------------------------------------
-rmSync('public/models', { recursive: true, force: true });
+// Only the generated subtrees are cleared; the recoloured characters written
+// by tools/recolour.mjs live alongside and must survive.
+rmSync('public/models/src', { recursive: true, force: true });
+rmSync(PROPS_OUT, { recursive: true, force: true });
 rmSync(STORY_OUT, { recursive: true, force: true });
 
 // ---- 2. copy ------------------------------------------------------------
@@ -72,6 +97,28 @@ const report = [];
 for (const src of COPY) {
   const dest = copy(src, SRC_OUT);
   if (dest) report.push({ file: basename(dest), step: 'copy', kb: kb(dest) });
+}
+
+// ---- 2b. convert sidecar glTF props to self-contained GLB ---------------
+for (const src of CONVERT) {
+  if (!existsSync(src)) {
+    warnings.push(`missing source: ${src}`);
+    continue;
+  }
+  ensure(PROPS_OUT);
+  const name = basename(src, '.gltf');
+  const dest = join(PROPS_OUT, `${name}.glb`);
+
+  const res = spawnSync(process.execPath, ['tools/gltf-to-glb.mjs', src, dest], {
+    stdio: 'pipe',
+    encoding: 'utf8',
+  });
+
+  if (res.status !== 0) {
+    warnings.push(`convert failed for ${name}: ${(res.stderr || res.stdout || '').trim().slice(0, 160)}`);
+    continue;
+  }
+  report.push({ file: `${name}.glb`, step: 'gltf -> glb', kb: kb(dest) });
 }
 
 // ---- 3. strip animation libraries --------------------------------------
@@ -145,5 +192,5 @@ if (warnings.length) {
 const cityCount = existsSync(CITY)
   ? readdirSync(CITY).filter((f) => f.endsWith('.gltf')).length
   : 0;
-console.log(`  city pack: ${cityCount} gltf files available in ${CITY}`);
-console.log('  (prop selection is an open decision; nothing from the city pack is staged yet)\n');
+console.log(`  city pack: ${cityCount} gltf files available, ${CONVERT.filter((c) => c.includes('City')).length} staged`);
+console.log('  (see src/assets/plan.ts for which asset fills which role)\n');

@@ -17,7 +17,7 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
-  type Object3D,
+  Object3D,
   PerspectiveCamera,
   Scene,
   Vector3,
@@ -29,6 +29,16 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PLAN, type PlannedAsset } from './assets/plan';
 import { CHARACTER_HEIGHT, SOURCES } from './assets/manifest';
 import { LaserBarrier, Searchlight, Sparkle } from './render/effects';
+import {
+  buildCake,
+  buildCnTower,
+  buildCrown,
+  buildMaskEmblem,
+  buildVaultDoor,
+  Confetti,
+  GrappleCable,
+  MagicOrb,
+} from './render/custom';
 import './gallery.css';
 
 interface AssetItem {
@@ -71,7 +81,9 @@ const renderer = new WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(THUMB, THUMB, false);
-renderer.setClearColor(new Color('#121a28'), 1);
+// Mid-tone, not near-black: Matthew is dark navy once recoloured, and a
+// dark backdrop hides exactly the asset most in need of review.
+renderer.setClearColor(new Color('#2b3450'), 1);
 
 const scene = new Scene();
 const camera = new PerspectiveCamera(32, 1, 0.01, 200);
@@ -145,6 +157,25 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/**
+ * Copy the shared renderer's output into a 2D canvas.
+ *
+ * `gl.finish()` is required before the copy, not optional. drawImage reads the
+ * drawing buffer, and without a flush the GPU may not have finished presenting
+ * — which showed up as the FIRST thumbnail being blank regardless of which
+ * model it was, because a freshly created context needs the sync most.
+ * preserveDrawingBuffer alone does not cover it: that stops the buffer being
+ * cleared, it does not guarantee it has been written.
+ */
+function copyToCanvas(target: HTMLCanvasElement, size: number): void {
+  renderer.getContext().finish();
+  const ctx = target.getContext('2d');
+  if (!ctx) return;
+  target.width = size;
+  target.height = size;
+  ctx.drawImage(renderer.domElement, 0, 0, size, size);
+}
+
 /** Render one model into a destination 2D canvas. */
 function renderThumb(item: AssetItem, target: HTMLCanvasElement): Promise<void> {
   return enqueue(async () => {
@@ -157,11 +188,7 @@ function renderThumb(item: AssetItem, target: HTMLCanvasElement): Promise<void> 
     renderer.render(scene, camera);
     holder.clear();
 
-    const ctx = target.getContext('2d');
-    if (!ctx) return;
-    target.width = THUMB;
-    target.height = THUMB;
-    ctx.drawImage(renderer.domElement, 0, 0, THUMB, THUMB);
+    copyToCanvas(target, THUMB);
   });
 }
 
@@ -422,12 +449,7 @@ async function openDetail(item: AssetItem): Promise<void> {
     renderer.render(scene, camera);
     holder.clear();
 
-    const ctx = el.detailCanvas.getContext('2d');
-    if (ctx) {
-      el.detailCanvas.width = size;
-      el.detailCanvas.height = size;
-      ctx.drawImage(renderer.domElement, 0, 0, size, size);
-    }
+    copyToCanvas(el.detailCanvas, size);
     detailRaf = requestAnimationFrame(spin);
   };
   detailRaf = requestAnimationFrame(spin);
@@ -840,7 +862,7 @@ interface FxPreview {
 const FX: FxPreview[] = [
   {
     name: 'Thief sparkle',
-    note: 'Marks anything interactable. Blue means take it. Particles orbit on independent phases so the cloud never reads as a rigid ring.',
+    note: 'Marks anything interactable. Blue is Matthew\u2019s and means take it. Particles orbit on independent phases so the cloud never reads as a rigid ring.',
     build: () => {
       const s = new Sparkle({ count: 16, radius: 0.5, rise: 0.7 });
       return { object: s.points, update: (d) => s.update(d), dispose: () => s.dispose() };
@@ -848,7 +870,7 @@ const FX: FxPreview[] = [
   },
   {
     name: 'Laser barrier',
-    note: 'The primary hazard. Red means avoid. Two crossed quads keep it solid from the shallow gameplay camera angle, where a single flat quad would vanish edge-on.',
+    note: 'The primary hazard. Magenta is Aurora\u2019s colour, so a laser reads as her trap rather than generic danger. Two crossed quads keep it solid from the shallow gameplay camera angle, where a single flat quad would vanish edge-on.',
     build: () => {
       const l = new LaserBarrier({ width: 1.5 });
       return { object: l.group, update: (d) => l.update(d), dispose: () => l.dispose() };
@@ -870,6 +892,101 @@ const FX: FxPreview[] = [
       const s = new Searchlight();
       s.lockTo(2);
       return { object: s.group, update: (d) => s.update(d), dispose: () => s.dispose() };
+    },
+  },
+  {
+    name: 'Magic orb',
+    note: 'The level 2 moving hazard. Aurora throws these during the chase, so it is her magenta and shares the sparkle system. Replaces the lantern, which read as set dressing.',
+    build: () => {
+      const o = new MagicOrb();
+      return { object: o.group, update: (d) => o.update(d), dispose: () => o.dispose() };
+    },
+  },
+  {
+    name: 'The cake',
+    note: 'Red velvet, white frosting, six lit candles — straight from Aurora\u2019s reference. The entire plot object, and nothing in any pack resembled one.',
+    build: () => {
+      const cake = buildCake();
+      return { object: cake, update: () => {}, dispose: () => cake.removeFromParent() };
+    },
+  },
+  {
+    name: 'Aurora\u2019s crown',
+    note: 'Gold spiked crown from the reference, replacing the Mage hat. Alternating tall and short points are what read as a crown rather than a cog at distance.',
+    build: () => {
+      const crown = buildCrown(0.26);
+      return { object: crown, update: () => {}, dispose: () => crown.removeFromParent() };
+    },
+  },
+  {
+    name: 'CN Tower',
+    note: 'In both reference images, and what makes the skyline Toronto rather than a generic city. The observation pod is the identifying detail.',
+    build: () => {
+      const tower = buildCnTower(14);
+      return { object: tower, update: () => {}, dispose: () => tower.removeFromParent() };
+    },
+  },
+  {
+    name: 'Mask emblem',
+    note: 'Matthew\u2019s gold bandit-mask logo — his title treatment, and a banner in Aurora\u2019s image. Goes on the vault door, and is available for the HUD.',
+    build: () => {
+      const emblem = buildMaskEmblem(1);
+      return { object: emblem, update: () => {}, dispose: () => emblem.removeFromParent() };
+    },
+  },
+  {
+    name: 'Vault door',
+    note: 'The level 1 route endpoint, carrying the emblem so the payoff is legible.',
+    build: () => {
+      const vault = buildVaultDoor(2.4, 1.7);
+      vault.add(buildMaskEmblem(0.8)).children.at(-1)!.position.set(0, 0.85, 0.25);
+      return { object: vault, update: () => {}, dispose: () => vault.removeFromParent() };
+    },
+  },
+  {
+    name: 'Grapple cable',
+    note: 'Gold cable from a wrist gadget, as in the reference. One cylinder restretched per frame rather than rebuilt, so swinging allocates nothing.',
+    build: () => {
+      const group = new Group();
+      const gadget = new Object3D();
+      const anchor = new Object3D();
+      anchor.position.set(1.1, 1.3, 0);
+      group.add(gadget, anchor);
+      const cable = new GrappleCable();
+      group.add(cable.mesh);
+      let t = 0;
+      return {
+        object: group,
+        update: (d) => {
+          t += d;
+          // Swing the anchor so the restretch is visible.
+          anchor.position.set(Math.cos(t) * 1.1, 1.1 + Math.sin(t * 0.7) * 0.4, 0);
+          group.updateMatrixWorld(true);
+          cable.setSpan(gadget, anchor);
+        },
+        dispose: () => cable.dispose(),
+      };
+    },
+  },
+  {
+    name: 'Confetti',
+    note: 'Gold flecks from both references. Capped and pooled, and decorative only — the doc is explicit that confetti is never a physical damage object.',
+    build: () => {
+      const c = new Confetti(40);
+      let t = 99;
+      return {
+        object: c.group,
+        update: (d) => {
+          t += d;
+          // Re-burst on a loop so the preview always shows something.
+          if (t > 3) {
+            t = 0;
+            c.burst(new Vector3(0, 0.2, 0));
+          }
+          c.update(d);
+        },
+        dispose: () => c.dispose(),
+      };
     },
   },
 ];
@@ -931,8 +1048,7 @@ function renderEffects(): void {
       renderer.render(scene, camera);
       holder.clear();
 
-      const ctx = card.canvas.getContext('2d');
-      if (ctx) ctx.drawImage(renderer.domElement, 0, 0, 300, 300);
+      copyToCanvas(card.canvas, 300);
     }
     fxRaf = requestAnimationFrame(tick);
   };
