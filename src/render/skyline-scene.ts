@@ -9,10 +9,12 @@ import { SkylineCamera } from './skyline-camera';
 import { SkylineStreet } from './skyline-street';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower } from './custom';
+import { SparkleField } from './effects';
+import { PALETTE } from './palette';
 import { darken, disposeTree, unfog } from './environment/skyline';
 import type { EnvironmentLayer } from './environment/layer';
 import type { StreetAssets } from './skyline-assets';
-import { CAMERA_FAR, FOG_DENSITY } from './skyline-view';
+import { CAMERA_FAR, CAMERA_NEAR, ENTITY_DRAW_AHEAD, FOG_DENSITY } from './skyline-view';
 import { ObstacleKit } from './skyline-obstacles';
 import type { SkylineHero } from './skyline-hero';
 import { upperAnchor } from '../levels/skyline/motion';
@@ -44,7 +46,6 @@ export class SkylineScene {
   private darkPink = new MeshStandardMaterial({ color: 0x562b49, roughness: 0.85 });
   private blocks: InstancedMesh;
   private trims: InstancedMesh;
-  private runway: InstancedMesh;
   /**
    * Anchor markers, as three instanced pools rather than 18 meshes.
    *
@@ -79,6 +80,28 @@ export class SkylineScene {
   private kit: ObstacleKit | null = null;
   /** Anchor gantries, instanced: one per visible anchor. */
   private gantries: InstancedMesh | null = null;
+  /** Ground markers under a low anchor, so the descent lands on something. */
+  private lowMarks: InstancedMesh | null = null;
+  /**
+   * Unfogged markers, so the player can read what is coming.
+   *
+   * The meshes themselves fade with distance — that is the depth cue and it
+   * should stay. What must not fade is the SIGNAL. Gold sparkle on a gift is
+   * level 1's own language, dropped in the level 2 rebuild and restored
+   * here; the rose marker does the same job for a hazard.
+   */
+  private giftMarks = new SparkleField(10, {
+    color: PALETTE.gold, count: 8, radius: 0.5, size: 7, attenuate: false,
+  });
+  /**
+   * Smaller and sparser than the first attempt, which at 11px x 3 read as a
+   * magenta blob large enough to hide the obstacle underneath it. A marker
+   * that obscures the thing it marks has defeated itself.
+   */
+  private hazardMarks = new SparkleField(18, {
+    color: PALETTE.magenta, count: 2, radius: 0.3, size: 6, attenuate: false,
+  });
+  private markBuffer: Vector3[] = [];
   private landmark: Object3D | null = null;
 
   constructor(canvas: HTMLCanvasElement, private course: Course) {
@@ -99,6 +122,7 @@ export class SkylineScene {
      */
     this.stage.scene.fog = new FogExp2(0x111e32, FOG_DENSITY);
     this.stage.camera.far = CAMERA_FAR;
+    this.stage.camera.near = CAMERA_NEAR;
     this.stage.camera.updateProjectionMatrix();
 
     /**
@@ -117,9 +141,14 @@ export class SkylineScene {
     this.stage.scene.add(this.root); this.stage.observe();
     this.blocks = new InstancedMesh(this.box, this.city, 100);
     this.trims = new InstancedMesh(this.box, this.windowMat, 500);
-    this.runway = new InstancedMesh(this.box, this.cyan, 100);
-    for (const mesh of [this.blocks, this.trims, this.runway]) { mesh.frustumCulled = false; this.root.add(mesh); }
+    for (const mesh of [this.blocks, this.trims]) { mesh.frustumCulled = false; this.root.add(mesh); }
     this.ground = this.cube(this.root, this.groundMat, 0, -1, -60, 28, 2, 260);
+    for (const field of [this.giftMarks, this.hazardMarks]) {
+      // Backdrop rules do not apply: these are read THROUGH the fog on
+      // purpose, which is the whole point of them.
+      (field.points.material as MeshBasicMaterial).fog = false;
+      this.root.add(field.points);
+    }
     for (const layer of [new SkyLayer()]) {
       this.backdrop.push(layer);
       this.root.add(layer.object);
@@ -217,6 +246,8 @@ export class SkylineScene {
     // the cable the player grabs has a visible reason to be strung there.
     this.gantries = assets.batch('anchorSpan', ANCHOR_POOL);
     if (this.gantries) this.root.add(this.gantries);
+    this.lowMarks = assets.batch('lowAnchor', ANCHOR_POOL);
+    if (this.lowMarks) this.root.add(this.lowMarks);
 
     /**
      * The CN Tower, ahead down the street.
@@ -287,7 +318,7 @@ export class SkylineScene {
       }
       attr.setXYZ(1, s.anchor.x, s.anchor.y, s.p.z - s.anchor.z); attr.needsUpdate = true;
     }
-    let b = 0, w = 0, r = 0;
+    let b = 0, w = 0;
     if (this.street) {
       this.street.update(s.p.z, this.camera.position.z);
     } else {
@@ -306,19 +337,23 @@ export class SkylineScene {
         for (const x of [-3, 3]) this.instance(this.trims, w++, x, 0.03, s.p.z - z, 0.08, 0.05, 10);
       }
     }
-    // All lanes have a continuous street; illuminate the selected running route.
-    if (s.requestedMode === 'run' || s.mode === 'run') for (let i = -2; i < 19; i++) {
-      const z = Math.floor(s.p.z / 6) * 6 + i * 6;
-      for (const offset of [-1.8, 1.8]) this.instance(this.runway, r++, s.lane * this.course.laneWidth + offset,
-        0.06, s.p.z - z, 0.12, 0.06, 2.5);
-    }
+    /**
+     * The cyan lane markers are gone.
+     *
+     * They were authored for the pre-rescale 6-unit lanes: offsets of +/-1.8
+     * reached 113% of the way across a 3.2-unit lane, so they MISREPORTED
+     * which lane was selected — and sat at y=0.06, which after the datum fix
+     * floated them above the carriageway. The Kenney road carries its own
+     * painted markings, so there is nothing left for them to do.
+     */
     const cycle = Math.floor(s.elapsed / this.course.cycle);
     const list = [
       ...(s.anchor ? [s.anchor] : []),
-      ...Array.from({ length: 5 }, (_, i) => LANES.map((lane) => upperAnchor(this.course, lane, cycle + i))).flat(),
-    ].filter((a, i, all) => all.findIndex((b) => b.id === a.id) === i && a.z > s.p.z - 22 && a.z < s.p.z + 150);
+      ...Array.from({ length: 12 }, (_, i) => LANES.map((lane) => upperAnchor(this.course, lane, cycle + i))).flat(),
+    ].filter((a, i, all) => all.findIndex((b) => b.id === a.id) === i && a.z > s.p.z - 22 && a.z < s.p.z + ENTITY_DRAW_AHEAD);
     const anchorCounts = [0, 0, 0];
     let gantryCount = 0;
+    let lowCount = 0;
     list.slice(0, ANCHOR_POOL).forEach((a) => {
       const active = a.id === s.anchor?.id;
       // 0 gold (attached), 1 cyan (reachable, same lane), 2 idle.
@@ -342,9 +377,15 @@ export class SkylineScene {
         this.dummy.scale.setScalar(1);
         this.dummy.updateMatrix();
         this.gantries.setMatrixAt(gantryCount++, this.dummy.matrix);
+      } else if (a.kind === 'lower' && this.lowMarks && lowCount < ANCHOR_POOL) {
+        // Something to actually land on. Without this the descent drew a
+        // cable to an invisible point just above the road.
+        this.dummy.position.set(a.x, 0, s.p.z - a.z);
+        this.dummy.rotation.set(0, 0, 0);
+        this.dummy.scale.setScalar(1);
+        this.dummy.updateMatrix();
+        this.lowMarks.setMatrixAt(lowCount++, this.dummy.matrix);
       } else if (!this.street && a.kind === 'lower') {
-        // Primitive stand-in only; the road itself marks the low route once
-        // the real street is in.
         this.instance(this.blocks, b++, a.x, 0.25, s.p.z - a.z, 1.5, 0.5, 1.5);
       }
     });
@@ -356,20 +397,38 @@ export class SkylineScene {
       this.gantries.count = gantryCount;
       this.gantries.instanceMatrix.needsUpdate = true;
     }
+    if (this.lowMarks) {
+      this.lowMarks.count = lowCount;
+      this.lowMarks.instanceMatrix.needsUpdate = true;
+    }
     const finish = s.p.z - this.course.duration * this.course.speed;
     this.instance(this.trims, w++, 0, 17, finish, 24, 0.5, 0.5);
     for (const side of [-1, 1]) this.instance(this.trims, w++, side * 12, 8.5, finish, 0.5, 17, 0.5);
-    for (const [mesh, count] of [[this.blocks, b], [this.trims, w], [this.runway, r]] as const) {
+    for (const [mesh, count] of [[this.blocks, b], [this.trims, w]] as const) {
       mesh.count = count; mesh.instanceMatrix.needsUpdate = true;
     }
     this.visibleEntities.clear();
+    const giftAt: Vector3[] = [];
+    const hazardAt: Vector3[] = [];
     for (const e of this.course.entities) {
       const mesh = this.contents.get(e.id)!;
-      mesh.visible = !states.has(e.id) && e.z > s.p.z - 3 && e.z < s.p.z + 135;
+      mesh.visible = !states.has(e.id) && e.z > s.p.z - 3 && e.z < s.p.z + ENTITY_DRAW_AHEAD;
       mesh.position.set(e.x, e.y, s.p.z - e.z);
-      if (mesh.visible) this.visibleEntities.add(e.id);
+      if (mesh.visible) {
+        this.visibleEntities.add(e.id);
+        // Marker at the top of a ground obstacle and the underside of an
+        // overhead one: in both cases the edge the player has to clear.
+        const marker = this.markBuffer[giftAt.length + hazardAt.length] ??= new Vector3();
+        const lift = e.kind === 'gift' ? 0 : e.y - this.course.groundY > 3 ? -e.halfY : e.halfY;
+        marker.set(e.x, e.y + lift, s.p.z - e.z);
+        (e.kind === 'gift' ? giftAt : hazardAt).push(marker);
+      }
       // Gift bounds stay aligned with the visible box; no rotating collider mismatch.
     }
+    this.giftMarks.setAnchors(giftAt);
+    this.hazardMarks.setAnchors(hazardAt);
+    this.giftMarks.update(dt);
+    this.hazardMarks.update(dt);
     for (const layer of this.backdrop) layer.update(s.p.z, dt);
     this.camera.update(s, dt, reduced);
   }
@@ -386,11 +445,14 @@ export class SkylineScene {
     this.root.removeFromParent(); this.box.dispose(); this.diamond.dispose();
     this.cable.geometry.dispose(); (this.cable.material as LineBasicMaterial).dispose();
     for (const m of [this.city, this.windowMat, this.groundMat, this.blue, this.gold, this.pale, this.cyan, this.idle, this.pink, this.darkPink]) m.dispose();
-    for (const m of [this.blocks, this.trims, this.runway, ...this.anchorPools]) m.dispose();
+    for (const m of [this.blocks, this.trims, ...this.anchorPools]) m.dispose();
     this.fill.removeFromParent();
     this.fill.dispose();
     this.street?.dispose();
     this.gantries?.dispose();
+    this.lowMarks?.dispose();
+    this.giftMarks.dispose();
+    this.hazardMarks.dispose();
     if (this.landmark) disposeTree([this.landmark]);
     this.rigged?.dispose();
     for (const layer of this.backdrop) layer.dispose();

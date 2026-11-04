@@ -76,7 +76,15 @@ export interface StreetAssets {
  * the pack already gets right and just moves the whole set into the night.
  */
 const NIGHT = new Color(0x1b2740);
-const NIGHT_MIX = 0.55;
+/**
+ * Raised from 0.55 when the fog was thinned from 0.011 to 0.009.
+ *
+ * The first value leaned on fog to do part of the toning, so thinning the
+ * fog to let the player read further ahead also let the pale Kenney palette
+ * back through in the near field — the road came out lavender again. Tone
+ * belongs in the material, where it does not move when a view constant does.
+ */
+const NIGHT_MIX = 0.72;
 
 /**
  * Put every mesh under `root` on one shared material, toning it on first use.

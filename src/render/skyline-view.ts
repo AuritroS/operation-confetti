@@ -65,21 +65,54 @@ export const FOCUS_SETTLE = 4;
 export const FOCUS_START = 6.2;
 
 /**
- * Fog and clip, both functions of the stand-off.
+ * Fog, clip and draw distance — one interlocking set, not three dials.
  *
- * Level 1's values assume its over-the-shoulder camera. At any level 2
- * distance the hero is far enough away that level 1's 0.012 density drains
- * him before anything else is considered.
+ * The constraint that ties them together: for content to FADE in rather than
+ * snap, it has to be essentially invisible at the distance it first appears,
+ * and that distance has to be inside the frustum. So
+ *
+ *     CAMERA_FAR  >=  SPAWN_DISTANCE  >=  ln(20) / FOG_DENSITY
+ *
+ * The previous values failed it badly. At far=180 the frustum cut 162 units
+ * ahead of the player, towers were being placed out to 228, and fog at
+ * density 0.011 still left them **17% visible** where the clip plane sliced
+ * them off. They did not fade in; they appeared, whole, in one frame.
+ *
+ * Fog thin enough to read ten seconds of route ahead can never reach 95%
+ * inside a 180-unit frustum — the horizon sits at 272 units. That is why the
+ * fix is a bigger frustum rather than thicker fog: thicker fog would hide the
+ * popping by also hiding the obstacle the player is supposed to be reading.
  */
-export const FOG_DENSITY = 0.011;
-export const CAMERA_FAR = 180;
+export const FOG_DENSITY = 0.009;
+/** 95% fogged: ln(20) / FOG_DENSITY, rounded up. Content spawns past this. */
+export const FOG_HORIZON = 340;
+export const CAMERA_FAR = 380;
+/**
+ * Near plane, raised from three.js's 0.1.
+ *
+ * Depth precision scales with far/near, and pushing far to 380 at near=0.1
+ * would give a ratio of 3800 — enough to z-fight the crossing tiles against
+ * the road they sit on. At 1.0 the ratio is 380, better than the 1800 we had
+ * before this change, and nothing is ever within a metre of a camera that
+ * sits eighteen units behind the hero.
+ */
+export const CAMERA_NEAR = 1;
 
 /**
- * Half-width of the interactive zone, in world units.
+ * How far ahead gameplay entities are kept alive, in units.
  *
- * The contract between gameplay and decoration: lanes, anchors, gifts and
- * hazards live inside it, and nothing decorative may enter. Level 1 enforces
- * the same split through `isClearOfCorridor`; this is level 2's equivalent,
- * and `tests/skyline-zone.test.ts` fails if dressing crosses it.
+ * Longer than it needs to be for collision, because the complaint this
+ * answers is that the player could not see what was coming. Their unfogged
+ * markers are what actually carry at this range; the meshes themselves fade.
  */
-export const GAME_ZONE_HALF = 4.4;
+export const ENTITY_DRAW_AHEAD = 300;
+
+/**
+ * Half-width of the interactive zone, re-exported from the course.
+ *
+ * Owned by gameplay, consumed here: the street layer needs it to keep
+ * dressing out of the lanes, but it is not the render layer's number to
+ * choose. Level 1 enforces the same split through `isClearOfCorridor`;
+ * `tests/skyline-zone.test.ts` fails if dressing crosses it.
+ */
+export { GAME_ZONE_HALF } from '../levels/skyline/course';

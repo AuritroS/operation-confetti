@@ -13,6 +13,144 @@ with the real character, street and props integrated (see the asset pass).
 `/` and `?level=2` open it; `?level=1` opens the frozen first level. Earlier
 prototype sections and the recovered Claude plan are retained as history.
 
+## Correctness pass — datum, draw distance, grid lock (4 November 2026)
+
+Correctness only. Difficulty, point feedback, camera movement and polish are
+deliberately **deferred**: ramping difficulty on top of unverified hit
+registration makes every subsequent bug ambiguous.
+
+### The datum, got wrong in both directions
+
+A KayKit road was a solid slab whose TOP was the walking surface, so props at
+y=0 sank into it and the fix was to sink the tile by its own height. A Kenney
+tile is **a thin plate with raised kerbs** — its bounding-box top is the
+pavement and its carriageway is at the bottom. Carrying that sink across
+lifted the road out from under everything and left Matthew, every obstacle
+and all the dressing floating **0.34 units** in the air.
+
+The lesson is not "don't sink". It is that **the datum cannot be inferred
+from a bounding box**, because where the walkable surface sits inside that box
+depends on how the prop is modelled. `tests/skyline-datum.test.ts` pins the
+contract instead — carriageway, y=0 and the character's soles must agree —
+and separately asserts the tile is a *plate* (height/width < 0.05) rather than
+a slab, so swapping the asset for a different shape fails loudly.
+
+### Popping and the invisible mid-ground
+
+Both complaints traced to one interlocking set of constants pulling in
+opposite directions:
+
+```
+far plane 180, camera 18 behind the hero  →  frustum ends 162 units ahead
+towers were placed out to 228 ahead       →  66 units PAST the clip plane
+fog (0.011) at the clip plane             →  still 17% visible
+95%-fogged horizon at that density        →  272 units — unreachable
+```
+
+Content was crossing a hard edge at 17% opacity, so it appeared whole in one
+frame. And fog thin enough to read ten seconds of route ahead can never reach
+95% inside a 180-unit frustum, so **fog tuning alone could not fix both**.
+
+Resolved by giving fog room instead of thickening it: `far` 180 → **380**,
+`near` 0.1 → **1.0** (depth ratio improves from 1800 to 380, which also
+protects the crossing tiles from z-fighting the road), fog **0.009**, street
+and entity spawns pushed past the 340-unit horizon. `tests/skyline-draw.test.ts`
+pins the chain `CAMERA_FAR >= spawn >= FOG_HORIZON`, *and* the opposite
+requirement — that a hazard five seconds out is still over 50% visible.
+
+Readability is carried by **unfogged markers** rather than by thinning fog
+further: gold sparkle on gifts (level 1's own language, dropped in the
+rebuild) and a rose marker on hazards, both with `sizeAttenuation` off so
+they hold a constant screen size instead of shrinking to sub-pixel exactly
+where they are needed. The meshes still fade; only the signal does not.
+
+### The `pillar` archetype is gone
+
+It had `halfY: 6`, so it rendered as a construction barrier **stretched to 12
+units** — five times the character's height — because no honest full-height
+prop exists in any pack. Its meaning was "this lane is shut at every height",
+which is exactly a ground block *plus* an overhead at the same z. It is now a
+composition of two ordinary entities, each the right size for a real prop.
+
+It still bills once: a runner meets only the ground half, a swinger only the
+overhead half, and a player caught mid-transition is covered by the existing
+one-second protection window.
+
+### The grid is now structurally true
+
+Level 2 is three lanes by two heights, and that was previously only true by
+accident. Measured:
+
+```
+hazard 0–3 :  arc bottom / mid / top  →  clear / clear / clear
+hazard 5–13:  arc bottom / mid / top  →  hit   / hit   / hit
+```
+
+The swing arc — `8 + 3·cos(2πt/3.2)` — changes **no outcome anywhere**, and
+the player has no control over its phase. So a hazard authored *between* the
+bands would behave unpredictably for reasons the player cannot see or affect.
+`BAND` is now the only way to author a height, and the zone test refuses
+anything outside it.
+
+### Other correctness fixes
+
+- **Ground beyond the road.** The tile covers ±8.5; towers reach ±37, so up
+  to 28 units of each building stood over void. One dark plane, as level 1
+  does it — and dropped a clear half-unit, not a hair: at 0.05 it z-fought
+  the road and the lane markings dissolved into a grey wash.
+- **Stale lane markers deleted.** Authored for the pre-rescale 6-unit lanes,
+  their ±1.8 offsets reached **113%** across a 3.2-unit lane, so they
+  misreported the selected lane, and the datum fix left them floating.
+- **Bridge pillars off the carriageway.** They stood at ±3.9 against an outer
+  lane edge of ±3.55 — 0.35 units of clearance — reading as columns planted
+  in the road. Moved to the kerb. Collision never cared, which is exactly why
+  only the eye caught it.
+- **Lower anchors have something to land on**: a painted crossing marking.
+  The descent previously drew a cable to an invisible point.
+- **Zone fudge removed.** Span hazards reached 4.5 against a 4.4 zone and the
+  test papered over it with a `+0.3` tolerance. A contract with a fudge in it
+  is not a contract: `SPAN_HALF_X` now *derives* from `GAME_ZONE_HALF`, which
+  moved to the course where it belongs, so the two cannot disagree.
+- **Kenney tone deepened** 0.55 → 0.72. The first value leaned on fog to do
+  part of the work, so thinning the fog let the pale palette back through.
+
+### Measured transition costs, now derived not guessed
+
+| Move | Cost |
+|---|---|
+| Lane change | **0.650 s** |
+| Double lane | **0.850 s** |
+| Mode change | **1.275 s** |
+| Tightest beat gap | 2.00 s (before the bridge at t=15.5) |
+
+`tests/skyline-reaction.test.ts` recovers these **from `Motion` itself** and
+checks every beat allows the move it demands plus reaction. `check:swing`'s
+two-second assertion only measures when something enters the frustum, which
+is a different question.
+
+This also corrects an error in review: I had called the `gift-ground` window
+"at the floor with no margin". Measured, it has ~0.4 s of slack. It is the
+tightest chain in the level but it is not broken.
+
+### Verified
+
+- **196 tests across 21 files**, tsc clean, production build clean.
+- Peak **37,297 triangles / 53 draws** against a 60,000 / 60 ceiling — up
+  from 27.9k/40 because the draw distance more than doubled.
+- All 14 viewports correct; level 1 unchanged.
+
+### Hit registration was checked and found sound
+
+Swept 3D segment-vs-AABB, substepped at 120 Hz (0.071 units per substep
+against a ≥0.8-unit window), each entity resolving exactly once, protection
+suppressing double-billing. The maths was never the risk — the art not
+matching the maths was.
+
+One known mismatch left deliberately for the tuning pass: the player collider
+is `(0.35, 0.9, 0.35)` around `p.y`, so running it spans 0.35–2.15 while the
+character visually spans 0.01–2.40. Feet and hood sit outside the box.
+Nothing in the current course exploits it.
+
 ## Environment and game-zone pass — Kenney street, 45s route (4 November 2026)
 
 Two passes in one build: the environment rebuilt around the Kenney City Kit

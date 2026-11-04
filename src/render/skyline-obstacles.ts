@@ -44,6 +44,8 @@ import { ANCHOR_HEIGHT } from '../levels/skyline/motion';
 const SPAN_THRESHOLD = 3;
 /** Collider underside below this is a ground obstacle, above it overhead. */
 const GROUND_THRESHOLD = 0.6;
+/** Where a bridge pillar stands: on the kerb, clear of every lane. */
+const PILLAR_X = 6.2;
 
 export class ObstacleKit {
   constructor(private assets: StreetAssets) {}
@@ -110,9 +112,17 @@ export class ObstacleKit {
   private overhead(group: Group, e: Entity, span: boolean, clearance: number): void {
     if (span) {
       this.tile(group, 'bridgeDeck', e.halfX * 2, -e.halfY, 0, e.halfY * 2, e.halfZ * 2);
-      // Pillars at the very edge, outside all three lanes, down to the road.
+      /**
+       * Pillars go on the KERB, not in the carriageway.
+       *
+       * They were at +/-(halfX - 0.6) = 3.9 against an outer-lane edge of
+       * 3.55 — 0.35 units of clearance, so they read as columns planted in
+       * the road the player sprints down. Collision never cared (the deck
+       * blocks every lane anyway), which is exactly why only the eye caught
+       * it. PILLAR_X is outside the lanes and outside the zone.
+       */
       for (const side of [-1, 1]) {
-        const pillar = this.one(group, 'bridgePillar', side * (e.halfX - 0.6), -e.halfY, 0);
+        const pillar = this.one(group, 'bridgePillar', side * PILLAR_X, -e.halfY, 0);
         if (pillar) this.stretch(pillar, 1, clearance, 1, 'down');
       }
       return;

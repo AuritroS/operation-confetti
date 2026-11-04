@@ -74,6 +74,15 @@ export interface SparkleOptions {
   size?: number;
   color?: number;
   speed?: number;
+  /**
+   * Whether particles shrink with distance. Default true, which is right for
+   * a collectible you are nearly on top of.
+   *
+   * Level 2 turns it OFF for its distance markers: the whole job of those is
+   * to stay readable far down the street, and attenuation shrinks them to
+   * sub-pixel exactly where they are needed most.
+   */
+  attenuate?: boolean;
 }
 
 /**
@@ -99,6 +108,7 @@ export class Sparkle {
       size: options.size ?? 0.16,
       color: options.color ?? SPARKLE_BLUE,
       speed: options.speed ?? 1,
+      attenuate: options.attenuate ?? true,
     };
 
     const positions = new Float32Array(this.opts.count * 3);
@@ -120,7 +130,7 @@ export class Sparkle {
         transparent: true,
         blending: AdditiveBlending,
         depthWrite: false,
-        sizeAttenuation: true,
+        sizeAttenuation: options.attenuate ?? true,
       }),
     );
     this.points.frustumCulled = false;
@@ -201,7 +211,7 @@ export class SparkleField {
         transparent: true,
         blending: AdditiveBlending,
         depthWrite: false,
-        sizeAttenuation: true,
+        sizeAttenuation: options.attenuate ?? true,
       }),
     );
     this.points.frustumCulled = false;

@@ -111,6 +111,15 @@ export const STREET_PROPS = {
   anchorSpan: K('electricity-side-wide', [6.0, 7.5], 'anchor carrier, facade to facade'),
   anchorWires: K('electricity-wires-wide', [1.0, 1.8], 'anchor cable'),
   anchorPole: K('electricity-pole-wide', [6.0, 7.5], 'anchor mast, where no facade is near'),
+  /**
+   * Ground marker under a low anchor.
+   *
+   * A pedestrian crossing painted on the road: the descent needs something
+   * to aim at, and a flat marking is the only honest thing to put in the
+   * carriageway — anything with height would be an obstacle the runner has
+   * never heard of.
+   */
+  lowAnchor: K('road-crossing', [0.04, 0.1], 'low-anchor landing marking', 3),
 
   // ---- overhead obstacles ------------------------------------------------
   bridgeDeck: K('road-bridge', [6.0, 7.5], 'the bridge, spanning every lane'),

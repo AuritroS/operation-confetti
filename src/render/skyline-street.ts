@@ -14,11 +14,23 @@
  *
  * ---- the ground datum ----------------------------------------------------
  *
- * The road has thickness, and every placement here assumes y=0 is the surface
- * you stand on. Road tiles are therefore sunk by their own depth so their TOP
- * lands on zero. The previous version did not, and the 0.3-unit road sat on
- * top of everything placed at y=0 — cars, towers and Matthew were all buried
- * to the ankle by the surface they were supposed to be standing on.
+ * y=0 is the carriageway, and road tiles are base-seated so their LOWEST
+ * surface lands on it.
+ *
+ * This was got wrong twice in opposite directions, so it is worth stating
+ * why. A KayKit road was a solid slab whose TOP was the walking surface, so
+ * placing things at y=0 buried them and the fix was to sink the tile by its
+ * own height. A Kenney tile is not a slab — it is a thin plate with RAISED
+ * KERBS, so its bounding-box top is the pavement and its carriageway is at
+ * the bottom. Carrying the sink across to it lifted the road out from under
+ * everything and left Matthew, the obstacles and the dressing floating 0.34
+ * units in the air.
+ *
+ * The lesson is not "don't sink" — it is that the datum cannot be inferred
+ * from a bounding box, because where the walkable surface sits inside that
+ * box depends on how the prop is modelled. `tests/skyline-datum.test.ts`
+ * pins it instead: the carriageway, y=0, and the character's soles must
+ * agree.
  *
  * ---- one tile is the whole street ----------------------------------------
  *
@@ -29,10 +41,26 @@
  * thirteen-unit slabs of the very pavement the tile already had. One tile,
  * centred, and the facades sit at its edge.
  */
-import { Group, Object3D, type InstancedMesh } from 'three';
+import {
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  PlaneGeometry,
+  type InstancedMesh,
+} from 'three';
 import type { StreetAssets } from './skyline-assets';
 import type { StreetPropId } from './skyline-props';
-import { GAME_ZONE_HALF } from './skyline-view';
+import { FOG_HORIZON, GAME_ZONE_HALF } from './skyline-view';
+
+/**
+ * Furthest the street is drawn, and the margin before a tower may appear.
+ *
+ * Exported so `tests/skyline-draw.test.ts` can check them against the fog
+ * horizon and the frustum rather than anyone re-deriving the arithmetic.
+ */
+export const STREET_AHEAD = FOG_HORIZON;
+export const TOWER_SPAWN_MARGIN = 6;
 
 /**
  * Where the canyon's inner FACES stand.
@@ -52,8 +80,14 @@ export const FACADE_X = 6.9;
  */
 export const DRESSING_INSET = 1.5;
 
-/** How far ahead the street is drawn. Fog hides the far seam. */
-const AHEAD = 150;
+/**
+ * How far ahead the street is drawn.
+ *
+ * Past the fog horizon, so the far row arrives at about 5% opacity and fades
+ * up rather than appearing at the clip plane. At 150 it was arriving 17%
+ * visible and being sliced off by a frustum that ended before the fog did.
+ */
+const AHEAD = STREET_AHEAD;
 /** How far behind the player the ROAD runs. Only the surface may do this. */
 const BEHIND = 30;
 
@@ -66,7 +100,7 @@ const BEHIND = 30;
  * where it is keeps this correct if the camera moves — including if it
  * becomes oblique.
  */
-const TOWER_CLEARANCE = 6;
+const TOWER_CLEARANCE = TOWER_SPAWN_MARGIN;
 
 /** A pedestrian crossing every N tiles, to break up the repeat. */
 const CROSSING_EVERY = 5;
@@ -106,25 +140,50 @@ export class SkylineStreet {
 
   private batches = new Map<StreetPropId, Batch>();
   private dummy = new Object3D();
+  private ground: Mesh;
 
-  /** Tile pitch and sink, measured from the asset rather than assumed. */
+  /** Tile pitch, measured from the asset rather than assumed. */
   private tile = 13;
-  private sink = 0;
   private rows = 0;
   private towerPitch = 26;
   private towerRows = 0;
 
   constructor(private assets: StreetAssets) {
     const road = assets.half('road');
-    if (road) {
-      this.tile = road.z * 2;
-      this.sink = road.y * 2;
-    }
+    if (road) this.tile = road.z * 2;
     this.rows = Math.ceil((AHEAD + BEHIND) / this.tile) + 1;
     this.towerPitch = this.tile * 2;
-    this.towerRows = Math.ceil(AHEAD / this.towerPitch) + 2;
+    // No +slack: an extra row lands past the far plane, where it is clipped
+    // rather than drawn. Fog hides that now, but drawing geometry purely to
+    // have it discarded is waste. `tests/skyline-draw.test.ts` pins it.
+    this.towerRows = Math.ceil(AHEAD / this.towerPitch);
 
-    // Surface first, so everything else sorts over it.
+    /**
+     * Ground beyond the road.
+     *
+     * The road tile is 17 units wide; the canyon towers scale to 15-30 and
+     * are placed by their inner face, so up to 28 units of each building
+     * stands past the tarmac. Without this they end in mid-air.
+     *
+     * Level 1 solved the identical problem the identical way — one dark
+     * plane under everything, for one draw call and two triangles.
+     *
+     * Dropped a clear HALF UNIT below the carriageway, not a hair. At 0.05
+     * it z-fought the road across the whole near field and the painted lane
+     * markings dissolved into a flat grey wash — the deeper far plane made
+     * depth precision tighter, so the margin that would once have been fine
+     * no longer was. Nothing can see under the road from this camera, so the
+     * gap costs nothing.
+     */
+    this.ground = new Mesh(
+      new PlaneGeometry(160, AHEAD + BEHIND + 40),
+      new MeshStandardMaterial({ color: 0x131d30, roughness: 1 }),
+    );
+    this.ground.rotation.x = -Math.PI / 2;
+    this.ground.position.y = -0.5;
+    this.object.add(this.ground);
+
+    // Surface next, so everything else sorts over it.
     this.add('road', this.rows);
     this.add('roadCrossing', Math.ceil(this.rows / CROSSING_EVERY) + 2);
     for (const id of TOWERS) this.add(id, this.towerRows * 2);
@@ -159,6 +218,9 @@ export class SkylineStreet {
   update(playerZ: number, cameraZ: number): void {
     for (const batch of this.batches.values()) batch.count = 0;
 
+    // The ground follows the player so its far edge never enters frame.
+    this.ground.position.z = -(AHEAD - BEHIND) / 2;
+
     // ---- surface ---------------------------------------------------------
     // Snapped to the tile pitch so the road slides under the player rather
     // than crawling, which is what makes the texture gradient read as depth.
@@ -167,8 +229,8 @@ export class SkylineStreet {
       const index = firstRow + row;
       const z = playerZ - index * this.tile;
       const crossing = ((index % CROSSING_EVERY) + CROSSING_EVERY) % CROSSING_EVERY === 0;
-      // Sunk by its own thickness: the TOP of the road is the datum.
-      this.place(crossing ? 'roadCrossing' : 'road', 0, -this.sink, z);
+      // Base-seated: the carriageway is the tile's lowest surface, so y=0.
+      this.place(crossing ? 'roadCrossing' : 'road', 0, 0, z);
     }
 
     // ---- canyon and dressing ---------------------------------------------
@@ -230,6 +292,9 @@ export class SkylineStreet {
   }
 
   dispose(): void {
+    this.ground.geometry.dispose();
+    (this.ground.material as MeshStandardMaterial).dispose();
+    this.ground.removeFromParent();
     for (const { mesh } of this.batches.values()) mesh.dispose();
     this.batches.clear();
     this.object.removeFromParent();

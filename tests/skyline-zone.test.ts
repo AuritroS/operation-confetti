@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Box3, BoxGeometry, Mesh, Vector3, type Object3D } from 'three';
-import { SKYLINE } from '../src/levels/skyline/course';
+import { BAND, SKYLINE } from '../src/levels/skyline/course';
 import { ANCHOR_HEIGHT } from '../src/levels/skyline/motion';
 import { ObstacleKit } from '../src/render/skyline-obstacles';
 import { SkylineStreet } from '../src/render/skyline-street';
@@ -54,9 +54,27 @@ describe('the interactive zone is separate from the environment', () => {
   });
 
   it('keeps every gameplay entity inside the zone', () => {
+    // No tolerance. The span hazards reach 4.5 and the zone was 4.4, which
+    // I papered over with a +0.3 fudge; a contract with a fudge in it is not
+    // a contract. The zone is 4.6 and everything fits inside it.
     for (const e of SKYLINE.entities) {
       expect(Math.abs(e.x) + e.halfX, `${e.id} spills outside the interactive zone`)
-        .toBeLessThanOrEqual(GAME_ZONE_HALF + 0.3);
+        .toBeLessThanOrEqual(GAME_ZONE_HALF);
+    }
+  });
+
+  it('authors every hazard in one of the two canonical bands', () => {
+    const bands = Object.entries(BAND);
+    for (const e of hazards) {
+      const span: [number, number] = [e.y - e.halfY, e.y + e.halfY];
+      const match = bands.find(
+        ([, [low, high]]) => Math.abs(span[0] - low) < 0.01 && Math.abs(span[1] - high) < 0.01,
+      );
+      expect(
+        match,
+        `${e.id} spans ${span[0]}-${span[1]}, which is neither band. A hazard ` +
+          'between the bands depends on swing phase, which the player cannot control.',
+      ).toBeTruthy();
     }
   });
 
@@ -91,17 +109,31 @@ describe('obstacle art covers its own collider', () => {
   });
 
   /**
-   * Overhead hazards are the deliberate exception on the X axis: their
-   * pillars sit at the very edge of the collider and reach DOWN outside it,
-   * because a deck floating on nothing is a worse lie than a support the
-   * player never touches. Nothing may overhang sideways into a free lane.
+   * The honest rule is not "art may not exceed the collider" — it is **art
+   * may not claim a place the player can go**.
+   *
+   * A bridge pillar standing on the kerb reaches well past the deck's
+   * collider, and must: a span floating on nothing is a worse lie than a
+   * support the player can never touch. What would be a real lie is art
+   * covering a part of the INTERACTIVE ZONE that the collider does not,
+   * because that reads as a blocked lane which is actually open.
+   *
+   * So the test is scoped to the zone. Outside it, structure is free.
    */
-  it('never overhangs into a neighbouring lane', () => {
+  it('never claims a part of the interactive zone its collider does not', () => {
     for (const e of hazards) {
       const box = built(e);
-      const overhang = Math.max(box.max.x - e.halfX, -e.halfX - box.min.x);
-      expect(overhang, `${e.id} art reaches ${overhang.toFixed(2)} past its collider`)
-        .toBeLessThan(SKYLINE.laneWidth * 0.5);
+      const artMin = e.x + box.min.x;
+      const artMax = e.x + box.max.x;
+      const blockedMin = e.x - e.halfX;
+      const blockedMax = e.x + e.halfX;
+      // Where the art intrudes into the zone beyond what the collider blocks.
+      const leftLie = Math.min(blockedMin, Math.max(-GAME_ZONE_HALF, artMin));
+      const rightLie = Math.max(blockedMax, Math.min(GAME_ZONE_HALF, artMax));
+      expect(blockedMin - leftLie, `${e.id} art blocks open space on its left`)
+        .toBeLessThan(0.05);
+      expect(rightLie - blockedMax, `${e.id} art blocks open space on its right`)
+        .toBeLessThan(0.05);
     }
   });
 
