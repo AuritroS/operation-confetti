@@ -23,6 +23,8 @@ const STORY_OUT = 'public/story';
 const A = 'assets/KayKit_Adventurers_2.0_FREE';
 const CITY = 'assets/KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf';
 const HOLIDAY = 'assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf';
+const KENNEY = 'assets/kenney_city-kit-roads/Models/GLB format';
+const KENNEY_OUT = 'public/models/city';
 
 /**
  * Copied as-is.
@@ -61,9 +63,78 @@ const CONVERT = [
   `${CITY}/dumpster.gltf`,
   `${CITY}/trash_A.gltf`,
   `${CITY}/bush.gltf`,
+
+  // ---- Level 2 street canyon ------------------------------------------
+  // Level 1 looks down on a rooftop, so it never needed a ground surface or
+  // anything at street scale. Level 2 runs THROUGH the canyon, where the
+  // road is the strongest depth cue available: a repeating surface gives a
+  // texture gradient, which is the cue a flat-shaded box floor cannot
+  // provide at any distance.
+  `${CITY}/road_straight.gltf`,
+  `${CITY}/road_straight_crossing.gltf`,
+
+  // Vehicles are the scale reference. A viewer knows how big a car is and
+  // does not know how big a blue box is, so these do more for depth than
+  // any amount of extra building detail.
+  `${CITY}/car_taxi.gltf`,
+  `${CITY}/car_sedan.gltf`,
+  `${CITY}/car_hatchback.gltf`,
+
+  // Street furniture: dressing, and `trafficlight_A` doubles as a visible
+  // reason for an anchor to exist where one is authored.
+  `${CITY}/trafficlight_A.gltf`,
+  `${CITY}/firehydrant.gltf`,
+  `${CITY}/bench.gltf`,
+
+  // Two more silhouettes. Level 1 reads its buildings at distance through
+  // fog, where six repeats are invisible; level 2 passes them at arm's
+  // length, where they are not.
+  `${CITY}/building_G.gltf`,
+  `${CITY}/building_H.gltf`,
+
+  // Base-less variants, for buildings that must MEET the road.
+  // The exported A-F each carry their own plinth, which is correct standing
+  // on nothing in a skyline band and wrong standing on a street — the
+  // plinth holds the facade off the tarmac and the building reads as
+  // floating. These are the canyon walls.
+  `${CITY}/building_A_withoutBase.gltf`,
+  `${CITY}/building_C_withoutBase.gltf`,
+  `${CITY}/building_E_withoutBase.gltf`,
+  `${CITY}/building_G_withoutBase.gltf`,
 ];
 
 const PROPS_OUT = 'public/models/props';
+
+/**
+ * Kenney City Kit Roads 2.2 (CC0), for level 2's street.
+ *
+ * Copied, not converted. Every model in this pack references ONE external
+ * `Textures/colormap.png` of 11 KB, so copying the GLBs beside a single copy
+ * of that texture costs one request and one GPU texture for the whole set.
+ * Embedding it per-prop — as the KayKit sidecar conversion has to, because
+ * those carry an atlas each — would ship the same PNG twenty times and cost
+ * twenty textures.
+ *
+ * Why this pack exists alongside KayKit: it has the street vocabulary KayKit
+ * does not — cones, barriers, hanging signs, power lines, and a real bridge
+ * with pillars. Level 2 runs through a street; level 1 looks down on a roof.
+ */
+const KENNEY_PROPS = [
+  // Surface
+  'road-straight', 'road-crossing', 'road-side', 'tile-low',
+  // The bridge, which previously had to be faked out of boxes
+  'road-bridge', 'bridge-pillar-wide',
+  // Anchors: a wire across the street is the most legible "grab that" a city
+  // has, and it already spans all three lanes.
+  'electricity-pole-wide', 'electricity-wires-wide', 'electricity-side-wide',
+  'light-curved-double', 'light-curved',
+  'road-sign-empty-hanging', 'sign-highway-wide', 'traffic-light-hanging',
+  // Obstacles
+  'construction-barrier', 'construction-cone', 'construction-fence',
+  'construction-light', 'dumpster',
+  // Dressing
+  'traffic-light', 'road-sign-street',
+];
 
 /** Animation libraries: copied, then stripped of their mannequin mesh. */
 const PRUNE = [
@@ -100,6 +171,7 @@ function copy(src, destDir) {
 // by tools/recolour.mjs live alongside and must survive.
 rmSync('public/models/src', { recursive: true, force: true });
 rmSync(PROPS_OUT, { recursive: true, force: true });
+rmSync(KENNEY_OUT, { recursive: true, force: true });
 rmSync(STORY_OUT, { recursive: true, force: true });
 
 // ---- 2. copy ------------------------------------------------------------
@@ -130,6 +202,31 @@ for (const src of CONVERT) {
     continue;
   }
   report.push({ file: `${name}.glb`, step: 'gltf -> glb', kb: kb(dest) });
+}
+
+// ---- 2c. copy the Kenney street set, sharing one texture ---------------
+{
+  const texture = `${KENNEY}/Textures/colormap.png`;
+  if (!existsSync(texture)) {
+    warnings.push(`missing Kenney texture: ${texture}`);
+  } else {
+    // The GLBs reference `Textures/colormap.png` relatively, so the folder
+    // layout has to survive the copy or every one of them loads untextured.
+    ensure(join(KENNEY_OUT, 'Textures'));
+    copyFileSync(texture, join(KENNEY_OUT, 'Textures', 'colormap.png'));
+    report.push({ file: 'city/Textures/colormap.png', step: 'copy (shared)', kb: kb(texture) });
+
+    for (const name of KENNEY_PROPS) {
+      const src = `${KENNEY}/${name}.glb`;
+      if (!existsSync(src)) {
+        warnings.push(`missing Kenney prop: ${name}`);
+        continue;
+      }
+      const dest = join(KENNEY_OUT, `${name}.glb`);
+      copyFileSync(src, dest);
+      report.push({ file: `city/${name}.glb`, step: 'copy', kb: kb(dest) });
+    }
+  }
 }
 
 // ---- 3. strip animation libraries --------------------------------------

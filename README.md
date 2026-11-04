@@ -10,6 +10,72 @@ Design doc: [`design.md`](./design.md) · Settled tech spec: [`docs/TECH_SPEC.md
   on `operation-confetti.auritro.com`
 - **Data:** Supabase Postgres, reached only from the Worker
 
+## Current review: level 2 — swipe, swing and run
+
+The game opens in **Skyline Chase** at `/` (also `/?level=2`). Level 1 is
+frozen at `/?level=1`; its gameplay, visuals and shared input are unchanged.
+
+**Swipe left/right** to move one lane, **up to swing**, and **down to run**.
+Desktop: **arrow keys or WASD**. The first swipe starts the course. Two quick
+sideways swipes cross both lanes without waiting in the middle. A new swipe
+can redirect a transition; current position, velocity and acceleration are
+preserved. Taps, holds and key repeat are inert. Each stroke triggers one
+dominant-axis action after 28 CSS pixels; ambiguous diagonals wait for a clear axis.
+
+Running and swinging are available in **all three lanes**. Sideways movement
+preserves the selected mode; up/down preserves the lane. Running persists
+until an up-swipe, which leaps into an automatic swing. Down attaches a low
+anchor and blends into a landing and run. An up-swipe beneath/near an overhead
+obstruction is remembered: the HUD shows “Swing selected” and launch starts
+after clearance. A down-swipe cancels that pending launch.
+
+The **45-second** course teaches one archetype at a time, then commits: a
+bridge that can only be run under, a barricade that can only be swung over,
+and a closing stretch mixing lane and height choices. Four scored gifts
+(+100 each) plus completion (+200) make 600.
+
+The street is built from **Kenney City Kit Roads 2.2** (CC0) — road, bridge,
+barriers, cones, hanging signs and the power cables the player grapples —
+over a **KayKit** canyon, with level 1's sky and CN Tower reused for
+continuity. Review affordances: `?clean` hides the debug panel, `?debug`
+shows it, `?closeup` pulls the camera in, `?level=1` opens the frozen level.
+
+Run `npm run check:swing` for the automated end-to-end review: real touch
+gestures over six viewports, the full 600-point route, two-second warnings on
+every hazard, and the 60,000-triangle / 60-draw budget.
+A primitive articulated character demonstrates reaching, banking, landing,
+running and launch; final character and city art remain future work.
+
+There is one unscored teaching gift and four scored gifts, distributed across
+all three lanes, with obstacles ahead of each choice. A verified safe route
+collects all four for **600 points**. Gifts give +100, hits deduct 50, and
+completion gives +200. A hit causes recoil and one second of protection;
+travel and lane controls continue. The old freeze-and-reattach flow is removed.
+
+**Replay / R** restarts; **P** pauses; **I** toggles debug (`?debug` starts with
+it visible). Returning to the tab does not automatically resume. A fresh
+swipe resumes and applies that direction. The bottom lane/mode indicators
+are read-only, so swipes can begin over them too.
+
+Implementation is isolated in `src/levels/skyline/`, `src/core/skyline-swipe-input.ts`,
+`src/render/skyline-scene.ts`, `src/render/skyline-camera.ts` and `src/level2.ts`.
+The earlier planar and hold-controlled implementations and tests have been removed.
+
+`npm run check:swing` checks real touch/keyboard input, mid-transfer changes,
+ground entry/exit, remembered launches, damage, pause, replay, six viewport sizes, a 600-point course
+and the level 1 entry. It uses Playwright request interception and needs no
+running web server. Screenshots are in `tools/shots/level2-swipes-*.png`. The rebuild passes 162 tests
+and a production build. Browser checks peak at 50 draw calls / 5,012 triangles;
+actual phone frame rate remains an on-device review item.
+
+Before removal, the old prototype passed 174 tests and a production build.
+The environment denied Git index writes, so a checkpoint commit could not be
+created. Its 19 changed/new files are preserved in
+[`checkpoints/level2-hold-2026-11-04.tar.gz`](./checkpoints/level2-hold-2026-11-04.tar.gz),
+with file hashes and base commit `4be7b94` in the adjacent JSON manifest. The
+archive was read back and byte-compared before replacing any source files.
+See [`design-level2.md`](./design-level2.md) for the design and review history.
+
 ---
 
 ## First-time setup

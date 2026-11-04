@@ -1,0 +1,26 @@
+{
+  "base_commit": "4be7b94",
+  "reason": "Git index writes denied by environment; verified source archive before replacement",
+  "archive_sha256": "2c4243c689530a145c11633d2326c67a58906d475ebf6823d92e2ab8304a42b2",
+  "files": {
+    "README.md": "1247c387fe9e7e463265aef59b3ecb93c043cff668c3946840a3b9e4f9138b63",
+    "index.html": "4f6c2315b848103ce5e95b005a455584927c5de6b99fc3b2f40248d6842b6765",
+    "package.json": "dd56f5af33bd74d528dc83d1deb359b5f54f06104b8058ca1d1d2ea9f31c3e82",
+    "design-level2.md": "36214bfea04442d2c30bf3e5d74cb9d2bd330076c1aabf302dc18d24e6105fb2",
+    "src/entry.ts": "5bad0225f5ce6dbfd3538ae5225c70657e7cf853e1a8c69c0118bedd8970162b",
+    "src/level2.ts": "234fdcd9d63bcac974fb5f83013a5bdee756f667deaf35e66349739da91650b4",
+    "src/level2.css": "79a1bfbdec3be598a590a3e2712eb9eeb5f61f64f14dc1cde52b14e5b8da039c",
+    "src/core/chase-input.ts": "77c59987236cb5a6182104385a597498cc7405995111970a140d75a28f55513b",
+    "src/levels/chase.ts": "79e6b664b344728eca808f012e4a1d7ad4836c7dc978569bcb55d0560c675121",
+    "src/levels/level2.ts": "e4b66b4e042089b2fde6e506fef12dfb218f3dfc16c5c77d1399a9b462e6480f",
+    "src/levels/swing-types.ts": "453c6e3e2b557f525568613b57c924793e778f38666f8627d42682b5ab632d91",
+    "src/levels/swing.ts": "42f7c8121c056a07a1973cd22c455824faba3ca220678077d1465d49c38f2b65",
+    "src/render/chase-scene.ts": "b762360e075e0543898eb791b437fd8900da091ec1ea8fa01318fce4a16ca3da",
+    "src/render/swing-entities.ts": "7911ef653e35e3d2c3496861534c5708b6bf569498acf32eadab2b41e515a55f",
+    "src/render/swing-scene.ts": "22f8cf638a7afbdea9e31139c592f0cf48bd5b42e9a8022e5de4dfbe87e5c9dd",
+    "tests/chase-input.test.ts": "ae3b0d25391673dbbb1243491afe93112bd81646f91c5b82b9f4d886aae6f722",
+    "tests/chase.test.ts": "4c965258e12d39ced87a0baa44459c846475be09f9556e29d7e9e335f13315cd",
+    "tests/swing.test.ts": "cb457bf66e3d0914c797a470535bfe4d472caf85471057d78778ef9a12d978d3",
+    "tools/check-swing-review.mjs": "c649e456e9ce47bb747c9be7cf799cffc3e358de2747f62b1e022727275f1fea"
+  }
+}

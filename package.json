@@ -24,7 +24,8 @@
     "assets:index": "node tools/build-asset-index.mjs",
     "shoot": "node tools/shoot.mjs",
     "assets:recolour": "node tools/recolour.mjs",
-    "check:devices": "node tools/devices.mjs"
+    "check:devices": "node tools/devices.mjs",
+    "check:swing": "node tools/check-swing-review.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"
