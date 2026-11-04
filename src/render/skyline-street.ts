@@ -233,15 +233,23 @@ export class SkylineStreet {
           facadeTurn(side),
         );
 
-        // Streetlights alternate sides: a pair at every pitch reads as a
-        // corridor of gates, one per side reads as a street.
+        /**
+         * Streetlights alternate sides: a pair at every pitch reads as a
+         * corridor of gates, one per side reads as a street.
+         *
+         * Same quarter turn as the facades, for the same measured reason.
+         * `light-curved` is 0.05 wide against 0.225 deep with its mass
+         * offset +0.088 on Z — the lamp arm reaches along +Z. On a street
+         * that also runs along Z that pointed every arm UP OR DOWN the road
+         * instead of out over it.
+         */
         if ((i + (side > 0 ? 1 : 0)) % 2 === 0) {
           this.place(
             'streetlight',
             side * (FACADE_X - 0.7),
             0,
             worldZ + this.tile * 0.3,
-            side > 0 ? Math.PI : 0,
+            facadeTurn(side),
           );
         }
       }
@@ -251,10 +259,15 @@ export class SkylineStreet {
       const r = hash(i, 5);
       const side = r < 0.5 ? -1 : 1;
       const x = side * (FACADE_X - DRESSING_INSET);
-      const facing = side > 0 ? Math.PI : 0;
-      if (r < 0.2) this.place('trafficLight', x, 0, worldZ + this.tile * 0.6, facing);
-      else if (r < 0.42) this.place('streetSign', x, 0, worldZ + this.tile * 0.6, facing);
-      else if (r < 0.58) this.place('dumpster', x, 0, worldZ + this.tile * 0.6, facing);
+      // Mirroring by side is right for a pole, wrong for anything that has
+      // to be READ: a signal head is wider in X than deep, so it already
+      // faces the oncoming player, and flipping it by PI on one kerb turned
+      // it to face away. A dumpster's long axis is Z, which is correct
+      // against a kerb that also runs along Z.
+      const mirrored = side > 0 ? Math.PI : 0;
+      if (r < 0.2) this.place('trafficLight', x, 0, worldZ + this.tile * 0.6, 0);
+      else if (r < 0.42) this.place('streetSign', x, 0, worldZ + this.tile * 0.6, mirrored);
+      else if (r < 0.58) this.place('dumpster', x, 0, worldZ + this.tile * 0.6, mirrored);
     }
 
     // Draw exactly what was written. Set ONCE — the frame loop never touches

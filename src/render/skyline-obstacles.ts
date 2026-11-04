@@ -47,6 +47,36 @@ const GROUND_THRESHOLD = 0.6;
 /** Where a bridge pillar stands: on the kerb, clear of every lane. */
 const PILLAR_X = 6.2;
 
+/**
+ * Quarter turn that puts a prop ACROSS the player's path instead of along it.
+ *
+ * Measured. The Kenney street furniture is authored with its long axis on Z:
+ *
+ *     construction-barrier   0.135 wide x 0.225 deep
+ *     construction-fence     0.075 wide x 0.375 deep
+ *     dumpster               0.275 wide x 0.370 deep
+ *     road-sign-empty-hanging 0.09 wide x 0.295 deep
+ *
+ * The route also runs along Z, so dropped in untouched every one of them
+ * pointed AT the player — a barrier lying lengthways down the lane it was
+ * supposed to be blocking, and a sign panel showing its edge instead of its
+ * face. `road-bridge` is the same story for a different reason: it is a road
+ * segment, and a bridge crossing the street has to run across it.
+ *
+ * Cones and beacons are square in plan and need no turn, which is why the
+ * barricade was the one obstacle that looked right.
+ */
+export const BLOCKING_TURN = Math.PI / 2;
+
+/**
+ * Props whose authored long axis runs along Z and therefore need the turn.
+ *
+ * Exported so the test checks the SAME list the builder uses. A test that
+ * restates which props are long passes however wrong the builder is — the
+ * facade test made exactly that mistake in draft.
+ */
+export const TURNED_PROPS: readonly StreetPropId[] = ['barrier', 'fence', 'dumpster', 'bridgeDeck', 'signHanging'];
+
 export class ObstacleKit {
   constructor(private assets: StreetAssets) {}
 
@@ -84,7 +114,7 @@ export class ObstacleKit {
    */
   private ground(group: Group, e: Entity, span: boolean): void {
     const width = e.halfX * 2;
-    this.tile(group, 'barrier', width, -e.halfY, e.halfZ * 0.2, e.halfY * 2);
+    this.tile(group, 'barrier', width, -e.halfY, e.halfZ * 0.2, BLOCKING_TURN, e.halfY * 2);
     // Cones in front, spaced from the width so a lane blocker gets two and
     // the full-street wall gets five.
     const cones = span ? 5 : 2;
@@ -111,7 +141,7 @@ export class ObstacleKit {
    */
   private overhead(group: Group, e: Entity, span: boolean, clearance: number): void {
     if (span) {
-      this.tile(group, 'bridgeDeck', e.halfX * 2, -e.halfY, 0, e.halfY * 2, e.halfZ * 2);
+      this.tile(group, 'bridgeDeck', e.halfX * 2, -e.halfY, 0, BLOCKING_TURN, e.halfY * 2, e.halfZ * 2);
       /**
        * Pillars go on the KERB, not in the carriageway.
        *
@@ -131,7 +161,7 @@ export class ObstacleKit {
     // plus a hanger carrying it up to the overhead line the anchors use. A
     // sign suspended from nothing is the same lie as a floating deck, and
     // the cable line is already there to hang it from.
-    const sign = this.one(group, 'signHanging', 0, e.halfY, 0);
+    const sign = this.one(group, 'signHanging', 0, e.halfY, 0, BLOCKING_TURN);
     if (sign) this.fit(sign, e.halfX * 2, e.halfY * 2, e.halfZ * 2, 'top');
     const rise = ANCHOR_HEIGHT - e.y - e.halfY;
     if (rise > 0) {
@@ -150,12 +180,25 @@ export class ObstacleKit {
    * a unit and invisible, right up until a prop was stretched and the error
    * scaled with it.
    */
-  private one(group: Group, id: StreetPropId, x: number, y: number, z: number): Object3D | null {
+  private one(
+    group: Group, id: StreetPropId, x: number, y: number, z: number, turn = 0,
+  ): Object3D | null {
     const prop = this.assets.prop(id);
     if (!prop) return null;
     const holder = new Group();
     holder.position.set(x, y, z);
-    holder.add(prop);
+    if (turn) {
+      // The turn goes on an INNER pivot, so the holder's own scale keeps
+      // meaning world X/Y/Z. Rotating the holder itself would make
+      // `scale.x` stretch along world Z and every fit below would be
+      // silently transposed.
+      const pivot = new Group();
+      pivot.rotation.y = turn;
+      pivot.add(prop);
+      holder.add(pivot);
+    } else {
+      holder.add(prop);
+    }
     group.add(holder);
     return holder;
   }
@@ -170,27 +213,35 @@ export class ObstacleKit {
     width: number,
     baseY: number,
     z: number,
+    turn: number,
     height?: number,
     depth?: number,
   ): void {
     const half = this.assets.half(id);
     if (!half) return;
-    const unit = Math.max(half.x * 2, 0.01);
-    const count = Math.max(1, Math.ceil(width / unit));
+    // After a quarter turn the prop's Z extent is what lies across the path
+    // and its X extent is what reaches into it. Getting this the wrong way
+    // round scales the piece along the axis it is not spanning.
+    const across = Math.max((turn ? half.z : half.x) * 2, 0.01);
+    const into = Math.max((turn ? half.x : half.z) * 2, 0.01);
+    const count = Math.max(1, Math.ceil(width / across));
     const step = width / count;
     for (let i = 0; i < count; i++) {
-      const prop = this.one(group, id, (i + 0.5) / count * width - width / 2, baseY, z);
+      const prop = this.one(group, id, (i + 0.5) / count * width - width / 2, baseY, z, turn);
       if (!prop) continue;
       // Squeeze laterally so `count` copies land exactly on `width`, and
       // stretch vertically when the collider is taller than the prop.
-      prop.scale.x *= step / unit;
+      prop.scale.x *= step / across;
       if (height) prop.scale.y *= height / Math.max(half.y * 2, 0.01);
-      if (depth) prop.scale.z *= depth / Math.max(half.z * 2, 0.01);
+      if (depth) prop.scale.z *= depth / into;
     }
   }
 
   /** Scale a prop to exactly fill a box, anchored at its top or bottom. */
   private fit(prop: Object3D, w: number, h: number, d: number, anchor: 'top' | 'bottom'): void {
+    // Measure AFTER any turn: a rotated prop's world extents are not its
+    // authored ones, and fitting to the authored pair transposes the result.
+    prop.updateMatrixWorld(true);
     const size = new Box3().setFromObject(prop).getSize(new Vector3());
     prop.scale.set(
       (prop.scale.x * w) / Math.max(size.x, 0.01),
@@ -202,6 +253,7 @@ export class ObstacleKit {
 
   /** Stretch a prop along one axis, growing from its seated end. */
   private stretch(prop: Object3D, x: number, y: number, z: number, from: 'down' | 'up'): void {
+    prop.updateMatrixWorld(true);
     const size = new Box3().setFromObject(prop).getSize(new Vector3());
     prop.scale.set(prop.scale.x * x, (prop.scale.y * y) / Math.max(size.y, 0.01), prop.scale.z * z);
     if (from === 'down') prop.position.y -= y;

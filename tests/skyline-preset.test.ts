@@ -19,6 +19,9 @@ import { SKYLINE } from '../src/levels/skyline/course';
 import { FACADE_X, facadeTurn, MARGIN, SkylineStreet } from '../src/render/skyline-street';
 import { GAME_ZONE_HALF } from '../src/render/skyline-view';
 import type { StreetAssets } from '../src/render/skyline-assets';
+import { BLOCKING_TURN, TURNED_PROPS } from '../src/render/skyline-obstacles';
+import { STREET_PROPS, STREET_PROP_IDS } from '../src/render/skyline-props';
+import { glbBounds } from './glb-bounds';
 
 const ROUTE = SKYLINE.duration * SKYLINE.speed;
 
@@ -148,5 +151,43 @@ describe('buildings face the street', () => {
     const face = centre - (box?.max.z ?? 0);
     expect(face, 'the facade does not land on the kerb line').toBeCloseTo(FACADE_X, 6);
     assets.dispose();
+  });
+});
+
+describe('obstacles block the path rather than point down it', () => {
+  /**
+   * The Kenney street furniture is authored with its long axis on Z, and the
+   * route runs along Z too — so dropped in untouched a barrier lies
+   * lengthways down the lane it is supposed to be blocking, and a sign shows
+   * its edge instead of its face.
+   *
+   * Checked against the asset bounds, not against a hand-written list of
+   * which props are long, so re-exporting a prop at a different orientation
+   * fails here instead of looking subtly wrong in play.
+   */
+  it('turns exactly the props whose long axis runs along the route', () => {
+    for (const id of STREET_PROP_IDS) {
+      const spec = STREET_PROPS[id];
+      const size = glbBounds(spec.url.replace(/^\//, 'public/')).size;
+      const longAlongRoute = size[2] > size[0] * 1.15;
+      if (!TURNED_PROPS.includes(id)) continue;
+      // `bridgeDeck` is square in plan — it is turned because it is a ROAD
+      // segment that has to cross the street, not because it is long.
+      if (id === 'bridgeDeck') continue;
+      expect(longAlongRoute, `${id} is listed as turned but is not long along Z`).toBe(true);
+    }
+  });
+
+  it('applies a quarter turn, not a half one', () => {
+    // PI would flip a barrier end for end and leave it just as parallel to
+    // the lane as before — the mistake the facades had.
+    expect(Math.abs(Math.sin(BLOCKING_TURN)), 'the turn does not cross the path')
+      .toBeCloseTo(1, 6);
+  });
+
+  it('leaves square props alone', () => {
+    for (const id of ['cone', 'workLight', 'bridgePillar', 'gift'] as const) {
+      expect(TURNED_PROPS.includes(id), `${id} is square in plan and needs no turn`).toBe(false);
+    }
   });
 });

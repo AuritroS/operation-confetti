@@ -13,6 +13,53 @@ with the real character, street and props integrated (see the asset pass).
 `/` and `?level=2` open it; `?level=1` opens the frozen first level. Earlier
 prototype sections and the recovered Claude plan are retained as history.
 
+## Rotation pass — props that block instead of point (4 November 2026)
+
+The Kenney street furniture is authored with its **long axis on Z**, and the
+route runs along Z too. Dropped in untouched, every one of them pointed at
+the player instead of across their path. Measured:
+
+| Prop | w x d | Was | Now |
+|---|---|---|---|
+| `construction-barrier` | 0.135 x 0.225 | lying lengthways down the lane | quarter turn, spans it |
+| `construction-fence` | 0.075 x 0.375 | same | quarter turn |
+| `dumpster` *(as an obstacle)* | 0.275 x 0.370 | same | quarter turn |
+| `road-sign-empty-hanging` | 0.090 x 0.295 | panel edge-on | quarter turn, faces the player |
+| `road-bridge` | 1 x 1 | a road running **along** the street | quarter turn, crosses it |
+| `light-curved` | 0.050 x 0.225, offset +0.088 Z | lamp arm reaching up the road | quarter turn, reaches over it |
+| `traffic-light` | 0.118 x 0.090 | mirrored by PI, so one kerb faced away | faces the oncoming player |
+
+`construction-cone`, `construction-light`, `bridge-pillar` and the gift are
+square in plan and need no turn — which is why the barricade was the one
+obstacle that already looked roughly right.
+
+### Two implementation details that would have gone wrong quietly
+
+**The turn goes on an inner pivot, not the holder.** Rotating the holder
+makes its own `scale.x` stretch along world Z, so every fit in the builder
+would have been silently transposed — a barrier squeezed along the axis it
+was meant to span.
+
+**`fit` and `stretch` now measure after the turn.** A rotated prop's world
+extents are not its authored ones, and fitting a rotated piece to the
+authored pair transposes the result in a way that looks almost right.
+
+### Gated
+
+`TURNED_PROPS` is exported and the test checks it **against the asset bounds**
+rather than against a hand-written list, so re-exporting a prop at a
+different orientation fails here instead of looking subtly wrong in play. It
+also asserts the turn is a quarter and not a half — PI would flip a barrier
+end for end and leave it exactly as parallel to the lane as before, which is
+the mistake the facades had.
+
+### Verified
+
+- **203 tests across 23 files**, tsc clean, build clean, all 14 viewports.
+- `check:swing` PASS — 6 viewports, 600-point route, two-second warnings.
+- **52,721 triangles / 53 draws** against the 60,000 / 60 ceiling.
+- Level 1 unchanged.
+
 ## Environment rebuild — preset, not recycled (4 November 2026)
 
 Environment scope only. The obstacle rotation reported alongside this is the
