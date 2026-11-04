@@ -13,6 +13,101 @@ with the real character, street and props integrated (see the asset pass).
 `/` and `?level=2` open it; `?level=1` opens the frozen first level. Earlier
 prototype sections and the recovered Claude plan are retained as history.
 
+## Environment rebuild — preset, not recycled (4 November 2026)
+
+Environment scope only. The obstacle rotation reported alongside this is the
+same class of bug in the game zone and was deliberately **not** touched.
+
+### Why the popping survived the last fix
+
+The street layer was a recycling ring: each frame it derived a first index
+from the player's distance, rewrote a window of instance matrices and set
+`.count`. The road's window was correct —
+
+```
+road:   firstRow   = floor((playerZ - BEHIND)   / tile)   → persists 30u BEHIND the player ✓
+towers: firstTower = ceil ((playerZ + cameraZ + 6) / pitch)
+```
+
+— and the towers' was not. That `+ cameraZ` should have been `-`. The nearest
+drawn tower sat at renderZ −24, which means **a tower stopped being drawn
+once it was 24 units in front of the player**, 42 units from the lens and
+fully in frame. Buildings evaporated before you reached them.
+
+I introduced that constant to stop towers being drawn into the lens, and
+implemented it as a floor on the index rather than a skip on the near side —
+which removed the entire near field instead of just the blind span. The
+draw-distance test I wrote checked the far end of the chain and never looked
+at the near end.
+
+### The ring is gone, not fixed
+
+Fixing the sign removes one instance of the bug, not the category: a sliding
+window creates and destroys, and every popping bug this level has had was a
+boundary bug on one. The whole route's environment is now placed **once at
+construction** and never touched again. The frame loop is a single line:
+
+```ts
+update(playerZ: number): void {
+  this.object.position.z = playerZ;
+}
+```
+
+Equivalent to a camera moving through a static world, but it keeps the
+player-relative frame the game zone depends on, so nothing outside this layer
+changed.
+
+It costs almost nothing: 30 towers and 30 road tiles for the route plus a
+60-unit margin at each end, against the 20 and 22 the window was already
+drawing every frame.
+
+**`tests/skyline-preset.test.ts` states the property directly** — across a
+full simulated run, from before the start to past the end at 60 Hz, the
+layer's instance census must never change. A recycling ring cannot pass that,
+so it cannot return by accident.
+
+### The buildings were facing the wrong way the entire time
+
+```
+building_A_withoutBase   x −0.60..0.60 (centre 0.000)   z −0.65..0.80 (centre 0.075)
+building_E_withoutBase   x −1.00..1.00 (centre 0.000)   z −0.65..0.80 (centre 0.075)
+```
+
+Symmetric in X, asymmetric in Z. That +0.15 overhang on +Z is the shopfront
+and awning visible in the pack's own contents sheet: **the facade is authored
+facing +Z**. The street runs along Z, and the code rotated by `0` or `π` —
+which points the facade *along* the street and never *at* it. Both canyon
+walls had been showing their side elevations since the Kenney swap.
+
+Fixed with a quarter turn, `facadeTurn(side)`, exported as the single source
+so the test asserts the rotation production applies rather than a copy of it.
+
+Placement had to follow: after the turn the distance from a building's origin
+to its facade is `box.max.z`, not any half-extent — half-extents average the
+0.80/0.65 asymmetry away and would stand every building 0.075 units off the
+kerb. The loader now exposes real `box` bounds alongside `half`.
+
+### Measured
+
+- **200 tests across 23 files**, tsc clean, build clean, all 14 viewports.
+- **52,991 triangles / 53 draws** peak, against the 60,000 / 60 ceiling.
+  Higher than the 37k of the recycling window because the whole route is now
+  resident — **12% headroom left**, which is the thinnest it has been.
+- Triangle spread across the run is 6,544, all of it game zone: entities
+  resolving and anchor pools cycling. The environment itself is provably
+  constant.
+
+### Known, and deliberately not addressed
+
+- **Thin triangle headroom.** If a phone struggles, the move is to split the
+  street into chunks and let three.js frustum-cull them. That preserves the
+  no-churn property — culling is not creation — but it is performance work
+  and nothing asked for it yet.
+- **Obstacle rotation.** `construction-barrier` is 0.14 wide × 0.22 deep and
+  `construction-fence` 0.08 × 0.38: both longer along Z than across X, so
+  they lie *along* the player's path instead of blocking it. Same quarter
+  turn as the buildings. Next scope.
+
 ## Correctness pass — datum, draw distance, grid lock (4 November 2026)
 
 Correctness only. Difficulty, point feedback, camera movement and polish are

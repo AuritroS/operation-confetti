@@ -34,6 +34,7 @@ const UNIT: StreetAssets = {
   },
   batch: () => null,
   half: () => ({ x: 0.5, y: 0.5, z: 0.5 }),
+  box: () => ({ min: { x: -0.5, y: 0, z: -0.5 }, max: { x: 0.5, y: 1, z: 0.5 } }),
   dispose: () => {},
 };
 

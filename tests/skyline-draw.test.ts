@@ -26,7 +26,7 @@ import {
   FOG_DENSITY,
   FOG_HORIZON,
 } from '../src/render/skyline-view';
-import { STREET_AHEAD, TOWER_SPAWN_MARGIN } from '../src/render/skyline-street';
+
 
 /** Worst-case lens stand-off: the portrait pull-back is additive. */
 const CAMERA_Z = CAMERA_DISTANCE + CAMERA_ASPECT_PULLBACK;
@@ -40,23 +40,12 @@ describe('draw distance, fog and frustum agree', () => {
       .toBeLessThan(0.06);
   });
 
-  it('spawns the street past the fog horizon', () => {
-    expect(STREET_AHEAD, 'the street appears before the fog has hidden it')
-      .toBeGreaterThanOrEqual(FOG_HORIZON);
-  });
-
-  it('keeps everything it draws inside the frustum', () => {
-    // Measured from the LENS, which sits behind the hero.
-    const furthest = STREET_AHEAD + CAMERA_Z;
-    expect(furthest, `street reaches ${furthest.toFixed(0)}u from the lens, past the far plane`)
-      .toBeLessThanOrEqual(CAMERA_FAR);
-  });
-
-  it('never draws a tower between the lens and the hero', () => {
-    // A tower placed "just behind the player" is drawn into the camera's
-    // face: the span between lens and hero is in front of the lens.
-    expect(TOWER_SPAWN_MARGIN).toBeGreaterThan(0);
-  });
+  /**
+   * The street no longer spawns anything — it is preset and the frame loop
+   * only moves it — so there is no street spawn distance left to check.
+   * `tests/skyline-preset.test.ts` asserts the stronger property instead:
+   * that its instance census never changes across a whole run.
+   */
 
   it('shows entities far enough ahead to be read', () => {
     // The complaint this answers is that the next obstacle was invisible.

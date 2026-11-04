@@ -1,45 +1,52 @@
 /**
- * Level 2 street canyon: road, towers and pavement dressing.
+ * Level 2 street canyon — a PRESET environment the camera moves through.
  *
  * Environment only. Nothing here knows what a gift, a hazard or an anchor is,
- * and nothing here may enter the interactive zone — see `GAME_ZONE_HALF` in
- * `skyline-view.ts` and `tests/skyline-zone.test.ts`, which fails if it does.
+ * and nothing here may enter the interactive zone — see `GAME_ZONE_HALF` and
+ * `tests/skyline-zone.test.ts`, which fails if it does.
+ *
+ * ---- why this is built once, not recycled -------------------------------
+ *
+ * The previous version was a recycling ring: every frame it derived a first
+ * index from the player's distance, rewrote a window of instance matrices and
+ * set `.count`. That is a sliding window which creates and destroys, and
+ * every popping bug this level has had was a boundary bug on it — including
+ * the one that shipped, where a sign error culled towers twenty-four units
+ * IN FRONT of the player, so buildings evaporated before you reached them.
+ *
+ * Fixing that sign would have removed one instance of the bug, not the
+ * category. So there is no window any more. The whole route's environment is
+ * placed once at construction and never touched again; the frame loop moves
+ * one parent group. Nothing is created, nothing is destroyed, and therefore
+ * nothing can pop — structurally, not by tuning.
+ *
+ * It costs almost nothing. The route is 383 units; with a 60-unit margin at
+ * each end that is 30 towers and 30 road tiles, against the 20 and 22 the
+ * recycling window was already drawing every frame.
  *
  * ---- the frame -----------------------------------------------------------
  *
- * Drawn in a PLAYER-RELATIVE frame: the hero sits at z=0 forever and the
- * world is placed at `playerZ - worldZ`, so ahead of the player is NEGATIVE
- * z. The camera sits at positive z, BEHIND the hero, which is why nothing
- * tall may be drawn between the two.
+ * The scene draws in a PLAYER-RELATIVE frame: the hero sits at render z=0 and
+ * the world appears at `playerZ - worldZ`. So children here are placed at
+ * local `-worldZ`, and `update` sets the group's z to `playerZ`. Ahead of the
+ * player is negative z; the camera sits behind at positive z.
  *
  * ---- the ground datum ----------------------------------------------------
  *
  * y=0 is the carriageway, and road tiles are base-seated so their LOWEST
- * surface lands on it.
- *
- * This was got wrong twice in opposite directions, so it is worth stating
- * why. A KayKit road was a solid slab whose TOP was the walking surface, so
- * placing things at y=0 buried them and the fix was to sink the tile by its
- * own height. A Kenney tile is not a slab — it is a thin plate with RAISED
- * KERBS, so its bounding-box top is the pavement and its carriageway is at
- * the bottom. Carrying the sink across to it lifted the road out from under
- * everything and left Matthew, the obstacles and the dressing floating 0.34
- * units in the air.
- *
- * The lesson is not "don't sink" — it is that the datum cannot be inferred
- * from a bounding box, because where the walkable surface sits inside that
- * box depends on how the prop is modelled. `tests/skyline-datum.test.ts`
- * pins it instead: the carriageway, y=0, and the character's soles must
- * agree.
+ * surface lands on it. This was got wrong twice in opposite directions — a
+ * KayKit road was a solid slab whose TOP was the walking surface, a Kenney
+ * tile is a thin plate with raised kerbs whose carriageway is at the bottom.
+ * The datum cannot be inferred from a bounding box; `tests/skyline-datum.ts`
+ * pins it instead.
  *
  * ---- one tile is the whole street ----------------------------------------
  *
  * A Kenney road tile is a complete two-way street WITH ITS OWN KERBS AND
- * PAVEMENT, not one lane. Two consequences, both learned the hard way:
- * tiling six across at one-per-lane drew a six-lane expanse for a three-lane
- * game, and adding separate pavement tiles beside it buried the road under
- * thirteen-unit slabs of the very pavement the tile already had. One tile,
- * centred, and the facades sit at its edge.
+ * PAVEMENT, not one lane. Tiling six across at one-per-lane drew a six-lane
+ * expanse for a three-lane game, and adding separate pavement tiles beside it
+ * buried the road under slabs of the pavement it already had. One tile,
+ * centred, with the facades at its edge.
  */
 import {
   Group,
@@ -51,56 +58,22 @@ import {
 } from 'three';
 import type { StreetAssets } from './skyline-assets';
 import type { StreetPropId } from './skyline-props';
-import { FOG_HORIZON, GAME_ZONE_HALF } from './skyline-view';
-
-/**
- * Furthest the street is drawn, and the margin before a tower may appear.
- *
- * Exported so `tests/skyline-draw.test.ts` can check them against the fog
- * horizon and the frustum rather than anyone re-deriving the arithmetic.
- */
-export const STREET_AHEAD = FOG_HORIZON;
-export const TOWER_SPAWN_MARGIN = 6;
+import { GAME_ZONE_HALF } from './skyline-view';
 
 /**
  * Where the canyon's inner FACES stand.
  *
  * Not where the buildings are centred: these towers scale to 15-30 units
- * wide, so a fixed centre line put the widest one's face inside the road
- * while a narrow neighbour left a gap. Placing by face keeps the street a
- * constant width whichever shape the hash picks.
+ * wide and are asymmetric, so a fixed centre line put one shape's face
+ * inside the road while another left a gap.
  */
 export const FACADE_X = 6.9;
 
-/**
- * How far dressing sits in from the facade, on the pavement.
- *
- * Must leave the interactive zone clear — `clearsGameZone` below is the
- * assertion, and `tests/skyline-zone.test.ts` fails if this closes up.
- */
+/** How far dressing sits in from the facade, on the pavement. */
 export const DRESSING_INSET = 1.5;
 
-/**
- * How far ahead the street is drawn.
- *
- * Past the fog horizon, so the far row arrives at about 5% opacity and fades
- * up rather than appearing at the clip plane. At 150 it was arriving 17%
- * visible and being sliced off by a frustum that ended before the fog did.
- */
-const AHEAD = STREET_AHEAD;
-/** How far behind the player the ROAD runs. Only the surface may do this. */
-const BEHIND = 30;
-
-/**
- * Margin added to the camera's own position before anything tall is drawn.
- *
- * Derived at runtime rather than hard-coded: the lens sits behind the hero,
- * so the span between them is in front of it and a 30-unit tower placed
- * "just behind the player" is drawn into the camera's face. Asking the camera
- * where it is keeps this correct if the camera moves — including if it
- * becomes oblique.
- */
-const TOWER_CLEARANCE = TOWER_SPAWN_MARGIN;
+/** How far the environment extends past each end of the route. */
+export const MARGIN = 60;
 
 /** A pedestrian crossing every N tiles, to break up the repeat. */
 const CROSSING_EVERY = 5;
@@ -108,11 +81,33 @@ const CROSSING_EVERY = 5;
 const TOWERS: StreetPropId[] = ['towerA', 'towerC', 'towerE', 'towerG'];
 
 /**
+ * Quarter turn that points a building's facade at the street.
+ *
+ * Exported with `facadeTurn` below so the test asserts the rotation THIS
+ * file applies, rather than a copy of it — a test that restates the value it
+ * is checking passes however wrong production is.
+ *
+ * Measured, not guessed. These models are symmetric in X (centre 0.000) and
+ * asymmetric in Z — reaching 0.80 one way against 0.65 the other — and that
+ * overhang is the shopfront and awning visible in the pack's own contents
+ * sheet. The facade is authored facing +Z.
+ *
+ * The street runs along Z, so rotating by 0 or PI (as the first version did)
+ * points the facade ALONG the street and never AT it: both canyon walls were
+ * showing their side elevations. A quarter turn puts +Z onto +/-X instead.
+ */
+export const FACADE_TURN = Math.PI / 2;
+
+/** The rotation applied to a canyon wall on `side`. The one source of it. */
+export const facadeTurn = (side: -1 | 1): number => (side > 0 ? -FACADE_TURN : FACADE_TURN);
+
+/**
  * Deterministic per-tile pseudo-random in [0, 1).
  *
  * An integer hash rather than Math.random: the street must be identical on
  * every replay, or a review screenshot cannot be compared with the one taken
- * before the change it is meant to verify.
+ * before the change it is meant to verify. Now used only at BUILD time — the
+ * frame loop no longer makes placement decisions at all.
  */
 function hash(n: number, salt: number): number {
   let h = (n * 374761393 + salt * 668265263) | 0;
@@ -122,17 +117,7 @@ function hash(n: number, salt: number): number {
 
 interface Batch {
   mesh: InstancedMesh;
-  /** Written this frame. */
-  count: number;
-  /**
-   * Pool capacity.
-   *
-   * Tracked separately because `mesh.count` is what three.js DRAWS and the
-   * frame loop rewrites it. Using it as the capacity check made the pool
-   * ratchet downward: a prop placed rarely set `count` to 0 on a frame with
-   * none, and from then on the guard refused every write.
-   */
-  capacity: number;
+  written: number;
 }
 
 export class SkylineStreet {
@@ -141,119 +126,121 @@ export class SkylineStreet {
   private batches = new Map<StreetPropId, Batch>();
   private dummy = new Object3D();
   private ground: Mesh;
+  private tile = 17;
+  private towerPitch = 34;
 
-  /** Tile pitch, measured from the asset rather than assumed. */
-  private tile = 13;
-  private rows = 0;
-  private towerPitch = 26;
-  private towerRows = 0;
-
-  constructor(private assets: StreetAssets) {
+  constructor(
+    private assets: StreetAssets,
+    private routeLength: number,
+  ) {
     const road = assets.half('road');
     if (road) this.tile = road.z * 2;
-    this.rows = Math.ceil((AHEAD + BEHIND) / this.tile) + 1;
     this.towerPitch = this.tile * 2;
-    // No +slack: an extra row lands past the far plane, where it is clipped
-    // rather than drawn. Fog hides that now, but drawing geometry purely to
-    // have it discarded is waste. `tests/skyline-draw.test.ts` pins it.
-    this.towerRows = Math.ceil(AHEAD / this.towerPitch);
+
+    const span = routeLength + MARGIN * 2;
+    const roadTiles = Math.ceil(span / this.tile) + 2;
+    const towerRows = Math.ceil(span / this.towerPitch) + 2;
 
     /**
      * Ground beyond the road.
      *
      * The road tile is 17 units wide; the canyon towers scale to 15-30 and
      * are placed by their inner face, so up to 28 units of each building
-     * stands past the tarmac. Without this they end in mid-air.
+     * stands past the tarmac. Without this they end in mid-air — the same
+     * problem level 1 solved the same way, with one dark plane.
      *
-     * Level 1 solved the identical problem the identical way — one dark
-     * plane under everything, for one draw call and two triangles.
-     *
-     * Dropped a clear HALF UNIT below the carriageway, not a hair. At 0.05
-     * it z-fought the road across the whole near field and the painted lane
-     * markings dissolved into a flat grey wash — the deeper far plane made
-     * depth precision tighter, so the margin that would once have been fine
-     * no longer was. Nothing can see under the road from this camera, so the
-     * gap costs nothing.
+     * Dropped a clear half unit, not a hair: at 0.05 it z-fought the road
+     * across the whole near field and the painted lane markings dissolved
+     * into a grey wash.
      */
     this.ground = new Mesh(
-      new PlaneGeometry(160, AHEAD + BEHIND + 40),
+      new PlaneGeometry(200, span + 80),
       new MeshStandardMaterial({ color: 0x131d30, roughness: 1 }),
     );
     this.ground.rotation.x = -Math.PI / 2;
-    this.ground.position.y = -0.5;
+    this.ground.position.set(0, -0.5, -routeLength / 2);
     this.object.add(this.ground);
 
-    // Surface next, so everything else sorts over it.
-    this.add('road', this.rows);
-    this.add('roadCrossing', Math.ceil(this.rows / CROSSING_EVERY) + 2);
-    for (const id of TOWERS) this.add(id, this.towerRows * 2);
-    this.add('streetlight', this.towerRows * 2);
-    this.add('trafficLight', this.towerRows);
-    this.add('streetSign', this.towerRows);
-    this.add('dumpster', this.towerRows);
+    this.allocate('road', roadTiles);
+    this.allocate('roadCrossing', Math.ceil(roadTiles / CROSSING_EVERY) + 2);
+    for (const id of TOWERS) this.allocate(id, towerRows * 2);
+    this.allocate('streetlight', towerRows * 2);
+    this.allocate('trafficLight', towerRows);
+    this.allocate('streetSign', towerRows);
+    this.allocate('dumpster', towerRows);
+
+    this.build();
   }
 
-  private add(id: StreetPropId, count: number): void {
+  private allocate(id: StreetPropId, count: number): void {
     const mesh = this.assets.batch(id, count);
     if (!mesh) return;
-    this.batches.set(id, { mesh, count: 0, capacity: count });
+    this.batches.set(id, { mesh, written: 0 });
     this.object.add(mesh);
   }
 
-  private place(id: StreetPropId, x: number, y: number, z: number, rotY = 0): void {
+  /** Place one instance at a WORLD position; the group handles the frame. */
+  private place(id: StreetPropId, x: number, y: number, worldZ: number, rotY = 0): void {
     const batch = this.batches.get(id);
-    if (!batch || batch.count >= batch.capacity) return;
-    this.dummy.position.set(x, y, z);
+    if (!batch || batch.written >= batch.mesh.count) return;
+    this.dummy.position.set(x, y, -worldZ);
     this.dummy.rotation.set(0, rotY, 0);
     this.dummy.scale.setScalar(1);
     this.dummy.updateMatrix();
-    batch.mesh.setMatrixAt(batch.count++, this.dummy.matrix);
+    batch.mesh.setMatrixAt(batch.written++, this.dummy.matrix);
   }
 
   /**
-   * `playerZ` is the player's world distance; `cameraZ` is where the lens
-   * sits in the player-relative frame, so the layer can refuse to draw
-   * anything tall between the two without being told the stand-off.
+   * Lay out the whole route, once.
+   *
+   * Everything from -MARGIN to routeLength + MARGIN, so neither end of the
+   * street is ever in frame.
    */
-  update(playerZ: number, cameraZ: number): void {
-    for (const batch of this.batches.values()) batch.count = 0;
-
-    // The ground follows the player so its far edge never enters frame.
-    this.ground.position.z = -(AHEAD - BEHIND) / 2;
-
-    // ---- surface ---------------------------------------------------------
-    // Snapped to the tile pitch so the road slides under the player rather
-    // than crawling, which is what makes the texture gradient read as depth.
-    const firstRow = Math.floor((playerZ - BEHIND) / this.tile);
-    for (let row = 0; row < this.rows; row++) {
-      const index = firstRow + row;
-      const z = playerZ - index * this.tile;
-      const crossing = ((index % CROSSING_EVERY) + CROSSING_EVERY) % CROSSING_EVERY === 0;
-      // Base-seated: the carriageway is the tile's lowest surface, so y=0.
-      this.place(crossing ? 'roadCrossing' : 'road', 0, 0, z);
+  private build(): void {
+    const firstRow = Math.floor(-MARGIN / this.tile) - 1;
+    const lastRow = Math.ceil((this.routeLength + MARGIN) / this.tile) + 1;
+    for (let i = firstRow; i <= lastRow; i++) {
+      const crossing = ((i % CROSSING_EVERY) + CROSSING_EVERY) % CROSSING_EVERY === 0;
+      this.place(crossing ? 'roadCrossing' : 'road', 0, 0, i * this.tile);
     }
 
-    // ---- canyon and dressing ---------------------------------------------
-    const firstTower = Math.ceil((playerZ + cameraZ + TOWER_CLEARANCE) / this.towerPitch);
-    for (let row = 0; row < this.towerRows; row++) {
-      const index = firstTower + row;
-      const z = playerZ - index * this.towerPitch;
+    const firstTower = Math.floor(-MARGIN / this.towerPitch) - 1;
+    const lastTower = Math.ceil((this.routeLength + MARGIN) / this.towerPitch) + 1;
+    for (let i = firstTower; i <= lastTower; i++) {
+      const worldZ = i * this.towerPitch;
 
       for (const side of [-1, 1] as const) {
         const salt = side > 0 ? 17 : 91;
-        const pick = TOWERS[Math.floor(hash(index, salt) * TOWERS.length)] as StreetPropId;
-        const jitter = (hash(index, salt + 3) - 0.5) * this.towerPitch * 0.3;
-        const halfX = this.assets.half(pick)?.x ?? 0;
-        this.place(pick, side * (FACADE_X + halfX), 0, z + jitter, side > 0 ? Math.PI : 0);
+        const pick = TOWERS[Math.floor(hash(i, salt) * TOWERS.length)] as StreetPropId;
+        const jitter = (hash(i, salt + 3) - 0.5) * this.towerPitch * 0.3;
+
+        /**
+         * Place by the FACADE, using the real face rather than a half-extent.
+         *
+         * After the quarter turn the model's +Z reaches along +/-X, so the
+         * distance from its origin to the facade is `box.max.z` — not
+         * `half.x`, and not `half.z` either, because half-extents average
+         * the 0.80/0.65 asymmetry away and would stand the building 0.075
+         * units off the kerb.
+         */
+        const box = this.assets.box(pick);
+        const toFacade = box ? box.max.z : 0;
+        this.place(
+          pick,
+          side * (FACADE_X + toFacade),
+          0,
+          worldZ + jitter,
+          facadeTurn(side),
+        );
 
         // Streetlights alternate sides: a pair at every pitch reads as a
         // corridor of gates, one per side reads as a street.
-        if ((index + (side > 0 ? 1 : 0)) % 2 === 0) {
+        if ((i + (side > 0 ? 1 : 0)) % 2 === 0) {
           this.place(
             'streetlight',
             side * (FACADE_X - 0.7),
             0,
-            z + this.tile * 0.3,
+            worldZ + this.tile * 0.3,
             side > 0 ? Math.PI : 0,
           );
         }
@@ -261,19 +248,39 @@ export class SkylineStreet {
 
       // Pavement dressing, biased close to the kerb where it passes near the
       // camera — distance alone reads flat however good the assets are.
-      const r = hash(index, 5);
+      const r = hash(i, 5);
       const side = r < 0.5 ? -1 : 1;
       const x = side * (FACADE_X - DRESSING_INSET);
       const facing = side > 0 ? Math.PI : 0;
-      if (r < 0.2) this.place('trafficLight', x, 0, z + this.tile * 0.6, facing);
-      else if (r < 0.42) this.place('streetSign', x, 0, z + this.tile * 0.6, facing);
-      else if (r < 0.58) this.place('dumpster', x, 0, z + this.tile * 0.6, facing);
+      if (r < 0.2) this.place('trafficLight', x, 0, worldZ + this.tile * 0.6, facing);
+      else if (r < 0.42) this.place('streetSign', x, 0, worldZ + this.tile * 0.6, facing);
+      else if (r < 0.58) this.place('dumpster', x, 0, worldZ + this.tile * 0.6, facing);
     }
 
+    // Draw exactly what was written. Set ONCE — the frame loop never touches
+    // these again, which is the whole point.
     for (const batch of this.batches.values()) {
-      batch.mesh.count = batch.count;
+      batch.mesh.count = batch.written;
       batch.mesh.instanceMatrix.needsUpdate = true;
     }
+  }
+
+  /**
+   * The entire frame cost of this layer.
+   *
+   * One transform on one group. No instance matrices are rewritten, no
+   * counts change, nothing is created or destroyed — which is what makes
+   * popping unexpressible rather than merely tuned away.
+   */
+  update(playerZ: number): void {
+    this.object.position.z = playerZ;
+  }
+
+  /** How many instances this layer holds, for the no-churn test. */
+  get census(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [id, batch] of this.batches) out[id] = batch.mesh.count;
+    return out;
   }
 
   /**

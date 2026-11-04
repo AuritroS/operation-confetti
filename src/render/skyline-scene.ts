@@ -225,7 +225,7 @@ export class SkylineScene {
 
   useAssets(assets: StreetAssets): void {
     if (this.street) return;
-    this.street = new SkylineStreet(assets);
+    this.street = new SkylineStreet(assets, this.course.duration * this.course.speed);
     this.root.add(this.street.object);
     // The flat box floor and the instanced blocks were standing in for the
     // road and the canyon. Both are now real, so retire the stand-ins rather
@@ -320,7 +320,7 @@ export class SkylineScene {
     }
     let b = 0, w = 0;
     if (this.street) {
-      this.street.update(s.p.z, this.camera.position.z);
+      this.street.update(s.p.z);
     } else {
       // Primitive stand-in, used only until the GLBs resolve.
       const base = Math.floor(s.p.z / 20) * 20;

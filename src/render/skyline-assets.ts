@@ -41,6 +41,16 @@ interface Batchable {
   material: Material;
   /** Scaled half-extents, so callers can place by face instead of centre. */
   half: { x: number; y: number; z: number };
+  /**
+   * Scaled min/max about the prop's own origin.
+   *
+   * Needed because these models are NOT centred. A KayKit building carries
+   * its shopfront and awning on the +Z face, so it reaches 0.80 one way and
+   * 0.65 the other — and placing a facade on a line requires knowing which.
+   * Half-extents average that asymmetry away and put the building 0.075
+   * units off the kerb.
+   */
+  box: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } };
 }
 
 export interface StreetAssets {
@@ -58,6 +68,8 @@ export interface StreetAssets {
    * shape the hash picks.
    */
   half(id: StreetPropId): { x: number; y: number; z: number } | null;
+  /** Scaled min/max about the prop's origin, for placing by an actual face. */
+  box(id: StreetPropId): Batchable['box'] | null;
   /** Ids that failed, for the debug panel and the review tool. */
   readonly missing: readonly StreetPropId[];
   dispose(): void;
@@ -183,15 +195,22 @@ export async function loadStreetAssets(): Promise<StreetAssets> {
             merged.applyMatrix4(new Matrix4().makeTranslation(0, -min, 0));
             merged.computeBoundingBox();
             merged.computeBoundingSphere();
-            const box = merged.boundingBox;
+            const bounds = merged.boundingBox;
+            const zero = { x: 0, y: 0, z: 0 };
             batchable.set(id, {
               geometry: merged,
               material,
               half: {
-                x: box ? (box.max.x - box.min.x) / 2 : 0,
-                y: box ? (box.max.y - box.min.y) / 2 : 0,
-                z: box ? (box.max.z - box.min.z) / 2 : 0,
+                x: bounds ? (bounds.max.x - bounds.min.x) / 2 : 0,
+                y: bounds ? (bounds.max.y - bounds.min.y) / 2 : 0,
+                z: bounds ? (bounds.max.z - bounds.min.z) / 2 : 0,
               },
+              box: bounds
+                ? {
+                    min: { x: bounds.min.x, y: bounds.min.y, z: bounds.min.z },
+                    max: { x: bounds.max.x, y: bounds.max.y, z: bounds.max.z },
+                  }
+                : { min: { ...zero }, max: { ...zero } },
             });
             owned.push(merged);
           }
@@ -215,6 +234,9 @@ export async function loadStreetAssets(): Promise<StreetAssets> {
     },
     half(id) {
       return batchable.get(id)?.half ?? null;
+    },
+    box(id) {
+      return batchable.get(id)?.box ?? null;
     },
     batch(id, count) {
       const entry = batchable.get(id);
