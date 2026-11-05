@@ -125,10 +125,11 @@ export function resolveAttach(
 
   // Local offset: out to the chosen face, up by a fraction of the height.
   const outward = named.face === 'front' ? 1 : -1;
+  const reach = named.wallOffset ?? (spec.front === '+Z' ? box.max.z : box.min.z);
   const local =
     spec.front === '+Z' || spec.front === '-Z'
-      ? { x: 0, z: outward * (spec.front === '+Z' ? box.max.z : box.min.z) }
-      : { x: outward * (spec.front === '+X' ? box.max.x : box.min.x), z: 0 };
+      ? { x: 0, z: outward * reach }
+      : { x: outward * (named.wallOffset ?? (spec.front === '+X' ? box.max.x : box.min.x)), z: 0 };
   const rotated = turn(local.x, local.z, resolved.rotationY);
   return new Vector3(resolved.position.x + rotated.x, named.y, resolved.position.z + rotated.z);
 }

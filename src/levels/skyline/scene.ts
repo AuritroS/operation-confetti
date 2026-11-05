@@ -135,45 +135,64 @@ export const BAY = COURSE.cycle * COURSE.speed;
 
 const ROUTE = ROUTE_LENGTH;
 
-const FIRST_BAY = Math.floor(-MARGIN / BAY);
-const LAST_BAY = Math.ceil((ROUTE + MARGIN) / BAY);
+const FIRST_BAY = -2;
+const LAST_BAY = 16;
 
-/** Four shapes, cycled rather than hashed, so the terrace is readable. */
-const TOWERS = ['towerA', 'towerC', 'towerE', 'towerG'] as const;
+/** Curated fixed architectural sequences for each side of the Queen West canyon. */
+const LEFT_WALL_TOWERS: readonly string[] = [
+  'towerA', // Bay -2 (Z = -54.4)
+  'towerE', // Bay -1 (Z = -27.2)
+  'towerA', // Bay 0 (Z = 0.0) - Start
+  'towerA', // Bay 1 (Z = 27.2)
+  'towerE', // Bay 2 (Z = 54.4)
+  'towerA', // Bay 3 (Z = 81.6)
+  'towerC', // Bay 4 (Z = 108.8)
+  'towerE', // Bay 5 (Z = 136.0)
+  'towerC', // Bay 6 (Z = 163.2)
+  'towerE', // Bay 7 (Z = 190.4)
+  'towerG', // Bay 8 (Z = 217.6)
+  'towerE', // Bay 9 (Z = 244.8)
+  'towerG', // Bay 10 (Z = 272.0)
+  'towerC', // Bay 11 (Z = 299.2)
+  'towerA', // Bay 12 (Z = 326.4)
+  'towerA', // Bay 13 (Z = 353.6)
+  'towerE', // Bay 14 (Z = 380.8) - Finish
+  'towerA', // Bay 15 (Z = 408.0)
+  'towerE', // Bay 16 (Z = 435.2)
+];
 
-/**
- * Deterministic variation, used ONLY at authoring time.
- *
- * An integer hash rather than Math.random so the scene is byte-identical on
- * every load and a review screenshot can be compared with the one before it.
- */
-function pick(n: number, salt: number, count: number): number {
-  let h = (n * 374761393 + salt * 668265263) | 0;
-  h = (h ^ (h >>> 13)) * 1274126177;
-  return ((h ^ (h >>> 16)) >>> 0) % count;
-}
+const RIGHT_WALL_TOWERS: readonly string[] = [
+  'towerE', // Bay -2 (Z = -54.4)
+  'towerA', // Bay -1 (Z = -27.2)
+  'towerC', // Bay 0 (Z = 0.0) - Start
+  'towerE', // Bay 1 (Z = 27.2)
+  'towerA', // Bay 2 (Z = 54.4)
+  'towerC', // Bay 3 (Z = 81.6)
+  'towerE', // Bay 4 (Z = 108.8)
+  'towerC', // Bay 5 (Z = 136.0)
+  'towerG', // Bay 6 (Z = 163.2)
+  'towerC', // Bay 7 (Z = 190.4)
+  'towerG', // Bay 8 (Z = 217.6)
+  'towerG', // Bay 9 (Z = 244.8)
+  'towerE', // Bay 10 (Z = 272.0)
+  'towerG', // Bay 11 (Z = 299.2)
+  'towerE', // Bay 12 (Z = 326.4)
+  'towerG', // Bay 13 (Z = 353.6)
+  'towerC', // Bay 14 (Z = 380.8) - Finish
+  'towerE', // Bay 15 (Z = 408.0)
+  'towerA', // Bay 16 (Z = 435.2)
+];
 
-/** A pedestrian crossing every N tiles, to break up the repeat. */
-const CROSSING_EVERY = 5;
 /** One Kenney tile is the whole street, kerbs and all; 19 is its scaled width. */
 const TILE = 19;
 
 const objects: Placement[] = [];
 
-/**
- * The carriageway, as ordinary placements.
- *
- * Road tiles used to be laid by a separate loop that wrote identity
- * rotations, which is how every lane marking ended up running across the
- * street instead of down it. Routing them through the same resolver as
- * everything else means the turn comes from the tile's measured axis rather
- * than from whoever wrote the loop.
- */
+/** The carriageway, as straight road tiles. */
 for (let i = Math.floor(-MARGIN / TILE) - 1; i <= Math.ceil((ROUTE + MARGIN) / TILE) + 1; i++) {
-  const crossing = ((i % CROSSING_EVERY) + CROSSING_EVERY) % CROSSING_EVERY === 0;
   objects.push({
     id: `road-${i}`,
-    prop: crossing ? 'roadCrossing' : 'road',
+    prop: 'road',
     x: 0,
     z: i * TILE,
     facing: { spans: 'along' },
@@ -185,60 +204,40 @@ const anchors: AnchorDef[] = [];
 
 for (let bay = FIRST_BAY; bay <= LAST_BAY; bay++) {
   const z = bay * BAY;
+  const idx = bay - FIRST_BAY;
+  const leftTower = LEFT_WALL_TOWERS[idx] ?? 'towerA';
+  const rightTower = RIGHT_WALL_TOWERS[idx] ?? 'towerE';
 
-  for (const side of [-1, 1] as const) {
-    const wall = side < 0 ? 'L' : 'R';
-    const tower = TOWERS[pick(bay, side < 0 ? 17 : 91, TOWERS.length)] as string;
-    objects.push({
-      id: `bldg-${wall}${bay}`,
-      prop: tower,
-      // x is the FACADE line; the resolver pushes the centre back by the
-      // building's own depth so the face lands here whichever shape it is.
-      x: side * FACADE_X,
-      z,
-      facing: { faces: 'street' },
-      side,
-      place: 'face',
-    });
+  objects.push({
+    id: `bldg-L${bay}`,
+    prop: leftTower,
+    x: -FACADE_X,
+    z,
+    facing: { faces: 'street' },
+    side: -1,
+    place: 'face',
+  });
 
-    // Lamps alternate sides, so the street reads as a street rather than a
-    // corridor of gates.
-    if ((bay + (side > 0 ? 1 : 0)) % 2 === 0) {
-      objects.push({
-        id: `lamp-${wall}${bay}`,
-        prop: 'streetlight',
-        x: side * KERB_X,
-        z: z + BAY * 0.35,
-        facing: { faces: 'street' },
-        side,
-      });
-    }
-  }
+  objects.push({
+    id: `bldg-R${bay}`,
+    prop: rightTower,
+    x: FACADE_X,
+    z,
+    facing: { faces: 'street' },
+    side: 1,
+    place: 'face',
+  });
 
-  // One span per bay, bracketed to the facade on each side.
+  // One streetcar cable span per bay, bracketed to the facades at Y=19.
   const wireId = `wire-${bay}`;
   wires.push({
     id: wireId,
     from: { on: `bldg-L${bay}`, point: 'bracket' },
     to: { on: `bldg-R${bay}`, point: 'bracket' },
-    sag: 0.06,
+    sag: 0.05,
   });
   for (const lane of [-1, 0, 1] as const) {
     anchors.push({ id: `anchor-${bay}-${lane}`, wire: wireId, lane });
-  }
-
-  // Pavement dressing, on the kerb and clear of the lanes.
-  const which = pick(bay, 5, 6);
-  if (which < 3) {
-    const side = which === 1 ? 1 : -1;
-    objects.push({
-      id: `dress-${bay}`,
-      prop: which === 0 ? 'trafficLight' : which === 1 ? 'streetSign' : 'dumpster',
-      x: side * KERB_X,
-      z: z + BAY * 0.6,
-      facing: which === 0 ? { faces: 'oncoming' } : { spans: 'along' },
-      side,
-    });
   }
 }
 
@@ -298,13 +297,8 @@ const encounters: Encounter[] = ([
   { id: 'last-left-high', assembly: 'hangingSign', lane: -1, t: 43.5 },
 ] satisfies Encounter[]).sort((a, b) => a.t - b.t);
 
-/** Landing markings, one per lane at each bay, for the low road. */
+/** Landing markings removed — player can land anywhere on the road. */
 const landings: Landing[] = [];
-for (let bay = FIRST_BAY; bay <= LAST_BAY; bay++) {
-  for (const lane of [-1, 0, 1] as const) {
-    landings.push({ id: `land-${bay}-${lane}`, lane, z: bay * BAY + BAY * 0.5 });
-  }
-}
 
 export const SCENE: SceneDefinition = Object.freeze({
   objects: Object.freeze(objects),

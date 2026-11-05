@@ -24,7 +24,7 @@ import {
   type Encounter,
 } from './config';
 import { SCENE } from './scene';
-import type { Course, Direction, Entity } from './types';
+import type { Course, Entity } from './types';
 
 export { BAND, GAME_ZONE_HALF, PLAYER_HALF, ROUTE_LENGTH };
 
@@ -89,25 +89,3 @@ SKYLINE.entities = SCENE.encounters.map(toEntity).sort((a, b) => a.z - b.z);
 export function assemblyOf(id: string): AssemblyId | null {
   return SCENE.encounters.find((e) => e.id === id)?.assembly ?? null;
 }
-
-/**
- * Ordinary inputs for the automated review; no privileged state mutation.
- *
- * Hand-authored for now. Phase 3 replaces this with a solver that searches
- * the decision tree for a path collecting every scored gift with no hits,
- * so a course change cannot silently invalidate the review route — which is
- * exactly how `check:swing` went stale.
- */
-export const REVIEW_SWIPES: readonly { time: number; direction: Direction }[] = [
-  { time: 0, direction: 'up' },
-  { time: 5, direction: 'left' },
-  { time: 11.0, direction: 'right' },
-  { time: 11.8, direction: 'down' },
-  { time: 20, direction: 'up' },
-  { time: 23.0, direction: 'right' },
-  { time: 23.2, direction: 'right' },
-  { time: 31.0, direction: 'left' },
-  { time: 31.2, direction: 'left' },
-  { time: 31.8, direction: 'down' },
-  { time: 41.5, direction: 'right' },
-];

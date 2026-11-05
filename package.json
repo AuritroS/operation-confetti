@@ -26,7 +26,8 @@
     "assets:recolour": "node tools/recolour.mjs",
     "check:devices": "node tools/devices.mjs",
     "check:swing": "node tools/check-swing-review.mjs",
-    "check:scene": "node tools/check-scene.mjs"
+    "check:scene": "node tools/check-scene.mjs",
+    "check:route": "node tools/check-route.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

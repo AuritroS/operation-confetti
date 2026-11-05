@@ -32,10 +32,10 @@ const CLOSEUP = 0.45;
  * A gameplay camera eighteen units back sees three props at a time, which
  * is exactly the round-trip the inspection frame exists to remove.
  */
-const INSPECT_DEFAULT = { x: 52, y: 48, z: 46, lookX: 0, lookY: 4, lookZ: -46 };
+const INSPECT_DEFAULT = { x: 0, y: 15, z: 24, lookX: 0, lookY: 17, lookZ: -20 };
 
 /**
- * Overridable from the URL: `?inspect&cam=x,y,z,lookY,lookZ`.
+ * Overridable from the URL: `?inspect&cam=x,y,z,lookY,lookZ` or `x,y,z,lookX,lookY,lookZ`.
  *
  * Framing a contact sheet is a judgement, and round-tripping through a code
  * change for every nudge is the cost this tool exists to remove.
@@ -46,6 +46,16 @@ const INSPECT_VIEW = (() => {
   if (!raw) return INSPECT_DEFAULT;
   const n = raw.split(',').map(Number);
   if (n.length < 3 || n.some((v) => !Number.isFinite(v))) return INSPECT_DEFAULT;
+  if (n.length >= 6) {
+    return {
+      x: n[0] as number,
+      y: n[1] as number,
+      z: n[2] as number,
+      lookX: n[3] as number,
+      lookY: n[4] as number,
+      lookZ: n[5] as number,
+    };
+  }
   return {
     x: n[0] as number,
     y: n[1] as number,

@@ -6,6 +6,7 @@ import {
 } from 'three';
 import { Stage } from './stage';
 import { SkylineCamera } from './skyline-camera';
+import { ANCHOR_PROPS } from './skyline-props';
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECT, INSPECTING, InspectLabels, travelArrows } from './skyline-inspect';
@@ -25,6 +26,15 @@ import type { Course, Point3, Snapshot } from '../levels/skyline/types';
 
 /** Anchor markers drawn at once, across all three state pools. */
 const ANCHOR_POOL = 18;
+
+/** Shared with the asset probe so the landmark uses the actual game model. */
+export function buildSkylineLandmark(): Group {
+  const tower = buildCnTower(78);
+  tower.position.set(-19, -2, -150);
+  darken(tower, 0.45);
+  unfog(tower);
+  return tower;
+}
 
 export class SkylineScene {
   readonly stage: Stage;
@@ -107,6 +117,20 @@ export class SkylineScene {
   });
   private markBuffer: Vector3[] = [];
   private landmark: Object3D | null = null;
+  private gameplayVisible = true;
+
+  setGameplayVisible(visible: boolean): void {
+    this.gameplayVisible = visible;
+    this.hero.visible = visible && !this.rigged;
+    if (this.rigged) this.rigged.object.visible = visible;
+    this.cable.visible = visible;
+    this.giftMarks.points.visible = visible;
+    this.hazardMarks.points.visible = visible;
+    for (const pool of this.anchorPools) pool.visible = visible;
+    for (const group of this.contents.values()) group.visible = visible;
+    if (this.gantries) this.gantries.visible = visible;
+    if (this.lowMarks) this.lowMarks.visible = visible;
+  }
 
   constructor(canvas: HTMLCanvasElement, private course: Course) {
     this.stage = new Stage(canvas); this.camera = new SkylineCamera(this.stage.camera);
@@ -160,7 +184,7 @@ export class SkylineScene {
       (field.points.material as MeshBasicMaterial).fog = false;
       this.root.add(field.points);
     }
-    for (const layer of [new SkyLayer()]) {
+    for (const layer of [new SkyLayer({ moon: { x: 24, y: 60, z: -120 } })]) {
       this.backdrop.push(layer);
       this.root.add(layer.object);
     }
@@ -232,6 +256,7 @@ export class SkylineScene {
     this.rigged = hero;
     this.root.add(hero.object);
     this.hero.visible = false;
+    hero.object.visible = this.gameplayVisible;
   }
 
   useAssets(assets: StreetAssets): void {
@@ -241,12 +266,8 @@ export class SkylineScene {
      * built by the same resolver and the same street builder, so what is
      * reviewed is what ships.
      */
-    this.street = new SkylineStreet(assets, INSPECTING ? INSPECT : undefined);
+    this.street = new SkylineStreet(assets);
     this.root.add(this.street.object);
-    if (INSPECTING) {
-      this.street.object.add(travelArrows());
-      this.labels = new InspectLabels(document.body);
-    }
     if (SHOW_BOXES) {
       this.boxes = new SkylineBoxes(assets, this.street.anchors, this.course.entities);
       this.root.add(this.boxes.object);
@@ -268,9 +289,9 @@ export class SkylineScene {
 
     // Anchor gantries: a carrier spanning the street at the anchor line, so
     // the cable the player grabs has a visible reason to be strung there.
-    this.gantries = assets.batch('anchorSpan', ANCHOR_POOL);
+    this.gantries = assets.batch(ANCHOR_PROPS.upper, ANCHOR_POOL);
     if (this.gantries) this.root.add(this.gantries);
-    this.lowMarks = assets.batch('lowAnchor', ANCHOR_POOL);
+    this.lowMarks = assets.batch(ANCHOR_PROPS.lower, ANCHOR_POOL);
     if (this.lowMarks) this.root.add(this.lowMarks);
 
     /**
@@ -284,10 +305,7 @@ export class SkylineScene {
     // Inside the far plane: at 150 units ahead the camera is ~168 away, and
     // CAMERA_FAR is 180. The first attempt put it at -1150 where it was
     // clipped entirely and simply never appeared.
-    const tower = buildCnTower(74);
-    tower.position.set(-27, -11, -150);
-    darken(tower, 0.45);
-    unfog(tower);
+    const tower = buildSkylineLandmark();
     this.landmark = tower;
     this.root.add(tower);
     for (const e of this.course.entities) {
@@ -310,7 +328,9 @@ export class SkylineScene {
     this.hero.position.set(s.p.x, s.p.y - crouch, 0);
     this.hero.rotation.set(running ? -0.12 : -Math.atan2(s.v.y, s.v.z) * 0.65,
       -Math.atan2(s.v.x, s.v.z) * 0.55, -Math.atan2(s.v.x, s.v.z) * 0.5 + (reduced ? 0 : Math.sin(s.hitAge * 35) * hit * 0.2));
+    this.hero.visible = this.gameplayVisible && !this.rigged;
     if (this.rigged) {
+      this.rigged.object.visible = this.gameplayVisible;
       // Same transform as the stand-in, so swapping the art cannot move the
       // character relative to the colliders the runner is testing.
       this.rigged.object.position.copy(this.hero.position);
@@ -454,6 +474,15 @@ export class SkylineScene {
     this.hazardMarks.setAnchors(hazardAt);
     this.giftMarks.update(dt);
     this.hazardMarks.update(dt);
+    if (!this.gameplayVisible) {
+      this.giftMarks.points.visible = false;
+      this.hazardMarks.points.visible = false;
+      for (const pool of this.anchorPools) pool.visible = false;
+      for (const mesh of this.contents.values()) mesh.visible = false;
+      if (this.gantries) this.gantries.visible = false;
+      if (this.lowMarks) this.lowMarks.visible = false;
+      this.cable.visible = false;
+    }
     for (const layer of this.backdrop) layer.update(s.p.z, dt);
     this.camera.update(s, dt, reduced);
   }

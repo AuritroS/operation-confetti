@@ -33,6 +33,7 @@ export interface Box {
 export interface AttachPoint {
   readonly face: 'front' | 'back';
   readonly y: number;
+  readonly wallOffset?: number;
 }
 
 /** Everything resolution needs to know about a prop, all of it measured. */
@@ -159,10 +160,11 @@ export function resolveAttach(
 
   const b = facts.box;
   const outward = named.face === 'front' ? 1 : -1;
+  const reach = named.wallOffset ?? (facts.front === '+Z' ? b.max.z : b.min.z);
   const local =
     facts.front === '+Z' || facts.front === '-Z'
-      ? { x: 0, z: outward * (facts.front === '+Z' ? b.max.z : b.min.z) }
-      : { x: outward * (facts.front === '+X' ? b.max.x : b.min.x), z: 0 };
+      ? { x: 0, z: outward * reach }
+      : { x: outward * (named.wallOffset ?? (facts.front === '+X' ? b.max.x : b.min.x)), z: 0 };
   const rotated = turn(local.x, local.z, resolved.rotationY);
   return { x: resolved.position.x + rotated.x, y: named.y, z: resolved.position.z + rotated.z };
 }

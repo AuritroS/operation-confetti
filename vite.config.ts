@@ -48,7 +48,7 @@ export default defineConfig({
      */
     watch: { usePolling: true, interval: 250 },
     // Accept the Host header Tailscale sends when serving the tailnet name.
-    allowedHosts: ['.ts.net', 'localhost', '127.0.0.1'],
+    allowedHosts: true,
     proxy: {
       // Keeps dev routing identical to production, where the Worker owns /api.
       '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },

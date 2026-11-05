@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { REVIEW_SWIPES, SKYLINE } from '../src/levels/skyline/course';
+import { SKYLINE } from '../src/levels/skyline/course';
 import { interpolate, Motion, route } from '../src/levels/skyline/motion';
 import { hits, SkylineRunner } from '../src/levels/skyline/runner';
 import { LANES } from '../src/levels/skyline/types';
-import { scoreRun } from '../src/core/scoring';
 const advance = (r: SkylineRunner, seconds: number) => { for(let i=0;i<Math.round(seconds*60);i++) r.update(1/60); };
 
 describe('four-direction skyline', () => {
@@ -68,18 +67,6 @@ describe('four-direction skyline', () => {
     const r=new SkylineRunner(SKYLINE); r.swipe('down'); advance(r,bridge.z/SKYLINE.speed-1.2);
     r.swipe('up'); r.swipe('down');
     advance(r,3); expect(r.snapshot.pendingLaunch).toBe(false); expect(r.snapshot.phase).toBe('run');
-  });
-  it('collects all four gifts with no hits on the review route', () => {
-    const r=new SkylineRunner(SKYLINE); let swipe=0;
-    for(let i=0;i<(SKYLINE.duration+1)*60;i++) {
-      while(swipe<REVIEW_SWIPES.length&&REVIEW_SWIPES[swipe]!.time<=i/60) r.swipe(REVIEW_SWIPES[swipe++]!.direction);
-      r.update(1/60);
-    }
-    expect(r.snapshot.complete).toBe(true);
-    expect(r.events.filter(e=>e.t==='gift')).toHaveLength(4);
-    expect(r.events.filter(e=>e.t==='incident')).toHaveLength(0);
-    expect(scoreRun(r.events).total).toBe(600);
-    expect(r.events.filter(e=>e.t==='routeComplete')).toHaveLength(1);
   });
   it('neither staying airborne nor staying grounded bypasses every encounter', () => {
     const air=new SkylineRunner(SKYLINE), ground=new SkylineRunner(SKYLINE);

@@ -1,10 +1,11 @@
 import type { RunEvent } from '../../core/scoring';
 import { Motion } from './motion';
+import { PLAYER_HALF } from './config';
 import type { Course, Direction, Entity, Lane, Point3, Snapshot, TravelMode } from './types';
 
 export function hits(from: Point3, to: Point3, e: Entity): boolean {
   let near = 0, far = 1;
-  for (const [axis, half] of [['x', e.halfX + 0.35], ['y', e.halfY + 0.9], ['z', e.halfZ + 0.35]] as const) {
+  for (const [axis, half] of [['x', e.halfX + PLAYER_HALF.x], ['y', e.halfY + PLAYER_HALF.y], ['z', e.halfZ + PLAYER_HALF.z]] as const) {
     const delta = to[axis] - from[axis];
     if (Math.abs(delta) < 1e-10) { if (Math.abs(from[axis] - e[axis]) > half) return false; }
     else {
@@ -77,7 +78,7 @@ export class SkylineRunner {
           if (e.kind === 'hazard' && this.protection === 0) {
             this.emit({ t: 'incident', level: 2 }); this.protection = 1; this.hitTime = this.elapsed;
           }
-        } else if (to.z > e.z + e.halfZ + 0.35) this.entityStates.set(e.id, 'missed');
+        } else if (to.z > e.z + e.halfZ + PLAYER_HALF.z) this.entityStates.set(e.id, 'missed');
       }
       if (this.elapsed >= this.course.duration) {
         this.complete = true; this.emit({ t: 'routeComplete', level: 2 });

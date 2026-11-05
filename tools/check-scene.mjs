@@ -7,7 +7,7 @@
  */
 import { createServer } from 'vite';
 
-const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
+const server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
 const { auditScene, formatAudit } = await server.ssrLoadModule('/src/levels/skyline/audit.ts');
 const { propLookup } = await server.ssrLoadModule('/tools/scene-bounds.ts');
 

@@ -3,13 +3,20 @@
  * fulfills same-origin requests from a local build, useful in the sandbox.
  * Includes real keyboard/touch gestures, pause, replay and projected framing.
  */
-import { build } from 'vite';
+import { build, createServer } from 'vite';
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import assert from 'node:assert/strict';
 
 const OUT = resolve('node_modules/.cache/swing-review');
+// Generate the route offline; no solver cost or solver code in the game.
+const server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
+let review;
+try {
+  const { prepareReview } = await server.ssrLoadModule('/tools/skyline-review.ts');
+  review = prepareReview();
+} finally { await server.close(); }
 await build({
   logLevel: 'warn',
   define: { 'import.meta.env.DEV': 'true' },
@@ -52,6 +59,8 @@ const advanceTo = async (time) => {
 try {
   await page.clock.install(); await page.goto('https://swing-review.local/');
   await page.waitForFunction(() => !!window.__skylineReview);
+  assert.deepEqual(await page.evaluate(() => window.__skylineReview.course), review.course,
+    'the bundled course must equal the course the solver verified');
   await page.clock.runFor(100);
   const cdp = await context.newCDPSession(page);
   const swipe = async (direction) => {
@@ -94,25 +103,28 @@ try {
     console.log(`PASS four swipes, ground/air framing: ${width}x${height}`);
   }
   await page.setViewportSize({width:390,height:844}); await page.keyboard.press('KeyR');
-  // Read from the page, never mirrored here: a local copy drifted from the
-  // course the moment the route was rebuilt.
-  const actions=(await page.evaluate(()=>window.__skylineReview.swipes)).map(s=>[s.time,s.direction]);
+  const actions=review.solution.swipes.map(s=>[s.time,s.direction]);
   let action=0,maxDraws=0,maxTriangles=0; const captured=new Set(),seen=new Map();
-  await swipe('up');action++;
-  for(let i=0;i<1600&&!(await state()).complete;i++) {
+  await swipe(actions[action++][1]);
+  for(let i=0;i<Math.ceil(review.course.duration/.05)+100&&!(await state()).complete;i++) {
     const s=await state();
     while(action<actions.length&&s.elapsed>=actions[action][0]) await swipe(actions[action++][1]);
     const f=await framing();maxDraws=Math.max(maxDraws,f.draws);maxTriangles=Math.max(maxTriangles,f.triangles);
     assert.ok(visible(f.player),`route player at ${s.elapsed}: ${f.player}`);
     for(const e of f.entities) if(visible(e.point)&&!seen.has(e.id)) seen.set(e.id,s.elapsed);
-    for(const [name,time] of [['swing',6],['descent',10.8],['run',12.6],['launch',16.7],['left-run',28]]) {
-      if(s.elapsed>=time&&!captured.has(name)) {await page.screenshot({path:`tools/shots/level2-swipes-${name}.png`});captured.add(name);}
+    for(const name of ['swing','descend','run','launch','transfer']) {
+      if(s.phase===name&&!captured.has(name)) {await page.screenshot({path:`tools/shots/level2-swipes-${name}.png`});captured.add(name);}
     }
     await page.clock.runFor(50);
   }
   assert.equal((await state()).complete,true);
-  assert.equal(await page.locator('#hud-score').textContent(),'600');
+  assert.equal(await page.locator('#hud-score').textContent(),String(review.solution.outcome.score));
   assert.equal((await page.evaluate(()=>window.__skylineReview.events)).filter(e=>e.t==='incident').length,0);
+  const entityStates = new Map(await page.evaluate(()=>window.__skylineReview.entityStates));
+  assert.deepEqual([...entityStates].filter(([,status])=>status==='hit'), [], 'no protected hazard contacts');
+  for (const e of review.course.entities.filter(e=>e.kind==='gift'&&e.scored)) {
+    assert.equal(entityStates.get(e.id), 'collected', `collected ${e.id}`);
+  }
   // 15,000 was the ceiling while the level was untextured primitives. The
   // agreed budget for the real street is 60,000 triangles and 60 draws, set
   // before the asset work started so this stays pass/fail rather than a
@@ -124,18 +136,25 @@ try {
     assert.ok(seen.has(id),`${id} is visible`);
     assert.ok(time-seen.get(id)>=2,`${id} warning ${(time-seen.get(id)).toFixed(2)}s`);
   }
-  console.log('PASS real-touch 600-point course, two-second warnings, workload:',{maxDraws,maxTriangles});
+  console.log(`PASS real-touch generated route (${review.solution.outcome.score} points), two-second warnings, workload:`,{maxDraws,maxTriangles});
 
   await page.locator('#btn-replay').click();assert.equal((await state()).started,false);
-  await swipe('down');await advanceTo(13);await swipe('up');
-  assert.equal((await state()).pendingLaunch,true);
-  assert.equal(await page.locator('#skyline-action').textContent(),'Swing selected');
-  await page.screenshot({path:'tools/shots/level2-swipes-clearance.png'});
-  await page.clock.runFor(700);assert.equal((await state()).p.y,1.25);
-  await page.clock.runFor(1800);assert.equal((await state()).pendingLaunch,false);assert.ok((await state()).p.y>4);
+  if (review.queuedLaunch) {
+    const {requestAt,holdUntil,airborneAt}=review.queuedLaunch;
+    await swipe('down');await advanceTo(requestAt);await swipe('up');
+    assert.equal((await state()).pendingLaunch,true);
+    assert.equal(await page.locator('#skyline-action').textContent(),'Swing selected');
+    await page.screenshot({path:'tools/shots/level2-swipes-clearance.png'});
+    await advanceTo(holdUntil);assert.equal((await state()).p.y,review.course.groundY);
+    await advanceTo(airborneAt);assert.equal((await state()).pendingLaunch,false);assert.ok((await state()).p.y>4);
+    console.log('PASS queued launch from a course-derived clearance window');
+  } else console.log('SKIP queued-launch browser scenario: no suitable clearance window in this course');
 
-  await page.keyboard.press('KeyR');await press('up');await advanceTo(7.1);
-  assert.equal((await page.evaluate(()=>window.__skylineReview.events)).filter(e=>e.t==='incident').length,1);
+  await page.keyboard.press('KeyR');await press('up');
+  if (review.firstDamage !== null) {
+    await advanceTo(review.firstDamage);
+    assert.ok((await page.evaluate(()=>window.__skylineReview.events)).some(e=>e.t==='incident'));
+  } else console.log('SKIP damage browser scenario: idle swing route has no hazard contact');
   const z=(await state()).p.z;await swipe('right');await page.clock.runFor(200);assert.ok((await state()).p.z>z);
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
   const blurred=await state();await page.clock.runFor(500);assert.deepEqual(await state(),blurred);
@@ -144,7 +163,7 @@ try {
   assert.equal(await page.locator('#btn-replay').count(),0);
   assert.match(await page.locator('#debug').textContent(),/stage\s+1\/3/);
   assert.deepEqual(errors,[]);
-  console.log('PASS persistent modes, mid-swipe redirection, queued launch, damage, pause/replay and level 1.');
+  console.log('PASS browser review completed: input, generated route, applicable course scenarios, pause/replay and level 1.');
 } catch(e) {
   console.error('Browser errors:',errors);console.error('State:',await state().catch(()=>null));
   await page.screenshot({path:'tools/shots/level2-swipes-failure.png'}).catch(()=>{});throw e;

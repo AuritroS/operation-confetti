@@ -46,6 +46,13 @@ every hazard, and the 60,000-triangle / 60-draw budget.
 A primitive articulated character demonstrates reaching, banking, landing,
 running and launch; final character and city art remain future work.
 
+`npm run check:route` now generates the review swipes from the scene-derived
+course and verifies them with the production runner. The browser check drives
+that generated schedule and derives its expected score and clearance scenario
+from the current course. The solver also reports sampled input-timing tolerance;
+failure to find a route is not proof that a course is impossible. See
+[`docs/ROUTE_SOLVER.md`](./docs/ROUTE_SOLVER.md) for the checks and their limits.
+
 There is one unscored teaching gift and four scored gifts, distributed across
 all three lanes, with obstacles ahead of each choice. A verified safe route
 collects all four for **600 points**. Gifts give +100, hits deduct 50, and
@@ -64,8 +71,8 @@ The earlier planar and hold-controlled implementations and tests have been remov
 `npm run check:swing` checks real touch/keyboard input, mid-transfer changes,
 ground entry/exit, remembered launches, damage, pause, replay, six viewport sizes, a 600-point course
 and the level 1 entry. It uses Playwright request interception and needs no
-running web server. Screenshots are in `tools/shots/level2-swipes-*.png`. The rebuild passes 162 tests
-and a production build. Browser checks peak at 50 draw calls / 5,012 triangles;
+running web server. Screenshots are in `tools/shots/level2-swipes-*.png`.
+Run the test suite and production build for the current validation results;
 actual phone frame rate remains an on-device review item.
 
 Before removal, the old prototype passed 174 tests and a production build.
@@ -107,19 +114,26 @@ npm run worker:dev   # terminal 1 — Worker + API on :8787
 npm run dev          # terminal 2 — Vite on :5173, proxies /api to the Worker
 ```
 
-Three pages in dev:
+Review pages in dev:
 
 | Path | What it is |
 |---|---|
 | `/` | the game |
 | `/assets` | asset gallery — browse all 120 models, pick the ones to use |
-| `/probe.html` | character harness — play any clip, attach props |
+| `/probe.html` | Level 2 asset review — rotate current assets, approve or mark for removal |
+| `/probe.html?characters` | original character harness — play any clip, attach props |
 
 The gallery needs an index first:
 
 ```bash
 npm run assets:index   # writes .asset-index.json
 ```
+
+The Level 2 probe reads the current scene and obstacle builders. Its Preview
+selector shows obstacle parts in their assembled form. Approval/removal choices
+are saved in the current browser; **Copy choices** produces a list to send back
+for application to the scene. Marking a removal does not hide live gameplay art
+or leave its collider behind. `?asset=barrier` (for example) links to an item.
 
 It is a **development tool only**. The source packs are 42 MB, so they are
 streamed off disk by a dev-only Vite plugin rather than copied into `public/`,

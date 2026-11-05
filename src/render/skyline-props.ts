@@ -46,6 +46,13 @@ export type Axis = '+X' | '-X' | '+Z' | '-Z';
 export interface AttachPoint {
   readonly face: 'front' | 'back';
   readonly y: number;
+  /**
+   * Local depth along the authored front where the attachment actually penetrates.
+   * If omitted, falls back to the bounding box face (box.max.z or box.min.z).
+   * KayKit buildings have ground-floor canopies/awnings extending far out (+Z),
+   * while the upper masonry wall at y=19 is recessed by several units.
+   */
+  readonly wallOffset?: number;
 }
 
 export interface StreetPropSpec {
@@ -132,21 +139,25 @@ const K = (
  * Deliberately the same height the gameplay anchors already use, so the
  * cable and the thing the rope grabs are one number rather than two that
  * drifted 6.8 units apart.
+ *
+ * KayKit buildings have ground-floor awnings that reach further out (+Z)
+ * than the upper masonry walls. `wallOffset` specifies the local Z depth
+ * where the wire bracket anchors directly into the brickwork at Y=19.
  */
-const WIRE_BRACKET = { bracket: { face: 'front', y: 19 } } as const;
+export const WIRE_BRACKET = { bracket: { face: 'front', y: 19 } } as const;
 
 export const STREET_PROPS = {
   // ---- the canyon (KayKit, street scale) --------------------------------
   // Base-less variants only: the A-F exports carry a plinth that holds the
   // facade off the tarmac, which is right in a skyline band and wrong here.
   towerA: P('building_A_withoutBase', 15.8, [22, 27], 18.0, 'canyon wall, low block',
-    { front: '+Z', points: WIRE_BRACKET }),
+    { front: '+Z', points: { bracket: { face: 'front', y: 19, wallOffset: 7.5 } } }),
   towerC: P('building_C_withoutBase', 12.1, [25, 30], 20.0, 'canyon wall, narrow tower',
-    { front: '+Z', points: WIRE_BRACKET }),
+    { front: '+Z', points: { bracket: { face: 'front', y: 19, wallOffset: 6.0 } } }),
   towerE: P('building_E_withoutBase', 13.0, [27, 32], 21.5, 'canyon wall, wide mid-rise',
-    { front: '+Z', points: WIRE_BRACKET }),
+    { front: '+Z', points: { bracket: { face: 'front', y: 19, wallOffset: 6.5 } } }),
   towerG: P('building_G_withoutBase', 15.0, [31, 36], 24.8, 'canyon wall, tall tower',
-    { front: '+Z', points: WIRE_BRACKET }),
+    { front: '+Z', points: { bracket: { face: 'front', y: 19, wallOffset: 7.5 } } }),
 
   // ---- the street surface (Kenney) --------------------------------------
   /**
@@ -193,12 +204,28 @@ export const STREET_PROPS = {
   // ---- overhead obstacles ------------------------------------------------
   bridgeDeck: K('road-bridge', [6.0, 7.5], 'the bridge, spanning every lane', KENNEY, { long: 'Z' }),
   bridgePillar: K('bridge-pillar-wide', [6.0, 7.5], 'bridge support, carried to the road'),
-  signGantry: K('sign-highway-wide', [8.5, 10.0], 'overhead sign, gantry', KENNEY,
+  signGantry: K('sign-highway-wide', [8.5, 10.0], 'overhead sign, gantry (wide)', KENNEY,
+    { front: '-X', long: 'Z' }),
+  signHighway: K('sign-highway', [8.5, 10.0], 'overhead sign, gantry (standard)', KENNEY,
+    { front: '-X', long: 'Z' }),
+  signHighwayDetailed: K('sign-highway-detailed', [9.5, 11.5], 'overhead sign, gantry (detailed)', KENNEY,
     { front: '-X', long: 'Z' }),
   signHanging: K('road-sign-empty-hanging', [5.5, 7.0], 'overhead sign, single lane', KENNEY,
     { front: '-Z', long: 'Z' }),
   lightHanging: K('traffic-light-hanging', [6.0, 7.5], 'hanging signal, single lane', KENNEY,
     { front: '-Z', long: 'Z' }),
+  trafficLightHoriz: K('traffic-light-object-horizontal', [0.7, 0.9], 'flat horizontal signal head', KENNEY,
+    { front: '-X', long: 'Z' }),
+  trafficLightVert: K('traffic-light-object-vertical', [1.6, 2.1], 'flat vertical signal head', KENNEY,
+    { front: '-X' }),
+  signWarningDiamond: K('road-sign-object-warning', [1.5, 2.0], 'flat hazard diamond sign face', KENNEY,
+    { front: '+X' }),
+  signStopOctagon: K('road-sign-object-stop', [1.4, 1.9], 'flat STOP octagon sign face', KENNEY,
+    { front: '+X' }),
+  signWarningPost: K('road-sign-warning', [5.8, 7.2], 'flat warning diamond on post', KENNEY,
+    { front: '+X' }),
+  signStopPost: K('road-sign-stop', [5.7, 7.1], 'flat STOP sign on post', KENNEY,
+    { front: '+X' }),
 
   // ---- ground obstacles ---------------------------------------------------
   barrier: K('construction-barrier', [1.3, 2.1], 'road works barrier', KENNEY, { long: 'Z' }),
@@ -227,6 +254,9 @@ export const STREET_PROPS = {
 } as const;
 
 export type StreetPropId = keyof typeof STREET_PROPS;
+
+/** Shared by the scene and asset review: props placed by the anchor pools. */
+export const ANCHOR_PROPS = { upper: 'anchorSpan', lower: 'lowAnchor' } as const;
 
 export const STREET_PROP_IDS = Object.keys(STREET_PROPS) as StreetPropId[];
 

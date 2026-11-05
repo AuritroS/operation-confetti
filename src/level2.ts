@@ -3,7 +3,7 @@ import { SkylineSwipeInput } from './core/skyline-swipe-input';
 import { isTouchDevice, Lifecycle } from './core/lifecycle';
 import { FixedLoop } from './core/loop';
 import { POINTS, scoreRun } from './core/scoring';
-import { REVIEW_SWIPES, SKYLINE } from './levels/skyline/course';
+import { SKYLINE } from './levels/skyline/course';
 import { SkylineRunner } from './levels/skyline/runner';
 import { laneName, LANES } from './levels/skyline/types';
 import type { Direction } from './levels/skyline/types';
@@ -52,7 +52,66 @@ hint.hidden = isTouchDevice();
 const hud = new Hud(), debug = new DebugPanel();
 const params = new URLSearchParams(location.search);
 let debugVisible = params.has('debug') && !params.has('clean'); debug.setVisible(debugVisible);
+
+// Environment Sweep Review mode is active by default for visual inspection.
+// Can be toggled back to play with the button or '?play'.
+let sweepMode = !params.has('play');
+let sweepTime = 0;
+let sweepPaused = false;
+
+const sweepBar = document.createElement('div');
+sweepBar.className = 'skyline-sweep-bar';
+sweepBar.innerHTML = `
+  <div class="sweep-title"><small>Level 02 Environment</small><strong>Canyon Sweep Review</strong></div>
+  <div class="sweep-controls">
+    <button id="btn-sweep-play" type="button">Pause</button>
+    <input type="range" id="sweep-scrubber" min="0" max="45" step="0.1" value="0" />
+    <span id="sweep-time-label" style="font-family:monospace; min-width:48px; text-align:right">0.0s</span>
+    <button id="btn-sweep-toggle" type="button">▶ Play</button>
+  </div>
+`;
+app.append(sweepBar);
+
+const btnSweepPlay = sweepBar.querySelector<HTMLButtonElement>('#btn-sweep-play')!;
+const scrubber = sweepBar.querySelector<HTMLInputElement>('#sweep-scrubber')!;
+const timeLabel = sweepBar.querySelector<HTMLElement>('#sweep-time-label')!;
+const btnSweepToggle = sweepBar.querySelector<HTMLButtonElement>('#btn-sweep-toggle')!;
+
 const view = new SkylineScene(document.getElementById('stage') as HTMLCanvasElement, SKYLINE);
+
+function applySweepMode(on: boolean): void {
+  sweepMode = on;
+  sweepBar.hidden = !on;
+  view.setGameplayVisible(!on);
+  heading.hidden = on;
+  instruction.hidden = on;
+  lanes.hidden = on;
+  modes.hidden = on;
+  divisions.hidden = on;
+  const hudEl = document.getElementById('hud');
+  if (hudEl) hudEl.hidden = on;
+  btnSweepToggle.textContent = on ? '▶ Play' : '🎥 Sweep';
+  if (on) {
+    hint.innerHTML = '<span>Space: Pause/Resume · Scrubber: Scrub timeline · Click "▶ Play" to test gameplay</span>';
+  } else {
+    hint.innerHTML = '<span>Arrow keys / WASD · ← → lane · ↑ swing · ↓ run</span><span><kbd>P</kbd> pause · <kbd>R</kbd> replay · <kbd>I</kbd> debug</span>';
+  }
+}
+applySweepMode(sweepMode);
+
+btnSweepPlay.addEventListener('click', () => {
+  sweepPaused = !sweepPaused;
+  btnSweepPlay.textContent = sweepPaused ? 'Play' : 'Pause';
+});
+
+scrubber.addEventListener('input', () => {
+  sweepTime = Number(scrubber.value);
+  timeLabel.textContent = `${sweepTime.toFixed(1)}s`;
+});
+
+btnSweepToggle.addEventListener('click', () => {
+  applySweepMode(!sweepMode);
+});
 // Non-blocking: play starts on primitives and upgrades in place when the
 // street lands. A failed load leaves a playable level, not a stalled screen.
 void loadStreetAssets().then((assets) => view.useAssets(assets));
@@ -69,6 +128,37 @@ function makeRunner(): SkylineRunner {
 }
 runner = makeRunner(); hud.reset();
 function update(dt: number): void {
+  if (sweepMode) {
+    if (!sweepPaused) {
+      sweepTime = (sweepTime + dt) % 45;
+    }
+    const sweepZ = sweepTime * 8.5;
+    if (document.activeElement !== scrubber) scrubber.value = sweepTime.toFixed(1);
+    timeLabel.textContent = `${sweepTime.toFixed(1)}s`;
+    const sweepSnapshot = {
+      p: { x: 0, y: 1.25, z: sweepZ },
+      v: { x: 0, y: 0, z: 8.5 },
+      a: { x: 0, y: 0, z: 0 },
+      lane: 0 as const,
+      mode: 'run' as const,
+      requestedMode: 'run' as const,
+      phase: 'run' as const,
+      elapsed: sweepTime,
+      progress: sweepTime / 45,
+      anchor: null,
+      transitioning: false,
+      landingAge: 0,
+      hitAge: 10,
+      protection: 0,
+      selections: 0,
+      started: true,
+      pendingLaunch: false,
+      complete: false,
+    };
+    view.update(sweepSnapshot, dt, reduced, new Map());
+    return;
+  }
+
   runner.update(dt); const s = runner.snapshot;
   for (const entity of SKYLINE.entities) {
     if (runner.entityStates.get(entity.id) !== 'collected' || collected.has(entity.id)) continue;
@@ -98,12 +188,25 @@ function update(dt: number): void {
   else { action.textContent = `${laneName(s.lane)} · Swinging`; note.textContent = '← → change lane · ↓ run'; }
 }
 function render(): void {
-  view.render(); const s = runner.snapshot;
+  view.render();
+  if (sweepMode) {
+    debug.set({
+      mode: 'Canyon Sweep View',
+      time: `${sweepTime.toFixed(1)}s / ${SKYLINE.duration}s`,
+      position: `Z = ${(sweepTime * 8.5).toFixed(1)} / ${(SKYLINE.duration * SKYLINE.speed).toFixed(1)}`,
+      status: sweepPaused ? 'Paused' : 'Sweeping',
+      fps: loop.stats.fps,
+      draws: view.stage.drawCalls,
+      tris: view.stage.triangles,
+    });
+    return;
+  }
+  const s = runner.snapshot;
   debug.set({ level: '2 · four swipes', state: s.phase, lane: laneName(s.lane),
     mode: `${s.mode} → ${s.requestedMode}`, clearance: s.pendingLaunch ? 'waiting' : 'clear',
     time: `${s.elapsed.toFixed(1)} / ${SKYLINE.duration}`, position: `${s.p.x.toFixed(1)} / ${s.p.y.toFixed(1)} / ${s.p.z.toFixed(1)}`,
     transfer: s.transitioning ? 'yes' : 'no', anchor: s.anchor?.id ?? 'released',
-    gifts: `${runner.events.filter((e) => e.t === 'gift').length}/4`,
+    gifts: `${runner.events.filter((e) => e.t === 'gift').length}/${SKYLINE.entities.filter(e => e.kind === 'gift' && e.scored).length}`,
     incidents: runner.events.filter((e) => e.t === 'incident').length,
     fps: loop.stats.fps, draws: view.stage.drawCalls, tris: view.stage.triangles });
 }
@@ -130,6 +233,7 @@ function restart(): void {
   update(0); render(); if (document.visibilityState === 'visible' && rotate.hidden) resume();
 }
 input.onGesture((g) => {
+  if (sweepMode) return;
   if (g.type === 'swipe') swipe(g.direction);
   else if (g.type === 'restart') restart();
   else if (paused) resume(); else lifecycle.pause('user');
@@ -137,6 +241,26 @@ input.onGesture((g) => {
 const togglePause = () => { pauseButton.blur(); if (paused) resume(); else lifecycle.pause('user'); };
 const replayRun = () => { replay.blur(); restart(); };
 const debugKey = (e: KeyboardEvent) => {
+  if (sweepMode && e.code === 'Space') {
+    e.preventDefault();
+    sweepPaused = !sweepPaused;
+    btnSweepPlay.textContent = sweepPaused ? 'Play' : 'Pause';
+    return;
+  }
+  if (sweepMode && (e.code === 'ArrowLeft' || e.code === 'KeyA')) {
+    e.preventDefault();
+    sweepTime = Math.max(0, sweepTime - 1);
+    scrubber.value = sweepTime.toFixed(1);
+    timeLabel.textContent = `${sweepTime.toFixed(1)}s`;
+    return;
+  }
+  if (sweepMode && (e.code === 'ArrowRight' || e.code === 'KeyD')) {
+    e.preventDefault();
+    sweepTime = Math.min(45, sweepTime + 1);
+    scrubber.value = sweepTime.toFixed(1);
+    timeLabel.textContent = `${sweepTime.toFixed(1)}s`;
+    return;
+  }
   if (e.code !== 'KeyI' || e.repeat) return; debugVisible = !debugVisible; debug.setVisible(debugVisible);
 };
 pauseButton.addEventListener('click', togglePause); replay.addEventListener('click', replayRun); window.addEventListener('keydown', debugKey);
@@ -144,10 +268,10 @@ input.attach(); lifecycle.attach(); update(0); render(); if (!paused) loop.start
 if (import.meta.env.DEV) Object.assign(window, { __skylineReview: {
   get snapshot() { return runner.snapshot; }, get paused() { return paused; },
   get events() { return [...runner.events]; }, framing: () => view.framing(),
-  // Exposed so the review tool drives the SAME route the course authors,
-  // rather than a copy of it. A mirrored list silently kept playing the old
-  // 36-second timings after the route was rebuilt, and scored 300.
-  swipes: REVIEW_SWIPES,
+  // The offline solver stays outside the player bundle. The browser check
+  // compares this course with the one it solved before sending real swipes.
+  course: SKYLINE,
+  get entityStates() { return [...runner.entityStates]; },
   /** Hazards with the time each is reached, so warning checks cannot drift. */
   hazards: SKYLINE.entities
     .filter((e) => e.kind === 'hazard')

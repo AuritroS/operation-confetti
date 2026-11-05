@@ -44,6 +44,14 @@ function gradientTexture(top: number, bottom: number): CanvasTexture {
   return texture;
 }
 
+export interface SkyLayerOptions {
+  readonly moon?: {
+    readonly x?: number;
+    readonly y?: number;
+    readonly z?: number;
+  };
+}
+
 export class SkyLayer implements EnvironmentLayer {
   readonly id = 'sky' as const;
   readonly object = new Group();
@@ -52,7 +60,7 @@ export class SkyLayer implements EnvironmentLayer {
   private readonly moon: Mesh;
   private readonly halo: Mesh;
 
-  constructor() {
+  constructor(options?: SkyLayerOptions) {
     // Inside of a large sphere. Rendered unlit so the gradient is exact.
     const texture = gradientTexture(PALETTE.ink, PALETTE.navyDeep);
     this.dome = new Mesh(
@@ -73,8 +81,13 @@ export class SkyLayer implements EnvironmentLayer {
       new CircleGeometry(7.4, 40),
       new MeshBasicMaterial({ color: 0xf2f0e4, depthWrite: false, fog: false }),
     );
+    const moonPos = {
+      x: options?.moon?.x ?? 26,
+      y: options?.moon?.y ?? 44,
+      z: options?.moon?.z ?? -120,
+    };
     for (const m of [this.halo, this.moon]) {
-      m.position.set(26, 44, -120);
+      m.position.set(moonPos.x, moonPos.y, moonPos.z);
       m.renderOrder = -9;
       this.object.add(m);
     }
