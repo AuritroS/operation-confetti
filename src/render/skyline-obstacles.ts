@@ -219,19 +219,32 @@ export class ObstacleKit {
     spine.position.set(0, 0, -0.05);
     group.add(spine);
 
-    // Dual vertical suspension hanger cables dropping from the streetcar wire line at y = 19m
-    const cableTop = ANCHOR_HEIGHT - e.y;
+    // Calculate the actual catenary wire height at this lane's X position
+    // Street span is 19.2m (facade at +/-9.6m) with 0.05 sag
+    const facadeX = 9.6;
+    const streetSpan = facadeX * 2;
+    const tLane = Math.max(0, Math.min(1, (e.x - (-facadeX)) / streetSpan));
+    const wireWorldY = 19.0 - 0.05 * streetSpan * 4 * tLane * (1 - tLane);
+    const wireY = wireWorldY - e.y;
+    const cableTop = Math.max(wireY + 0.45, ANCHOR_HEIGHT - e.y - 0.5);
     const signTop = signHeight * 1.5;
     const rise = cableTop - signTop;
+
     if (rise > 0) {
+      // Dual vertical suspension hanger cables rising directly to the streetcar wire
       for (const side of [-0.55, 0.55]) {
         const cable = new Mesh(new BoxGeometry(0.04, rise, 0.04), spineMat);
         cable.position.set(side, signTop + rise / 2, -0.05);
         group.add(cable);
+
+        // 3D cast-iron cable clamp sleeves physically gripping the longitudinal trolley wire
+        const clampSleeve = new Mesh(new BoxGeometry(0.09, 0.09, 0.35), spineMat);
+        clampSleeve.position.set(side, wireY, -0.05);
+        group.add(clampSleeve);
       }
-      // Top wire clamp bar attaching onto the streetcar overhead wire
-      const clampBar = new Mesh(new BoxGeometry(1.3, 0.06, 0.06), spineMat);
-      clampBar.position.set(0, cableTop, -0.05);
+      // Transverse clamp bar gripping the cross-span catenary wire
+      const clampBar = new Mesh(new BoxGeometry(1.3, 0.08, 0.08), spineMat);
+      clampBar.position.set(0, wireY, -0.05);
       group.add(clampBar);
     }
   }

@@ -161,6 +161,39 @@ export class SkylineStreet {
       }
     }
 
+    // Dedicated cross-span catenary cables directly above every overhead sign encounter
+    const span = FACADE_X * 2;
+    for (const e of this.layout.encounters) {
+      if (e.assembly !== 'hangingSign') continue;
+      const z = e.t * SKYLINE.speed;
+      let previous: Vector3 | null = null;
+      for (let i = 0; i <= WIRE_SEGMENTS; i++) {
+        const t = i / WIRE_SEGMENTS;
+        const x = -FACADE_X + span * t;
+        const y = 19.0 - 0.05 * span * 4 * t * (1 - t);
+        const here = new Vector3(x, y, -z);
+        if (previous) points.push(previous.x, previous.y, previous.z, here.x, here.y, here.z);
+        previous = here;
+      }
+    }
+
+    // Longitudinal streetcar trolley wires running along the 3 lanes down the route
+    const totalRouteZ = SKYLINE.duration * SKYLINE.speed;
+    const startZ = -MARGIN;
+    const endZ = totalRouteZ + MARGIN;
+    const zStep = 10;
+    const lanesX = [-SKYLINE.laneWidth, 0, SKYLINE.laneWidth];
+    for (const lx of lanesX) {
+      const tLane = (lx - (-FACADE_X)) / span;
+      const wireY = 19.0 - 0.05 * span * 4 * tLane * (1 - tLane);
+      let previous: Vector3 | null = null;
+      for (let z = startZ; z <= endZ; z += zStep) {
+        const here = new Vector3(lx, wireY, -z);
+        if (previous) points.push(previous.x, previous.y, previous.z, here.x, here.y, here.z);
+        previous = here;
+      }
+    }
+
     for (const anchor of this.layout.anchors) {
       const wire = this.wires.find((w) => w.id === anchor.wire);
       if (wire) this.anchors.set(anchor.id, resolveAnchor(anchor.lane, wire));
