@@ -17,55 +17,48 @@ import type { Lane, TravelMode } from './types';
 export const BAY = 27.2;
 
 /**
- * Act-based step acceleration schedule:
- * Act 1 (0-11s): 9.5 u/s (warmup)
- * Act 2 (11-23s): 11.0 u/s (+16%, canyon rush)
- * Act 3 (23-34s): 12.5 u/s (+32%, slalom weaves)
- * Act 4 (34-45s): 14.5 u/s (+53%, climax sprint)
+ * Continuous linear speed ramp:
+ * Starts at 9.5 u/s and smoothly accelerates to 14.5 u/s at t=45s (a = 0.111 u/s²).
+ * Replaces step gear shifts with zero-jerk, continuous Level 1-style acceleration.
  */
-export const ACT_SPEEDS = [
-  { until: 11, speed: 9.5 },
-  { until: 23, speed: 11.0 },
-  { until: 34, speed: 12.5 },
-  { until: 45, speed: 14.5 },
-] as const;
+const START_SPEED = 9.5;
+const END_SPEED = 14.5;
+const DURATION = 45;
+export const ACCEL = (END_SPEED - START_SPEED) / DURATION; // 5 / 45 = 1/9 u/s²
 
 export function speedAt(t: number): number {
-  if (t < 11) return 9.5;
-  if (t < 23) return 11.0;
-  if (t < 34) return 12.5;
-  return 14.5;
+  if (t <= 0) return START_SPEED;
+  if (t >= DURATION) return END_SPEED;
+  return START_SPEED + ACCEL * t;
 }
 
 export function positionAt(t: number): number {
-  if (t <= 0) return 0;
-  if (t < 11) return t * 9.5;
-  if (t < 23) return 104.5 + (t - 11) * 11.0;
-  if (t < 34) return 236.5 + (t - 23) * 12.5;
-  return 374.0 + Math.min(11, t - 34) * 14.5;
+  if (t <= 0) return t * START_SPEED;
+  const clamped = Math.min(DURATION, t);
+  const z = START_SPEED * clamped + 0.5 * ACCEL * clamped * clamped;
+  return t > DURATION ? z + END_SPEED * (t - DURATION) : z;
 }
 
 export function timeAt(z: number): number {
-  if (z <= 0) return 0;
-  if (z <= 104.5) return z / 9.5;
-  if (z <= 236.5) return 11 + (z - 104.5) / 11.0;
-  if (z <= 374.0) return 23 + (z - 236.5) / 12.5;
-  return 34 + Math.min(11, (z - 374.0) / 14.5);
+  if (z <= 0) return z / START_SPEED;
+  const maxZ = 540.0;
+  if (z >= maxZ) return DURATION + (z - maxZ) / END_SPEED;
+  return (-START_SPEED + Math.sqrt(START_SPEED * START_SPEED + 2 * ACCEL * z)) / ACCEL;
 }
 
 /** Route parameters. */
 export const COURSE = {
   duration: 45,
-  /** Weighted average speed across the 4 acts (533.5 / 45). */
-  speed: 11.855,
-  startSpeed: 9.5,
-  endSpeed: 14.5,
+  /** Average speed across the route (540 / 45 = 12.0 u/s). */
+  speed: 12.0,
+  startSpeed: START_SPEED,
+  endSpeed: END_SPEED,
   laneWidth: 3.2,
   groundY: 1.25,
   cycle: 3.2,
 } as const;
 
-export const ROUTE_LENGTH = positionAt(COURSE.duration);
+export const ROUTE_LENGTH = 540.0;
 
 /**
  * Half-width of the interactive zone.
