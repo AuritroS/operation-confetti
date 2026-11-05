@@ -41,6 +41,22 @@ export const wine = satin(0x72264f, 0.03, 0.8);
 export const midnight = satin(0x141d3a);
 
 /**
+ * Consolidated environment tones.
+ *
+ * Batching merges by material identity, so two meshes in near-identical blues
+ * cost two draw calls however alike they look. The scene had reached 56
+ * distinct materials across 57 meshes — nothing left for the batcher to merge,
+ * and several of those carried a dozen triangles each. Prefer one of these
+ * over a new near-duplicate unless the difference is one a player would
+ * actually notice.
+ */
+export const deckStone = satin(0x222b46);
+export const citySlab = satin(0x16203d);
+export const plumDeep = satin(0x301a42);
+export const cream = satin(0xfff2e3);
+export const lampGlow = luminous(0xffc471);
+
+/**
  * The tower's own fabric: pale concrete, as the landmark actually is, with the
  * night colour carried by the neon and glow sleeves in `tower.ts` rather than
  * baked into the stone. See `assets/aurora.png` for the lit reference.

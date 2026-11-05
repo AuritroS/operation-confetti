@@ -3,7 +3,6 @@ import {
   InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PointLight, Scene,
   BoxGeometry, DoubleSide, WebGLRenderer, ACESFilmicToneMapping,
 } from 'three';
-import { BOSS_PROPS } from '../../assets/boss/catalog';
 import type { BossPractice } from '../../levels/boss/practice';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { BossCamera } from './camera';
@@ -11,6 +10,13 @@ import { BossEnvironment } from './environment';
 import { BossActors } from './actors';
 import { BossSky } from './sky';
 import { BossMagic } from './magic';
+import { BossCelebration } from './celebration';
+import { BossEffects } from './effects';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { BOSS_PROPS } from '../../assets/boss/catalog';
+import type { BossCues } from '../../levels/boss/telegraph';
+import { IDLE_CUES } from '../../levels/boss/telegraph';
+import { AURORA_TORSO } from './targets';
 
 export class BossScene {
   readonly camera = new BossCamera();
@@ -19,6 +25,9 @@ export class BossScene {
   readonly actors = new BossActors();
   readonly sky = new BossSky();
   readonly magic = new BossMagic();
+  readonly effects: BossEffects;
+  private readonly celebration = new BossCelebration();
+  private readonly bossLight: PointLight;
   readonly renderer: WebGLRenderer;
   private readonly shots: Group[] = [];
   private readonly confetti: InstancedMesh;
@@ -44,13 +53,14 @@ export class BossScene {
     const cakeLight = new PointLight(0xffb765, 8, 8);
     cakeLight.position.set(BOSS_LAYOUT.cakeX, 3.5, BOSS_LAYOUT.cakeZ + 0.6);
     this.world.add(cakeLight);
-    const bossLight = new PointLight(0x9c45df, 7, 8);
-    bossLight.position.set(-0.8, 3.2, BOSS_LAYOUT.bossZ - 1.2);
-    this.world.add(bossLight);
+    this.bossLight = new PointLight(0x9c45df, 7, 8);
+    this.bossLight.position.set(-0.8, 3.2, BOSS_LAYOUT.bossZ - 1.2);
+    this.world.add(this.bossLight);
     const deckLight = new PointLight(0xffbb77, 4, 9);
     deckLight.position.set(-3.8, 3.2, 1.5);
     this.world.add(deckLight);
-    this.world.add(this.sky.root, this.environment.root, this.actors.root, this.magic.root);
+    this.effects = new BossEffects(this.environment.cake);
+    this.world.add(this.sky.root, this.environment.root, this.actors.root, this.magic.root, this.effects.root, this.celebration.mesh);
 
     for (let i = 0; i < 4; i++) {
       const group = new Group();
@@ -74,17 +84,35 @@ export class BossScene {
   }
 
   async load(): Promise<void> {
-    // Every environment prop is procedural now; only the actors and the
-    // cannon they carry come from GLBs.
-    await this.actors.load();
+    // Only the actors, the cannon they carry, and the scored gift come from
+    // GLBs; every environment prop is procedural.
+    const gift = BOSS_PROPS.find((item) => item.id === 'collectibleGift');
+    const [giftModel] = await Promise.all([
+      gift ? new GLTFLoader().loadAsync(gift.url) : Promise.resolve(null),
+      this.actors.load(),
+    ]);
+    if (giftModel && gift) {
+      const model = giftModel.scene;
+      model.scale.setScalar(gift.targetHeight / gift.nativeHeight);
+      this.effects.attachGift(model);
+    }
     this.environment.addProps(new Map(), BOSS_PROPS);
   }
 
-  update(game: BossPractice, step: number): void {
+  update(game: BossPractice, step: number, cues: BossCues = IDLE_CUES, practiceMode = false): void {
     this.sky.update(step);
     this.environment.update(step);
     this.magic.update(step);
-    this.actors.update(game, step);
+    this.magic.applyEnding(cues.cake);
+    this.actors.update(game, step, cues);
+    this.celebration.update(cues.cake);
+    this.effects.update(cues, step);
+    this.environment.setCakeRingStrength(cues.cake.phase === 'recovered'
+      ? Math.max(0, 1 - cues.cake.progress * 1.5) : 1);
+    // The exposed state gets a distinct cool light on Aurora on the exact
+    // simulation phase edge, reinforcing the absent shield without a timer.
+    this.bossLight.color.setHex(cues.shield.phase === 'down' ? 0x6be6c8 : 0x9c45df);
+    this.bossLight.intensity = cues.shield.phase === 'down' ? 8 : 7;
     for (let i = 0; i < this.shots.length; i++) {
       const mesh = this.shots[i]!;
       const shot = game.activeShots[i];
@@ -92,12 +120,18 @@ export class BossScene {
       if (!shot) continue;
       const t = shot.progress;
       const startX = BOSS_LAYOUT.laneCentres[shot.lane]!;
-      mesh.position.set(startX * (1 - t), 1.2 + t * 2.05 + Math.sin(t * Math.PI) * 0.42, BOSS_LAYOUT.playerZ - t * (BOSS_LAYOUT.playerZ - BOSS_LAYOUT.bossZ));
+      mesh.position.set(
+        startX * (1 - t),
+        1.2 + t * (AURORA_TORSO.y - 1.2) + Math.sin(t * Math.PI) * 0.42,
+        BOSS_LAYOUT.playerZ + t * (AURORA_TORSO.z - BOSS_LAYOUT.playerZ),
+      );
       mesh.rotation.z += step * 8;
     }
-    if (game.hitCount !== this.lastHits) {
+    if (game.hitCount > this.lastHits) {
       this.lastHits = game.hitCount;
-      this.confettiTime = 0.65;
+      // Practice always shows target feedback. In combat a shielded shot uses
+      // the shield's own block flash; only an exposed hit bursts on her torso.
+      if (practiceMode || cues.shield.phase === 'down') this.confettiTime = 0.65;
     }
     if (this.confettiTime > 0) {
       this.confettiTime = Math.max(0, this.confettiTime - step);
@@ -107,7 +141,11 @@ export class BossScene {
         const angle = i * 2.39996;
         const radius = 0.16 + progress * (0.45 + (i % 4) * 0.13);
         matrix.makeRotationZ(angle + progress * 3);
-        matrix.setPosition(Math.cos(angle) * radius, 3.25 + Math.sin(angle) * radius - progress * 0.2, BOSS_LAYOUT.bossZ + 0.45);
+        matrix.setPosition(
+          AURORA_TORSO.x + Math.cos(angle) * radius,
+          AURORA_TORSO.y + Math.sin(angle) * radius - progress * 0.2,
+          AURORA_TORSO.z,
+        );
         this.confetti.setMatrixAt(i, matrix);
       }
       this.confetti.instanceMatrix.needsUpdate = true;
@@ -125,13 +163,29 @@ export class BossScene {
       this.height = height;
       this.renderer.setSize(width, height, false);
       this.camera.resize(width, height);
+      // The victory shower spans whatever the lens actually sees, so it stays
+      // full-width at 360px and on desktop rather than only where it was
+      // tuned. Recomputed here because this is where fov and aspect settle.
+      const lens = this.camera.camera;
+      const depth = Math.abs(lens.position.z - (BOSS_LAYOUT.playerZ + 2.9) / 2);
+      const halfHeight = Math.tan((lens.fov * Math.PI) / 360) * depth;
+      this.celebration.setSpread(halfHeight * lens.aspect);
     }
     this.renderer.render(this.world, this.camera.camera);
   }
 
   get drawCalls(): number { return this.renderer.info.render.calls; }
   get triangles(): number { return this.renderer.info.render.triangles; }
+  reset(): void {
+    this.lastHits = 0;
+    this.confettiTime = 0;
+    this.confetti.visible = false;
+    this.actors.reset();
+    this.effects.reset();
+  }
   dispose(): void {
+    this.celebration.dispose();
+    this.effects.dispose();
     this.actors.dispose();
     this.sky.dispose();
     this.magic.dispose();

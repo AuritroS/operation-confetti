@@ -1,3 +1,5 @@
+import type { CakeSnapshot } from '../../levels/boss/telegraph';
+import { escapeOffset } from './endings';
 import {
   AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CatmullRomCurve3,
   Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D,
@@ -193,6 +195,13 @@ export class BossMagic {
     for (const strand of this.tether) {
       (strand.material as MeshBasicMaterial).opacity = 0.36 + Math.sin(t * 1.4) * 0.1;
     }
+  }
+
+  applyEnding(cake: CakeSnapshot): void {
+    const offset = cake.phase === 'escaped' ? escapeOffset(cake.progress) : { x: 0, y: 0, z: 0 };
+    this.root.position.set(offset.x, offset.y, offset.z);
+    this.root.visible = cake.phase === 'held' || (cake.phase === 'escaped' && cake.progress < 1);
+    for (const strand of this.tether) strand.visible = cake.phase !== 'recovered';
   }
 
   dispose(): void {

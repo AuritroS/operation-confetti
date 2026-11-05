@@ -7,7 +7,10 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { buildCake } from '../custom';
-import { gold, luminous, midnight, paleGold, satin, velvet, wine } from './materials';
+import {
+  citySlab, cream, deckStone, gold, lampGlow, luminous, midnight,
+  paleGold, plumDeep, satin, velvet, wine,
+} from './materials';
 import { makeTower } from './tower';
 import type { BossProp } from '../../assets/boss/catalog';
 
@@ -65,8 +68,8 @@ const DECK_LENGTH = DECK_NEAR_Z - DECK_FAR_Z;
 const DECK_CENTRE_Z = (DECK_NEAR_Z + DECK_FAR_Z) / 2;
 
 function makeDeck(parent: Group): void {
-  block(parent, [9.2, 0.38, DECK_LENGTH], [0, -0.25, DECK_CENTRE_Z], satin(0x19223b));
-  block(parent, [8.8, 0.07, DECK_LENGTH - 0.7], [0, -0.025, DECK_CENTRE_Z], satin(0x27314b));
+  block(parent, [9.2, 0.38, DECK_LENGTH], [0, -0.25, DECK_CENTRE_Z], deckStone);
+  block(parent, [8.8, 0.07, DECK_LENGTH - 0.7], [0, -0.025, DECK_CENTRE_Z], deckStone);
   const laneMats = [satin(0x202b47), satin(0x263454), satin(0x202b47)];
   const laneLength = DECK_NEAR_Z - (-5.1);
   const laneCentreZ = (DECK_NEAR_Z + -5.1) / 2;
@@ -82,18 +85,18 @@ function makeDeck(parent: Group): void {
   // one level where magenta finally means incoming damage leaves her attacks
   // nothing to contrast against on the surface they land on.
   for (const x of [-3.32, -1.1, 1.1, 3.32]) {
-    block(parent, [0.025, 0.014, laneLength], [x, 0.048, laneCentreZ], satin(0x8d8296, 0.23));
+    block(parent, [0.025, 0.014, laneLength], [x, 0.048, laneCentreZ], satin(0x7c8398));
   }
   for (const x of [-4.45, 4.45]) {
     block(parent, [0.27, 0.22, DECK_LENGTH - 0.7], [x, 0.1, DECK_CENTRE_Z], midnight);
     block(parent, [0.16, 0.06, DECK_LENGTH - 0.7], [x, 0.23, DECK_CENTRE_Z], gold);
     for (const z of [-4.6, -2.3, 0, 2.3, 4.6, 7.4, 10.2]) {
       cylinder(parent, 0.08, 0.11, 0.92, [x, 0.68, z], midnight, 10);
-      orb(parent, 0.09, [x, 1.18, z], luminous(0xffc471), 8);
+      orb(parent, 0.09, [x, 1.18, z], lampGlow, 8);
     }
   }
   // The small paving joints are concentrated on the shoulders and never mask a warning.
-  const joint = satin(0x60708c);
+  const joint = satin(0x7c8398);
   for (const side of [-1, 1]) {
     for (let i = 0; i < 9; i++) {
       const z = -4.4 + i * 1.16;
@@ -116,13 +119,13 @@ const STAGE_LIFT = Math.max(0, BOSS_LAYOUT.bossStageY - DAIS_STEPS_HEIGHT);
  */
 function makeDais(parent: Group): void {
   if (STAGE_LIFT > 0.01) {
-    const plinth = cylinder(parent, 4.62, 4.78, STAGE_LIFT, [0, STAGE_LIFT / 2, -6.2], satin(0x241a3c), 48);
+    const plinth = cylinder(parent, 4.62, 4.78, STAGE_LIFT, [0, STAGE_LIFT / 2, -6.2], plumDeep, 48);
     plinth.scale.z = 0.48;
     const reveal = cylinder(parent, 4.66, 4.66, 0.1, [0, STAGE_LIFT - 0.05, -6.2], gold, 48);
     reveal.scale.z = 0.48;
   }
   const tiers = [
-    { r: 4.5, y: 0.17, h: 0.34, z: -6.25, mat: satin(0x301a42) },
+    { r: 4.5, y: 0.17, h: 0.34, z: -6.25, mat: plumDeep },
     { r: 4.18, y: 0.46, h: 0.28, z: -6.43, mat: gold },
     { r: 3.95, y: 0.74, h: 0.3, z: -6.48, mat: velvet },
     { r: 3.82, y: 0.96, h: 0.12, z: -6.48, mat: paleGold },
@@ -146,7 +149,7 @@ function makeArchitecture(parent: Group): void {
   // hung on the tower rather than as a stage flat.
   for (const side of [-1, 1]) {
     const x = side * 3.75;
-    cylinder(parent, 0.32, 0.4, 4.25, [x, 2.95, z + 0.12], satin(0x3f2455), 20);
+    cylinder(parent, 0.32, 0.4, 4.25, [x, 2.95, z + 0.12], velvet, 20);
     for (const y of [0.94, 1.08, 4.92, 5.13]) {
       cylinder(parent, 0.43, 0.43, 0.12, [x, y, z + 0.12], gold, 20);
     }
@@ -177,7 +180,7 @@ function makeArchitecture(parent: Group): void {
     crest.rotation.z = side * -0.12;
     orb(parent, 0.13, [side * 4.38, 7.1, z + 0.2], luminous(0xf0a7ff), 10);
   }
-  const lamps = new InstancedMesh(new SphereGeometry(0.08, 8, 5), luminous(0xffd184), 25);
+  const lamps = new InstancedMesh(new SphereGeometry(0.08, 8, 5), lampGlow, 25);
   const matrix = new Matrix4();
   for (let i = 0; i < 25; i++) {
     const a = Math.PI - i / 24 * Math.PI;
@@ -227,7 +230,9 @@ function makeMoonAndSkyline(parent: Group): void {
     [-4.8, 5.5, 1.9], [-2.4, 4.2, 2.4], [0, 5.0, 2.1], [2.7, 4.7, 2.5],
     [5.1, 6.9, 2.3], [7.9, 5.6, 2.8], [10.6, 7.2, 2.2], [13.1, 4.9, 2.5],
   ] as const;
-  const cityMaterials = [satin(0x121b36), satin(0x16203d), satin(0x191a38)];
+  // One slab tone for the whole skyline: three navies a kilometre away are
+  // three draw calls and one colour to the eye.
+  const cityMaterials = [citySlab, citySlab, citySlab];
   const windows: number[] = [];
   for (let i = 0; i < buildings.length; i++) {
     const [rawX, rawHeight, rawWidth] = buildings[i]!;
@@ -239,8 +244,8 @@ function makeMoonAndSkyline(parent: Group): void {
     // turns "a plaza with buildings behind it" into "a platform in the air".
     const base = CITY_BASE_Y;
     block(parent, [width, height, 3.5], [x, base + height / 2, z], cityMaterials[i % 3]!);
-    block(parent, [width + 0.3, 0.3, 3.7], [x, base + height - 0.05, z], satin(0x253150));
-    if (i % 3 === 0) block(parent, [0.08, 0.65, 0.08], [x, base + height + 0.52, z], satin(0x596b9a));
+    block(parent, [width + 0.3, 0.3, 3.7], [x, base + height - 0.05, z], citySlab);
+    if (i % 3 === 0) block(parent, [0.08, 0.65, 0.08], [x, base + height + 0.52, z], citySlab);
     for (let row = 0; row < Math.floor(height / 0.48) - 1; row++) {
       for (let col = 0; col < Math.floor(width / 0.34) - 1; col++) {
         if ((row * 7 + col * 11 + i * 3) % 5 === 0) continue;
@@ -314,8 +319,8 @@ function makeCandelabra(parent: Group, x: number, z: number): void {
       new Vector3(x, baseY + 1.25, z), new Vector3(x + dx * 0.6, baseY + 1.46, z),
       new Vector3(x + dx, y - 0.23, z),
     ], 0.036, gold);
-    cylinder(parent, 0.035, 0.035, 0.28, [x + dx, y, z], satin(0xffe9cf), 8);
-    orb(parent, 0.07, [x + dx, y + 0.21, z], luminous(0xffb75b), 8).scale.y = 1.5;
+    cylinder(parent, 0.035, 0.035, 0.28, [x + dx, y, z], cream, 8);
+    orb(parent, 0.07, [x + dx, y + 0.21, z], lampGlow, 8).scale.y = 1.5;
   }
 }
 
@@ -335,7 +340,7 @@ function makeCakeDisplay(parent: Group, cake: Group, cakeRings: Mesh[]): void {
   cake.add(sponge);
   parent.add(cake);
   // Piped cream and red berries turn the small shared cake into the hero prop.
-  const cream = satin(0xfff2e3);
+
   const berry = satin(0xb80e36, 0.06, 0.36);
   for (const [radius, y, count] of [[0.84, 0.45, 24], [0.59, 0.98, 16]] as const) {
     for (let i = 0; i < count; i++) {
@@ -354,21 +359,18 @@ function makeCakeDisplay(parent: Group, cake: Group, cakeRings: Mesh[]): void {
   /*
    * Three rings it rests in, widest at the top and tapering to a point below.
    *
-   * A single hairline circle read as a dinner plate. Tapering them downward
-   * makes the cake look carried on a focused column of her magic rather than
-   * sat in a funnel, and giving each ring its own rotation makes that column
-   * look alive. They
-   * live in the cake group so they bob with it; nothing else needs to know
-   * where the cake is.
+   * A compact, quiet cone keeps the cake visibly resting just above the top
+   * ring. Equal short gaps preserve the levitation read without a tall funnel.
+   * They live in the cake group so both endings carry them with the cake.
    */
-  for (const [radius, drop, tube] of [[1.4, -0.26, 0.04], [0.94, -0.5, 0.048], [0.5, -0.76, 0.055]] as const) {
+  for (const [radius, drop] of [[1.4, -0.14], [0.95, -0.34], [0.5, -0.54]] as const) {
     // Bake the lie-flat rotation into the geometry rather than the mesh. With
     // it on the transform, animating rotation.z tipped each ring out of its
     // own plane instead of spinning it, and they read as loose crossing
     // ellipses rather than a stack.
-    const geometry = new TorusGeometry(radius, tube, 7, 44);
+    const geometry = new TorusGeometry(radius, 0.055, 7, 44);
     geometry.rotateX(Math.PI / 2);
-    const ring = new Mesh(geometry, luminous(0xd07bff, 0.9));
+    const ring = new Mesh(geometry, luminous(0xd07bff, 0.66));
     ring.position.set(0, drop, 0);
     cake.add(ring);
     cakeRings.push(ring);
@@ -404,12 +406,12 @@ function makeScatteredPartyPaper(parent: Group): void {
 }
 
 /** Collapse repeated static trim into material batches; the cake stays movable. */
-function batchArchitecture(root: Group, cake: Group): void {
+function batchArchitecture(root: Group, cake: Group, animated: ReadonlySet<Object3D> = new Set()): void {
   root.updateMatrixWorld(true);
   const worldToRoot = root.matrixWorld.clone().invert();
   const groups = new Map<string, Mesh[]>();
   const visit = (object: Object3D): void => {
-    if (object === cake || object instanceof InstancedMesh) return;
+    if (object === cake || animated.has(object) || object instanceof InstancedMesh) return;
     if (object instanceof Mesh && !Array.isArray(object.material)) {
       const group = groups.get(object.material.uuid) ?? [];
       group.push(object);
@@ -456,7 +458,7 @@ function makeGift(parent: Group, x: number, y: number, z: number, size: number, 
   // dais (0x40194e) — the same hue at the same value, which is camouflage,
   // not decoration. Hue cannot fix that while the dais is also purple, so
   // these jump the value instead: luminance around 230 against the dais's 34.
-  const wrap = plum ? satin(0xf2e4cd, 0.05, 0.62) : satin(0xffd28a, 0.32, 0.42);
+  const wrap = plum ? cream : satin(0xffd28a, 0.32, 0.42);
   const ribbon = plum ? satin(0x7b2f8c, 0.05, 0.6) : satin(0x5f2470, 0.05, 0.64);
   const w = size;
   const h = size * 0.82;
@@ -479,7 +481,7 @@ function makeGift(parent: Group, x: number, y: number, z: number, size: number, 
   gift.rotation.y = spin;
   parent.add(gift);
   // A contact shadow, so each box sits on the step instead of hovering over it.
-  const shade = new Mesh(new CylinderGeometry(w * 0.72, w * 0.72, 0.012, 10), satin(0x1d0f2a));
+  const shade = new Mesh(new CylinderGeometry(w * 0.72, w * 0.72, 0.012, 10), plumDeep);
   shade.position.set(x, y + 0.008, z);
   parent.add(shade);
 }
@@ -598,7 +600,9 @@ export class BossEnvironment {
     makeGiftStacks(this.root);
     makeScatteredPartyPaper(this.root);
     batchArchitecture(this.root, this.cake);
-    batchArchitecture(this.cake, new Group());
+    // The rings rotate and release during recovery; batching them would leave
+    // `cakeRings` pointing at detached meshes and freeze their visible geometry.
+    batchArchitecture(this.cake, new Group(), new Set(this.cakeRings));
     // Added after batching: it animates per frame, so it must stay its own mesh.
     this.root.add(this.confetti.mesh);
   }
@@ -606,11 +610,17 @@ export class BossEnvironment {
   update(step: number): void {
     this.time += step;
     this.confetti.update(step);
-    this.cake.position.y = BOSS_LAYOUT.cakeY + Math.sin(this.time * 1.4) * 0.075;
+    // The cake itself is driven by BossEffects: its endings move it, and two
+    // writers would fight. Only its rings are animated here.
     // Each ring turns at its own rate, and the middle one against the others.
     for (let i = 0; i < this.cakeRings.length; i++) {
       this.cakeRings[i]!.rotation.y = this.time * (i === 1 ? -0.5 : 0.3 + i * 0.16);
     }
+  }
+
+  /** Aurora's levitation rings release the cake as Matthew recovers it. */
+  setCakeRingStrength(strength: number): void {
+    for (const ring of this.cakeRings) ring.scale.setScalar(strength);
   }
 
   addProps(models: ReadonlyMap<string, Group>, catalog: readonly BossProp[]): void {

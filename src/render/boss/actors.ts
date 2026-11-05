@@ -8,6 +8,8 @@ import { AssetBundle, type Actor } from '../../assets/characters';
 import { BOSS_ACTORS, BOSS_ANIMATION_LIBRARIES, BOSS_CANNON_MOUNT, BOSS_PROPS } from '../../assets/boss/catalog';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { buildCrown } from '../custom';
+import type { BossCues } from '../../levels/boss/telegraph';
+import { endingEase, escapeOffset } from './endings';
 import type { BossPractice } from '../../levels/boss/practice';
 
 const _point = new Vector3();
@@ -159,14 +161,27 @@ export class BossActors {
   private matthewHolder = new Group();
   private readonly bossHolder = new Group();
   private hover = 0;
+  private ending = 'held';
+  private celebrated = false;
+  private readonly auroraShadow = shadow();
   private shotPose = 0;
   private lastShotCount = 0;
+  private lastStrikeId = 0;
+  private lastOrbId = 0;
+  private lastPlayerHit = 0;
+  private lastBossHit = 0;
+  /** Seconds left of a one-shot Aurora clip before she returns to idle. */
+  private castPose = 0;
+  /** Seconds left of Matthew's hit reaction. Outranks his firing pose. */
+  private hitPose = 0;
+  /** Aurora's procedural recoil, in seconds. */
+  private flinch = 0;
   private readonly matthewShadow = shadow();
 
   constructor() {
     this.root.add(this.matthewHolder);
     this.root.add(this.matthewShadow);
-    const auroraShadow = shadow();
+    const auroraShadow = this.auroraShadow;
     auroraShadow.position.set(0, BOSS_LAYOUT.bossStageY + 0.02, BOSS_LAYOUT.bossZ);
     this.root.add(auroraShadow);
   }
@@ -208,16 +223,89 @@ export class BossActors {
     this.aurora = aurora;
   }
 
-  update(game: BossPractice, step: number): void {
+  /**
+   * Aurora's attack performance.
+   *
+   * Driven entirely off cue IDs and cue progress, never the other way round:
+   * a clip ending can open no shield and deal no damage. `Use_Item` and
+   * `Throw` are free-tier substitutes of unknown length, so they are started
+   * at the phase boundary and clamped rather than synced to the moment of
+   * contact, which would need a playback-rate control the shared Actor API
+   * does not have.
+   */
+  private performAttacks(cues: BossCues, step: number): number {
+    const strike = cues.strikes[0];
+    const orb = cues.orbs[0];
+    if (strike && strike.id !== this.lastStrikeId) {
+      this.lastStrikeId = strike.id;
+      this.castPose = 1.1;
+      this.aurora?.play(BOSS_ACTORS.aurora.clips.raise, { fade: 0.08, loop: false, clampWhenFinished: true });
+    }
+    if (orb && orb.id !== this.lastOrbId) {
+      this.lastOrbId = orb.id;
+      this.castPose = 0.9;
+      this.aurora?.play(BOSS_ACTORS.aurora.clips.cast, { fade: 0.08, loop: false, clampWhenFinished: true });
+    }
+    if (this.castPose > 0) {
+      this.castPose = Math.max(0, this.castPose - step);
+      if (this.castPose === 0) this.aurora?.play(BOSS_ACTORS.aurora.clips.idle, { fade: 0.22 });
+    }
+    // Weight behind the telegraph: she winds back through the warning and
+    // drives forward on contact, on the cue's own clock so the lunge and the
+    // marker can never drift apart.
+    if (strike) {
+      if (strike.phase === 'warning') return -0.12 * strike.progress;
+      if (strike.phase === 'strike') return 0.6 * (1 - strike.progress);
+      return 0.22 * (1 - strike.progress);
+    }
+    if (orb) {
+      const throwOut = Math.min(1, orb.progress / 0.12);
+      return 0.5 * throwOut * Math.max(0, 1 - Math.max(0, orb.progress - 0.12) / 0.3);
+    }
+    return 0;
+  }
+
+  update(game: BossPractice, step: number, cues: BossCues): void {
+    const cake = cues.cake;
+    const lunge = cake.phase === 'held' ? this.performAttacks(cues, step) : 0;
+    // She is struck twenty times a fight, so a full clip would retrigger every
+    // few hundred milliseconds and never finish. A short procedural recoil
+    // reads as being pelted; the clip is saved for the ending, where it fits.
+    if (cues.bossHitId !== this.lastBossHit) {
+      this.lastBossHit = cues.bossHitId;
+      this.flinch = 0.18;
+    }
+    if (this.flinch > 0) this.flinch = Math.max(0, this.flinch - step);
+    const recoil = this.flinch / 0.18;
     // She hovers: a slow, shallow drift that never changes her hit position
     // enough to matter, but stops her reading as standing on furniture.
     this.hover += step;
-    this.bossHolder.position.y = BOSS_LAYOUT.bossStageY + 0.08 + BOSS_LAYOUT.bossFloat
-      + Math.sin(this.hover * 0.9) * 0.07;
-    this.matthewHolder.position.set(game.renderX, BOSS_LAYOUT.playerY, BOSS_LAYOUT.playerZ);
-    this.matthewHolder.rotation.z = -game.lanes.lean * 0.09;
+    this.bossHolder.position.set(0, BOSS_LAYOUT.bossStageY + 0.08 + BOSS_LAYOUT.bossFloat
+      + Math.sin(this.hover * 0.9) * 0.07, BOSS_LAYOUT.bossZ + lunge - recoil * 0.22);
+    this.bossHolder.rotation.set(0.065 - recoil * 0.13, 0, 0);
+    this.bossHolder.visible = true;
+    this.auroraShadow.visible = cake.phase === 'held';
+    // The lane change is sold by banking and turning into the move: there is
+    // no strafe clip in the free tier. All three come off `lean`, which is
+    // zero at rest and peaks mid-slide, so they settle exactly when the lane
+    // does and cost nothing when he is standing still.
+    const lean = game.lanes.lean;
+    this.matthewHolder.position.set(
+      game.renderX, BOSS_LAYOUT.playerY + Math.abs(lean) * 0.11, BOSS_LAYOUT.playerZ);
+    this.matthewHolder.rotation.set(0, -lean * 0.2, -lean * 0.26);
     this.matthewShadow.position.set(game.renderX, 0.05, BOSS_LAYOUT.playerZ);
-    if (game.shotCount !== this.lastShotCount) {
+    if (cues.playerHitId !== this.lastPlayerHit) {
+      this.lastPlayerHit = cues.playerHitId;
+      this.hitPose = 0.5;
+      this.shotPose = 0;
+      this.matthew?.play(BOSS_ACTORS.matthew.clips.hit, { fade: 0.06, loop: false, clampWhenFinished: true });
+    }
+    if (this.hitPose > 0) {
+      this.hitPose = Math.max(0, this.hitPose - step);
+      if (this.hitPose === 0) this.matthew?.play(BOSS_ACTORS.matthew.clips.idle, { fade: 0.16 });
+    }
+    // Being hit outranks firing: the reaction should not be cut by a shot.
+    if (this.hitPose === 0 && cake.phase === 'held' && game.shotCount > this.lastShotCount) {
       this.lastShotCount = game.shotCount;
       this.shotPose = 0.34;
       this.matthew?.play(BOSS_ACTORS.matthew.clips.shoot, { fade: 0.07, loop: false, clampWhenFinished: true });
@@ -226,8 +314,52 @@ export class BossActors {
       this.shotPose = Math.max(0, this.shotPose - step);
       if (this.shotPose === 0) this.matthew?.play(BOSS_ACTORS.matthew.clips.idle);
     }
+    if (cake.phase !== this.ending) {
+      this.ending = cake.phase;
+      this.celebrated = false;
+      this.shotPose = 0;
+      this.aurora?.play(cake.phase === 'recovered' ? BOSS_ACTORS.aurora.clips.hit
+        : cake.phase === 'escaped' ? BOSS_ACTORS.aurora.clips.raise : BOSS_ACTORS.aurora.clips.idle,
+        { loop: cake.phase === 'held', clampWhenFinished: true });
+      this.matthew?.play(cake.phase === 'escaped' ? BOSS_ACTORS.matthew.clips.hit
+        : BOSS_ACTORS.matthew.clips.idle, { loop: cake.phase !== 'escaped', clampWhenFinished: true });
+    }
+    if (cake.phase === 'escaped') {
+      const offset = escapeOffset(cake.progress);
+      this.bossHolder.position.x += offset.x;
+      this.bossHolder.position.y += offset.y;
+      this.bossHolder.position.z += offset.z;
+      this.bossHolder.rotation.z = -0.15 * cake.progress;
+      this.bossHolder.visible = cake.progress < 1;
+    } else if (cake.phase === 'recovered') {
+      const settle = endingEase(cake.progress / 0.45);
+      this.matthewHolder.position.x = game.renderX * (1 - settle);
+      this.matthewHolder.rotation.set(0, Math.PI * endingEase((cake.progress - 0.38) / 0.2), 0);
+      this.matthewShadow.position.x = this.matthewHolder.position.x;
+      if (cake.progress >= 0.55 && !this.celebrated) {
+        this.celebrated = true;
+        this.matthew?.play(BOSS_ACTORS.matthew.clips.win, { loop: false, clampWhenFinished: true });
+      }
+    }
     this.matthew?.update(step);
     this.aurora?.update(step);
+  }
+
+  reset(): void {
+    this.lastShotCount = 0;
+    this.lastStrikeId = 0;
+    this.lastOrbId = 0;
+    this.lastPlayerHit = 0;
+    this.lastBossHit = 0;
+    this.castPose = 0;
+    this.hitPose = 0;
+    this.flinch = 0;
+    this.shotPose = 0;
+    this.ending = 'held';
+    this.celebrated = false;
+    this.matthewHolder.rotation.set(0, 0, 0);
+    this.aurora?.play(BOSS_ACTORS.aurora.clips.idle);
+    this.matthew?.play(BOSS_ACTORS.matthew.clips.idle);
   }
 
   dispose(): void {

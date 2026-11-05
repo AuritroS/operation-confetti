@@ -1,17 +1,14 @@
 #!/usr/bin/env node
-/** Small browser check for the independent control harness. */
-import { chromium } from 'playwright';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+/** Small browser check for the independent control harness and fight start. */
+import { openReviewPage } from './boss-browser.mjs';
 
-const browser = await chromium.launch({ headless: true, args: ['--allow-file-access-from-files'] });
-try {
-  for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1280, height: 800 }]) {
-    const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+    const { browser, tab: page } = await openReviewPage({ viewport });
+    try {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(pathToFileURL(resolve('.local-tmp/level3-build/level3.html')).href);
-    await page.locator('#practice-lane').waitFor();
+    page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+    await page.locator('#practice-scene-status').waitFor({ state: 'hidden', timeout: 30_000 });
     const lane = page.locator('#practice-lane');
     const hits = page.locator('#practice-hits');
     const shots = page.locator('#practice-shots');
@@ -30,12 +27,16 @@ try {
     if (await page.locator('#practice-paused').isHidden()) throw new Error('Pause did not open');
     await page.keyboard.press('KeyP');
     if (!(await page.locator('#practice-paused').isHidden())) throw new Error('Resume failed');
+    await page.locator('#boss-start').click();
+    await page.waitForTimeout(100);
+    if (await page.locator('#boss-beat').textContent() !== 'Lane strike · dodge the marker') {
+      throw new Error('Fight did not start with a warned lane strike');
+    }
     if (errors.length) throw new Error(errors.join('\n'));
     const bodyWidth = await page.locator('body').evaluate((el) => el.scrollWidth);
     if (bodyWidth > viewport.width) throw new Error(`Horizontal overflow at ${viewport.width}`);
-    await page.close();
+    } finally {
+      await browser.close();
+    }
     process.stdout.write(`OK ${viewport.width}x${viewport.height}\n`);
-  }
-} finally {
-  await browser.close();
 }

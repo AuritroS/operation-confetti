@@ -4,8 +4,8 @@
     "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_A_blue.gltf",
     "url": "/models/level3/present_A_blue.glb",
     "nativeHeight": 0.662,
-    "targetHeight": 0.66,
-    "role": "Only scored gift; gold sparkle field as level 1, not blue"
+    "targetHeight": 0.9,
+    "role": "Only scored gift; plain blue present until cross-level collectible treatment is agreed"
   },
   {
     "id": "cannon",

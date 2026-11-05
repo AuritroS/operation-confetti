@@ -2,7 +2,7 @@ import {
   AdditiveBlending, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, PlaneGeometry, SphereGeometry, TorusGeometry,
 } from 'three';
-import { concrete, concreteDark, gold, luminous, satin } from './materials';
+import { concrete, concreteDark, deckStone, gold, luminous } from './materials';
 
 /**
  * The CN Tower's SkyPod, as the arena floor.
@@ -84,7 +84,7 @@ function makePod(parent: Group): void {
 function makeShaft(parent: Group): void {
   const z = TOWER_AXIS_Z;
   const neon = luminous(0xcc29c3, 0.95);
-  const cyan = luminous(0x53a6f9, 0.9);
+  const cyan = luminous(0x53a6f9, 0.88);
   // One shared additive material, so every glow sleeve in the tower batches
   // into a single extra draw call.
   const bloom = new MeshBasicMaterial({
@@ -195,17 +195,20 @@ function makeParapet(parent: Group, nearZ: number, farZ: number): void {
 
 /** Antenna masts and vent stacks: small silhouettes that give the pod scale. */
 function makeRoofClutter(parent: Group): void {
+  // Same material as the antenna's neon: two magenta emissives differing only
+  // by 0.15 opacity were two draw calls for no visible difference.
+  const neonLamp = luminous(0xcc29c3, 0.95);
   for (const [x, z, height] of [[-5.9, -9.4, 1.7], [6.1, -9.9, 2.2], [-6.4, -4.6, 1.2]] as const) {
     const mast = new Mesh(new CylinderGeometry(0.035, 0.07, height, 5), concreteDark);
     mast.position.set(x, height / 2, z);
     parent.add(mast);
-    const lamp = new Mesh(new SphereGeometry(0.08, 6, 5), luminous(0xcc29c3, 0.8));
+    const lamp = new Mesh(new SphereGeometry(0.08, 6, 5), neonLamp);
     lamp.position.set(x, height + 0.1, z);
     parent.add(lamp);
   }
   // A low skirt around the terrace sides hides the deck slab's cut edge.
   for (const side of [-1, 1]) {
-    const skirt = new Mesh(new CylinderGeometry(0.3, 0.42, 21.0, 4), satin(0x2b3350));
+    const skirt = new Mesh(new CylinderGeometry(0.3, 0.42, 21.0, 4), deckStone);
     skirt.rotation.x = Math.PI / 2;
     skirt.position.set(side * (TERRACE_HALF_WIDTH + 0.2), -0.35, 1.6);
     parent.add(skirt);
