@@ -1,5 +1,13 @@
 # Parallel collaboration: Level 2 and Level 3
 
+> **Historical record, not live guidance.** The parallel arrangement described
+> below is finished: `codex/level3` merged to `main` on 6 November 2026, and
+> the `.worktrees/level3` checkout and both stream branches are removed. Ports
+> 5303/5403, the ownership table and the dev-server commands no longer apply —
+> see `AGENTS.md` for how to work in the repository now. This is kept because
+> it records why the shared contracts are shaped as they are, and how the merge
+> was verified. See "Integration completed" at the end.
+
 Recorded 5 November 2026. This is the coordination contract for parallel work,
 not a claim that both agents have acknowledged it.
 

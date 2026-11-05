@@ -1,25 +1,43 @@
-# Parallel level development
+# Working in this repository
 
-Read `docs/COLLABORATION.md` before changing game code. It defines file ownership,
-worktree setup, development ports, shared-change coordination and integration gates.
-Read `design-level3.md` for the Level 3 proposal and staged build order.
+All three levels live on `main` in this single checkout. The parallel-worktree
+arrangement that built Level 3 is finished and removed; `docs/COLLABORATION.md`
+is kept as the record of how it ran and merged, not as live instruction.
 
-- Claude owns the ongoing Level 2 work in the original checkout. Preserve its
-  uncommitted changes; never stash, reset, clean, stage or commit another stream's work.
-- Codex implements Level 3 only in its separate `codex/level3` worktree after setup
-  succeeds. Planning documents may be prepared in the original checkout.
-- Keep Level 3 simulation, rendering, UI, assets and tests in their owned paths.
-  Shared modules are read-only during parallel implementation unless a specific
-  change has an agreed owner and integration sequence.
-- Simulation owns gameplay state, timings and collision geometry. Rendering reads
-  snapshots and events; meshes and animation callbacks never determine damage.
-- Preserve the user's stage order: verbs, asset selection, environment, interactive
-  arena, then polish. Record evidence for each gate before expanding the next layer.
-- Run dev servers on explicitly assigned ports with strict binding. Never stop
-  another stream's process or silently fall back to a different port.
-- Inspect the changed-file list before every commit. Commit only your own paths.
-  Integrate shared routing and campaign transitions after both levels are stable.
+Read `design.md`, `design-level2.md` and `design-level3.md` for each level's
+build order, decisions and evidence.
 
-These rules record the proposed collaboration boundary. They do not establish
-that another agent has read or accepted it; acknowledge cross-stream changes
-before relying on them.
+## Architecture
+
+- **Data** declares lane geometry, timings, attack sequences and stable IDs —
+  `src/levels/boss/config.ts` and `patterns.ts` are the pattern to follow.
+- **Simulation** owns HP, cooldowns, phase, projectiles, contact and terminal
+  outcomes. No DOM and no three.js imports in a runner.
+- **Presentation** reads snapshots and events. Decorative geometry never
+  changes a collision, and an animation ending must never apply damage, open a
+  shield or award a point. Telegraph visuals use the same committed target and
+  the same time bounds as the damage they predict.
+- **Composition** (`src/level2.ts`, `src/level3.ts`) wires input, loop,
+  simulation, scoring, scene and UI together. Combat rules do not live there,
+  and they never live in CSS.
+
+## Things that bite
+
+- `src/core/scoring.ts` is shared with the Worker, which recomputes every run
+  authoritatively. A client-side score that disagrees with `scoreRun` is a bug,
+  and the reducer's clamps — gift caps, overkill, events after an outcome —
+  are the contract, not suggestions.
+- `public/models/`, `public/story/` and `.asset-index.json` are generated and
+  gitignored, so they do not arrive with a clone. Build them before trusting a
+  test run: a missing GLB fails as `ENOENT`, not as a useful message.
+- Source packs under `assets/` are tracked and are the inputs to that build.
+- Review tooling writes into `tools/shots/` and takes an explicit base URL.
+  Check what a script does before running it; some rebuild assets.
+
+## Habits
+
+- Inspect the changed-file list before every commit.
+- Record evidence against a gate — what was checked, at what viewport, and what
+  is still open — rather than asserting a layer is done.
+- Automated browser capture is layout and legibility evidence. It is never
+  performance evidence and never a substitute for a real device.

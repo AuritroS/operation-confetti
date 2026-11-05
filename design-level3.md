@@ -10,7 +10,8 @@ browser and real touch review before its visual gate can be signed off.
 The branch started at `0081761`; `6d024f1` and `fccb2f0` were Codex's control
 and first environment slices. Claude continued the arena and left an uncommitted
 Stage 4 cue prototype; Codex continued that prototype on 6 November 2026 at
-the user's request. All work remains in the isolated Level 3 worktree.
+the user's request. The stream merged to `main` on 6 November 2026; the
+isolated worktree it was built in is gone, and paths below are repository-relative.
 
 Measured at 390x844: 98 draw calls, 60,360 triangles, Aurora 1.64x Matthew's
 screen height. Software-rasterised in CI, so these are geometry counts and
@@ -58,20 +59,20 @@ Check portrait framing early. Tune the verbs before choosing final lane spacing.
 
 ### Implemented control practice
 
-Open `/level3.html` from the Level 3 worktree's Vite server. The page shows three
+Open `/level3.html` from the dev server. The page shows three
 numbered lanes, a movable player marker, Aurora as a fixed aim target, animated
 confetti shots, accepted-shot and target-hit counters, pause/resume and reset.
 The practice target has no HP or attacks; hits measure aim and firing response.
 It uses the shared input recogniser and lane tween without modifying either.
 The playable logic and drawing live in separate Level 3 modules.
 
-Run locally from `.worktrees/level3`:
+Run locally:
 
 ```sh
-npm run dev -- --host 127.0.0.1 --port 5303 --strictPort
+npm run dev
 ```
 
-Visit `http://127.0.0.1:5303/level3.html`. For repeatable local checks:
+Visit `/level3.html` on the dev server. For repeatable local checks:
 
 ```sh
 ./node_modules/.bin/tsc --project tools/boss-tsconfig.json
@@ -134,8 +135,8 @@ compressed transfer or decoded GPU memory. Each prop GLB embeds an atlas, so
 repeated textures are a transfer-cost risk to measure when the scene is built.
 One decorated tree alone is 13,236 triangles; instance counts must stay bounded.
 
-Build the selected GLBs inside this worktree with `node tools/boss-assets.mjs`.
-The worktree has an exact copy of the Level 2 recolour tool from stable commit
+Build the selected GLBs with `node tools/boss-assets.mjs`.
+It shares the Level 2 recolour tool, from stable commit
 `4b5d989`; it produces the same `matthew.glb` hash as that checkout. The builder
 reuses the animation-strip tool, converts the nine curated Holiday props to
 `public/models/level3/`, and copies only selected transparent particle sprites
@@ -152,7 +153,7 @@ role colour; keep the lane warning a solid geometric shape and confetti as
 coloured paper, so neither depends on a soft particle image for readability.
 Pool and cap sprites. The source pack's full 15 MB is not copied into runtime.
 
-Open `http://127.0.0.1:5303/boss-assets.html` from the assigned Level 3 Vite
+Open `/boss-assets.html` from the dev
 server. The model viewer lets us rotate both actors, the selected props, and
 the **existing procedural cake and crown** at proposed sizes. Its TypeScript
 check and Vite compilation passed here; this session
@@ -207,7 +208,7 @@ Findings that constrain any further work on this frame:
   nearer than the skyline yet must appear behind it, and nothing in it writes
   depth. Anything added to that stack has to be reasoned about in draw order.
 
-Review the render at `http://127.0.0.1:5303/level3.html`; `?debug` prints draw
+Review the render at `/level3.html`; `?debug` prints draw
 and triangle counts, and exposes the scene graph on `window.level3` so capture
 tooling can measure real bounds instead of assumed coordinates. Shoot the
 viewport matrix with `node tools/boss-capture.mjs --query debug`.
@@ -542,7 +543,7 @@ on contact; exactly four gifts however long the fight runs; and the window
 count and duration, so a timing change cannot quietly restore the
 sixteen-second fight. The 14 failing tests in the full suite are all `ENOENT`
 on generated GLBs under `public/models/`, which is gitignored and must be built
-inside each worktree; they touch no Level 3 path.
+before the suite can read them; they touch no Level 3 path.
 
 Not done: browser and real-touch review of the new patterns, and target-phone
 performance. Still open: the recorded "Aurora should take seven successful
@@ -757,4 +758,4 @@ The mechanics and theme are specified by the user. Suggested remaining creative
 decisions are the final game-camera framing of the already-held cannon and Aurora's
 playful magical presentation. The rooftop-party setting is accepted. None requires changing
 shared code before review. Begin implementation with the isolated verb harness
-after worktree setup and discussion; do not jump ahead to the finished boss fight.
+after discussion; do not jump ahead to the finished boss fight.
