@@ -47,19 +47,30 @@ if (conn.status !== 0) {
   console.error(stderr);
 
   /*
-   * Name resolution is its own diagnosis.
+   * Not reaching the direct host is its own diagnosis, and it has nothing to
+   * do with the password.
    *
-   * `db.<ref>.supabase.co` is the direct connection, and newer projects
-   * publish it as AAAA only — so a machine without IPv6 gets "could not
-   * translate host name" and nothing about the password is wrong. The
-   * session pooler answers on IPv4 and takes the same SQL.
+   * `db.<ref>.supabase.co` publishes an AAAA record and no A record on newer
+   * projects. A machine with no IPv6 route therefore fails in one of two
+   * ways depending on how far it got: "could not translate host name" when
+   * the resolver returns nothing usable, or "No route to host" against a
+   * 2600:… address when it resolved and then could not be reached. Both mean
+   * the same thing, and the session pooler — which answers on IPv4 and takes
+   * the same DDL — is the fix for both.
    */
-  if (/translate host name|Name or service not known|nodename nor servname/i.test(stderr)) {
-    console.error('\n  That host did not resolve. It is the direct connection, which newer');
-    console.error('  Supabase projects publish over IPv6 only. Use the session pooler:');
-    console.error('  Dashboard > Connect > Session pooler, then in .env set');
+  const unreachable = /translate host name|Name or service not known|nodename nor servname/i.test(stderr)
+    || (/No route to host|Network is unreachable|Connection timed out/i.test(stderr) && /\(([0-9a-f]*:){2,}/i.test(stderr));
+
+  if (unreachable) {
+    console.error('\n  That is the direct connection, which this project publishes over IPv6');
+    console.error('  only — nothing is wrong with the password. Use the session pooler,');
+    console.error('  which answers on IPv4. Dashboard > Connect > Session pooler, then');
+    console.error('  add to .env:');
     console.error('    SUPABASE_DB_HOST=aws-0-<region>.pooler.supabase.com');
-    console.error(`    SUPABASE_DB_USER=postgres.${env.SUPABASE_PROJECT_REF}\n`);
+    console.error(`    SUPABASE_DB_USER=postgres.${env.SUPABASE_PROJECT_REF}`);
+    console.error('    SUPABASE_DB_PORT=5432\n');
+    console.error('  Session mode (5432), not transaction mode (6543): the schema has');
+    console.error('  DDL that transaction pooling will not run.\n');
   } else {
     console.error('\n  Check SUPABASE_DB_PASSWORD, and that the project is not paused.\n');
   }
