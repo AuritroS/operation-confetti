@@ -244,6 +244,9 @@ for (const src of CONVERT) {
       copyFileSync(src, dest);
       report.push({ file: `city/${name}.glb`, step: 'copy', kb: kb(dest) });
     }
+
+    // Transform road-straight to have clean 3-lane markings for Level 2
+    spawnSync(process.execPath, ['tools/generate-3lane-road.mjs'], { stdio: 'inherit' });
   }
 }
 

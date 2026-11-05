@@ -18,6 +18,7 @@
  * quietly going up or down by a few centimetres.
  */
 import { describe, expect, it } from 'vitest';
+import { NodeIO } from '@gltf-transform/core';
 import { glbBounds } from './glb-bounds';
 import { SKYLINE } from '../src/levels/skyline/course';
 import { STREET_PROPS } from '../src/render/skyline-props';
@@ -96,5 +97,44 @@ describe('the street datum', () => {
       .toBeGreaterThan(0.01);
     expect(height, 'the landing marking is tall enough to be an obstacle')
       .toBeLessThan(0.2);
+  });
+
+  it('has clean 3-lane dividers at +/-1.6m and no center line under lane 0', async () => {
+    const io = new NodeIO();
+    const doc = await io.read('public/models/city/road-straight.glb');
+    const prim = doc.getRoot().listMeshes()[0]!.listPrimitives()[0]!;
+    const pos = prim.getAttribute('POSITION')!.getArray()!;
+    const uv = prim.getAttribute('TEXCOORD_0')!.getArray()!;
+    const idx = prim.getIndices()!.getArray()!;
+
+    // Find all white painted triangles (UV ~ [0.406, 0.875])
+    const whiteZ: number[] = [];
+    for (let i = 0; i < idx.length; i += 3) {
+      const a = idx[i]!;
+      const u = uv[a * 2]!, v = uv[a * 2 + 1]!;
+      if (Math.abs(u - 0.406) < 0.01 && Math.abs(v - 0.875) < 0.01) {
+        // Average Z of the triangle scaled to world units (x 19)
+        const b = idx[i + 1]!, c = idx[i + 2]!;
+        const zAvg = ((pos[a * 3 + 2]! + pos[b * 3 + 2]! + pos[c * 3 + 2]!) / 3) * 19;
+        whiteZ.push(zAvg);
+      }
+    }
+
+    expect(whiteZ.length, 'road must have painted white dividing stripes').toBeGreaterThan(0);
+
+    // No white line running down the center of lane 0 (between -0.5m and +0.5m)
+    const centerMarkings = whiteZ.filter((z) => Math.abs(z) < 0.5);
+    expect(centerMarkings.length, 'lane 0 must be clean asphalt, not straddling a center line').toBe(0);
+
+    // Dividers must be centered around +/-1.60m (the boundaries between lanes -1, 0, and +1)
+    const leftDividers = whiteZ.filter((z) => z < -1.0 && z > -2.2);
+    const rightDividers = whiteZ.filter((z) => z > 1.0 && z < 2.2);
+    expect(leftDividers.length, 'must have left lane dividers').toBeGreaterThan(0);
+    expect(rightDividers.length, 'must have right lane dividers').toBeGreaterThan(0);
+
+    const leftMean = leftDividers.reduce((s, z) => s + z, 0) / leftDividers.length;
+    const rightMean = rightDividers.reduce((s, z) => s + z, 0) / rightDividers.length;
+    expect(leftMean).toBeCloseTo(-1.60, 1);
+    expect(rightMean).toBeCloseTo(1.60, 1);
   });
 });
