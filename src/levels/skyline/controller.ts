@@ -53,6 +53,23 @@ export class SkylineLevel implements LevelController {
     this.update(0);
   }
 
+  /**
+   * Advance the chase without input — a review affordance, like level 1's.
+   *
+   * Level 2 has no fail state: hazards cost points, not the run, so time can
+   * be advanced safely to reach the end of the course.
+   */
+  fastForward(seconds: number): void {
+    const step = 1 / 60;
+    // The chase does not move until the first swipe launches it, so a skip
+    // that only advances time would sit at the start line forever.
+    if (!this.runner.snapshot.started) this.runner.swipe('up');
+    for (let t = 0; t < seconds && !this.runner.snapshot.complete; t += step) {
+      this.runner.update(step);
+    }
+    this.update(0);
+  }
+
   update(step: number): void {
     this.runner.update(step);
     const snap = this.runner.snapshot;

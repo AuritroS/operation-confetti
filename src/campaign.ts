@@ -1,0 +1,307 @@
+/**
+ * The campaign shell.
+ *
+ * Plays all three levels in one page, in sequence, on one renderer. It owns
+ * everything a level deliberately does not: the loop, the renderer, pause and
+ * orientation, the HUD, and the run's event list. A level is mounted, played
+ * until it reports a result, then disposed before the next is mounted — which
+ * is the seam story panels and transitions drop into later.
+ *
+ * Score is reduced from the event stream with `scoreRun`, the same function
+ * the Worker recomputes with, so the number on screen is the number the server
+ * would agree with. Nothing is submitted: that arrives with the leaderboard.
+ *
+ * `?level=N` jumps straight to one level for development. A jumped run starts
+ * mid-stream and is therefore not a campaign result, which is why the flag is
+ * recorded on the run rather than quietly ignored.
+ */
+import { FixedLoop } from './core/loop';
+import { InputRecogniser } from './core/input';
+import { SkylineSwipeInput } from './core/skyline-swipe-input';
+import { Lifecycle } from './core/lifecycle';
+import { POINTS, scoreRun, type RunEvent } from './core/scoring';
+import type { LevelContext, LevelController } from './core/level';
+import { RendererHost } from './render/renderer-host';
+import { RouteLevel } from './levels/route-level';
+import { SkylineLevel } from './levels/skyline/controller';
+import { BossLevel } from './levels/boss/controller';
+import { Hud } from './ui/hud';
+
+const byId = <T extends HTMLElement>(id: string): T => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Missing #${id}`);
+  return el as T;
+};
+
+const canvas = byId<HTMLCanvasElement>('stage');
+const surface = byId('surface');
+const rotatePrompt = byId('rotate');
+const pausePill = byId('pause');
+const pauseNote = byId('pause-note');
+const pauseBtn = byId<HTMLButtonElement>('btn-pause');
+const stageLabel = byId('hud-stage');
+const bossReadout = byId('boss-readout');
+
+const host = new RendererHost(canvas);
+host.observe();
+const hud = new Hud();
+
+const params = new URLSearchParams(location.search);
+const debug = params.has('debug');
+const jumpTo = Number(params.get('level') ?? 0);
+
+/** How a level is built. The shell never reaches inside one. */
+interface StageSpec {
+  readonly id: 1 | 2 | 3;
+  readonly title: string;
+  readonly make: () => LevelController;
+}
+
+const STAGES: readonly StageSpec[] = [
+  { id: 1, title: 'The Gift Vault', make: () => new RouteLevel(host) },
+  { id: 2, title: 'Skyline Chase', make: () => new SkylineLevel(host) },
+  { id: 3, title: 'One Last Party Trick', make: () => new BossLevel() },
+];
+
+// ---- run state ---------------------------------------------------------
+
+let events: RunEvent[] = [];
+let index = 0;
+let current: LevelController | null = null;
+/** True while a level is being swapped, so input and results are ignored. */
+let switching = false;
+let campaignOver = false;
+
+const ctx: LevelContext = {
+  host,
+  emit: (event) => {
+    events.push(event);
+    hud.setScore(scoreRun(events).total);
+    if (event.t === 'gift') hud.showReward(POINTS.gift);
+    if (event.t === 'incident') hud.showPenalty(POINTS.incident);
+  },
+  debug,
+};
+
+function stage(): StageSpec { return STAGES[index]!; }
+
+function banner(title: string, note: string): void {
+  pausePill.firstChild!.textContent = `${title} `;
+  pauseNote.textContent = note;
+  pausePill.hidden = false;
+}
+
+function hideBanner(): void { pausePill.hidden = true; }
+
+// ---- input -------------------------------------------------------------
+
+/**
+ * Two recognisers, because the levels genuinely want different gestures:
+ * levels 1 and 3 take lane swipes and taps, level 2 takes four directions for
+ * its rope. Only the one belonging to the mounted level is attached, so a
+ * gesture can never reach a level that is not on screen.
+ */
+const laneInput = new InputRecogniser(surface);
+const swingInput = new SkylineSwipeInput(surface);
+
+laneInput.onGesture((g) => {
+  if (switching || lifecycle.isPaused) {
+    if (g.type === 'tap' || g.type === 'pauseToggle') resume();
+    return;
+  }
+  const level = current;
+  switch (g.type) {
+    case 'swipe':
+      if (level instanceof RouteLevel) level.swipe(g.dir);
+      else if (level instanceof BossLevel) level.swipe(g.dir);
+      break;
+    case 'tap':
+      if (level instanceof BossLevel) level.fire();
+      break;
+    case 'pauseToggle':
+      lifecycle.pause('user');
+      break;
+    case 'restart':
+      void restartCampaign();
+      break;
+    default:
+      break;
+  }
+});
+
+swingInput.onGesture((g) => {
+  if (switching) return;
+  if (lifecycle.isPaused) { resume(); return; }
+  const level = current;
+  if (!(level instanceof SkylineLevel)) return;
+  if (g.type === 'swipe') { level.swipe(g.direction); level.update(0); level.render(); }
+  else if (g.type === 'restart') void restartCampaign();
+  else lifecycle.pause('user');
+});
+
+function useInputFor(id: 1 | 2 | 3): void {
+  laneInput.detach();
+  swingInput.detach();
+  if (id === 2) swingInput.attach();
+  else laneInput.attach();
+}
+
+// ---- lifecycle ---------------------------------------------------------
+
+const lifecycle = new Lifecycle({
+  onPause: () => {
+    loop.stop();
+    laneInput.clearHeld();
+    swingInput.clear();
+    if (!campaignOver) banner('Paused', 'Tap or press P to resume');
+  },
+  onResumeRequested: () => {
+    if (!campaignOver) banner('Paused', 'Tap or press P to resume');
+  },
+  onOrientation: (isLandscape) => { rotatePrompt.hidden = !isLandscape; },
+});
+lifecycle.attach();
+
+function resume(): void {
+  for (const reason of lifecycle.pauseReasons) lifecycle.clear(reason);
+  if (lifecycle.isPaused) return;
+  hideBanner();
+  if (!campaignOver && !switching) loop.start();
+}
+
+pauseBtn.addEventListener('click', () => {
+  pauseBtn.blur();
+  if (lifecycle.isPaused) resume();
+  else lifecycle.pause('user');
+});
+
+// ---- the loop ----------------------------------------------------------
+
+const loop = new FixedLoop({
+  update(step) {
+    if (switching || !current) return;
+    current.update(step);
+    if (current.result !== null) void finishLevel(current.result);
+  },
+  render(alpha) {
+    current?.render(alpha);
+    if (current instanceof BossLevel) showBossReadout(current);
+  },
+});
+
+/**
+ * The boss fight's HP and cooldown readouts.
+ *
+ * Deliberately plain text for now. Level 3's standalone page has the designed
+ * bars; giving the campaign the same component means lifting them out of
+ * `level3.css` into a shared HUD, which is the next slice of work rather than
+ * something to half-do here.
+ */
+function showBossReadout(level: BossLevel): void {
+  const s = level.snapshot;
+  bossReadout.hidden = false;
+  bossReadout.textContent = s.state === 'practice'
+    ? 'Practice · swipe to move, tap to fire'
+    : `Matthew ${s.playerHp}/5 · Aurora ${s.bossHp}/100 · ${s.gun.jammed ? 'JAMMED' : s.gun.ready ? 'ready' : 'charging'}`;
+}
+
+// ---- sequencing --------------------------------------------------------
+
+async function mountStage(): Promise<void> {
+  switching = true;
+  const spec = stage();
+  stageLabel.textContent = `${spec.id}/3`;
+  bossReadout.hidden = true;
+  banner(spec.title, 'Loading…');
+
+  const level = spec.make();
+  await level.mount(ctx);
+  current = level;
+
+  // The boss fight opens in its protected practice state; in the campaign
+  // nobody is there to press a button, so it starts as soon as it is shown.
+  if (level instanceof BossLevel) level.startFight();
+
+  useInputFor(spec.id);
+  hideBanner();
+  switching = false;
+  if (!lifecycle.isPaused) loop.start();
+}
+
+async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
+  if (switching) return;
+  switching = true;
+  loop.stop();
+
+  const beaten = result === 'defeated';
+  const last = index >= STAGES.length - 1;
+  if (beaten || last) return endCampaign(result);
+
+  current?.dispose();
+  current = null;
+  index++;
+  await mountStage();
+}
+
+function endCampaign(result: 'complete' | 'defeated'): void {
+  campaignOver = true;
+  switching = false;
+  loop.stop();
+  laneInput.detach();
+  swingInput.detach();
+  const total = scoreRun(events).total;
+  banner(
+    result === 'complete' ? 'Cake recovered!' : 'Aurora escaped',
+    `Score ${total}  ·  press R to play again`,
+  );
+  // Keep drawing the ending; the simulation is finished but the scene is not.
+  loop.start();
+}
+
+async function restartCampaign(): Promise<void> {
+  current?.dispose();
+  current = null;
+  events = [];
+  campaignOver = false;
+  index = startIndex();
+  hud.reset();
+  await mountStage();
+}
+
+function startIndex(): number {
+  if (jumpTo >= 1 && jumpTo <= 3) return jumpTo - 1;
+  return 0;
+}
+
+/*
+ * Review hook, `?debug` only.
+ *
+ * The thing worth checking automatically is that three levels mount and unmount
+ * in sequence on one renderer without leaking a context or an error — which
+ * takes minutes to reach by playing. Only levels 1 and 2 can be skipped; the
+ * boss fight has no cheat, so nothing here can hand itself a victory.
+ */
+if (debug) {
+  Object.assign(window, { __campaign: {
+    get stage() { return stage().id; },
+    get score() { return scoreRun(events).total; },
+    get events() { return [...events]; },
+    get switching() { return switching; },
+    get over() { return campaignOver; },
+    get contexts() { return host.renderer.info.memory; },
+    skip(): boolean {
+      if (current instanceof RouteLevel) { current.fastForward(Number.MAX_SAFE_INTEGER); return true; }
+      if (current instanceof SkylineLevel) { current.fastForward(600); return true; }
+      return false;
+    },
+  } });
+}
+
+// ---- boot --------------------------------------------------------------
+
+hud.reset();
+index = startIndex();
+if (jumpTo >= 1 && jumpTo <= 3) {
+  console.info(`[dev] jumped to level ${jumpTo}; this run is not a campaign result`);
+}
+void mountStage();
