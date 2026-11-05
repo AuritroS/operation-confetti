@@ -9,7 +9,7 @@
  * postprocessing, and particle counts capped. Confetti and sparkle are
  * decorative and never participate in collision (§11).
  */
-import { PALETTE, ROLE } from './palette';
+import { ROLE } from './palette';
 import {
   AdditiveBlending,
   Vector3,
@@ -36,7 +36,8 @@ import {
  * art. Blue is Matthew's and means take it; magenta is Aurora's and means
  * avoid it — her magic, her orbs, her guards' searchlights.
  */
-export const SPARKLE_BLUE = ROLE.collectible;
+/** Kept named for the role, not the hue, so recolouring needs no rename. */
+export const SPARKLE_COLLECTIBLE = ROLE.collectible;
 export const HAZARD_RED = ROLE.hazard;
 
 let sharedDot: Texture | null = null;
@@ -69,10 +70,18 @@ export function dotTexture(): Texture {
 let sharedGlow: Texture | null = null;
 
 /**
- * Radiant electric neon glow texture for collectible aura halos.
+ * The reward glow: a white core falling off through gold.
  *
- * Multi-tier electric gradient: pure white/ice core transitioning through
- * saturated cyan neon to transparent additive falloff.
+ * It used to run white into saturated cyan, which put the one thing the
+ * player is meant to chase in a colour that belongs to nothing else in the
+ * game. `palette.ts` reserves gold for Matthew — "gold is his" — and the
+ * score, his trim and his cannon already use it, so a gold aura reads as
+ * *his* to collect. It also clears cyan out of gameplay signalling
+ * altogether, leaving magenta for hazards and teal for the boss's one
+ * opening, which is the whole vocabulary.
+ *
+ * Flat gold is trim; glowing gold is a reward. The glow is the signal, not
+ * the hue on its own.
  */
 export function glowTexture(): Texture {
   if (sharedGlow) return sharedGlow;
@@ -85,11 +94,11 @@ export function glowTexture(): Texture {
     const center = size / 2;
     const g = ctx.createRadialGradient(center, center, 0, center, center, center);
     g.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
-    g.addColorStop(0.12, 'rgba(235, 250, 255, 0.95)');
-    g.addColorStop(0.32, 'rgba(83, 166, 249, 0.82)');
-    g.addColorStop(0.55, 'rgba(70, 150, 255, 0.38)');
-    g.addColorStop(0.80, 'rgba(50, 120, 250, 0.09)');
-    g.addColorStop(1.0, 'rgba(50, 120, 250, 0.0)');
+    g.addColorStop(0.12, 'rgba(255, 246, 214, 0.95)');
+    g.addColorStop(0.32, 'rgba(234, 172, 91, 0.86)');
+    g.addColorStop(0.55, 'rgba(242, 158, 89, 0.40)');
+    g.addColorStop(0.80, 'rgba(226, 136, 56, 0.10)');
+    g.addColorStop(1.0, 'rgba(226, 136, 56, 0.0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
   }
@@ -191,7 +200,7 @@ export class GiftGlowField {
     options: GiftGlowOptions = {},
   ) {
     this.baseSize = options.size ?? 1.6;
-    const color = new Color(options.color ?? PALETTE.cyan);
+    const color = new Color(options.color ?? ROLE.collectible);
     const geometry = crossedQuads(this.baseSize);
     const material = new MeshBasicMaterial({
       color,
@@ -351,7 +360,7 @@ export class Sparkle {
       radius: options.radius ?? 0.42,
       rise: options.rise ?? 0.5,
       size: options.size ?? 0.16,
-      color: options.color ?? SPARKLE_BLUE,
+      color: options.color ?? SPARKLE_COLLECTIBLE,
       speed: options.speed ?? 1,
       attenuate: options.attenuate ?? true,
     };
@@ -450,7 +459,7 @@ export class SparkleField {
     this.points = new Points(
       geometry,
       new PointsMaterial({
-        color: new Color(options.color ?? SPARKLE_BLUE),
+        color: new Color(options.color ?? SPARKLE_COLLECTIBLE),
         size: options.size ?? 0.15,
         map: dotTexture(),
         transparent: true,

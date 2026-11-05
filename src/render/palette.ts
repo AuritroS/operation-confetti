@@ -27,9 +27,21 @@ export const PALETTE = {
   navy: 0x12368f,
   /** Lane dividers, UI accent. */
   blue: 0x234ca8,
-  /** Collectible sparkle. The "take it" signal. */
+  /**
+   * A cool accent, and Matthew's lighter blue.
+   *
+   * No longer the collectible signal: a reward in cool blue sat in a colour
+   * nothing else in the game used, while gold — which `buildCnTower`'s trim,
+   * the score and the cannon all use — was right there. Rewards glow gold.
+   */
   blueLight: 0x6295e1,
-  /** All trim, the grapple cable, the mask emblem, confetti. */
+  /**
+   * All trim, the grapple cable, the mask emblem, confetti — and the reward
+   * glow. The "take it" signal.
+   *
+   * Flat gold is trim; glowing gold is something to collect. The glow carries
+   * the meaning, so the two never compete.
+   */
   gold: 0xeaac5b,
   /** Aurora's robe. From aurora.png. */
   purpleDeep: 0x5c175c,
@@ -75,7 +87,13 @@ export function hex(key: PaletteKey): string {
  * naming a hue. Changing the language then means editing one line here.
  */
 export const ROLE = {
-  collectible: PALETTE.blueLight,
+  /**
+   * Rewards glow gold, not blue.
+   *
+   * This one line is the switch: every collectible aura and sparkle reads it,
+   * so the "take it" signal cannot drift apart between levels again.
+   */
+  collectible: PALETTE.gold,
   hazard: PALETTE.magenta,
   auroraMagic: PALETTE.magenta,
   trim: PALETTE.gold,
@@ -84,6 +102,10 @@ export const ROLE = {
   ground: PALETTE.slate,
   laneDivider: PALETTE.slateLine,
   windowLight: PALETTE.orangeWarm,
+  /**
+   * A cool architectural accent — the tower's SkyPod band. Never a gameplay
+   * signal: rewards are gold, hazards magenta, the boss's opening teal.
+   */
   neon: PALETTE.cyan,
   guardArmour: PALETTE.steel,
   guardTrim: PALETTE.magenta,
