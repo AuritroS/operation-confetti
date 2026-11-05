@@ -7,48 +7,16 @@
  * changes a decision mid-run. No timer is ever displayed, which the doc does
  * require.
  */
-const GIFT_ICON_SVG = '<svg viewBox="0 0 24 24" class="hud__gift-icon"><path class="hud__gift-bow" d="M12 7c-1.5-2.2-4.5-2-4.5.5 0 2 3.5 2.5 4.5 2.5m0-3c1.5-2.2 4.5-2 4.5.5 0 2-3.5 2.5-4.5 2.5" /><rect class="hud__gift-lid" x="3" y="7" width="18" height="4" rx="1" /><rect class="hud__gift-box" x="4.5" y="11" width="15" height="10" rx="1" /><line class="hud__gift-ribbon" x1="12" y1="7" x2="12" y2="21" /></svg>';
-
 export class Hud {
   private readonly score = document.getElementById('hud-score') as HTMLElement | null;
   private readonly delta = document.getElementById('hud-delta') as HTMLElement | null;
   private readonly vignette = document.getElementById('vignette') as HTMLElement | null;
-  private readonly giftsContainer = document.getElementById('hud-gifts') as HTMLElement | null;
-  private readonly giftSlots: HTMLElement[] = [];
   private shown = -1;
-  private giftsCollected = 0;
-
-  constructor() {
-    this.initGiftSlots();
-  }
-
-  private initGiftSlots(): void {
-    if (!this.giftsContainer) return;
-    this.giftsContainer.innerHTML = '';
-    for (let i = 0; i < 4; i++) {
-      const slot = document.createElement('span');
-      slot.className = 'hud__gift-slot';
-      slot.dataset['slot'] = String(i);
-      slot.innerHTML = GIFT_ICON_SVG;
-      this.giftsContainer.appendChild(slot);
-      this.giftSlots.push(slot);
-    }
-  }
 
   setScore(points: number): void {
     if (points === this.shown) return;
     this.shown = points;
     if (this.score) this.score.textContent = String(points);
-  }
-
-  setGifts(count: number): void {
-    this.giftsCollected = Math.max(0, Math.min(4, count));
-    for (let i = 0; i < this.giftSlots.length; i++) {
-      const slot = this.giftSlots[i];
-      if (slot) {
-        slot.classList.toggle('collected', i < this.giftsCollected);
-      }
-    }
   }
 
   showDelta(points: number): void {
@@ -78,7 +46,6 @@ export class Hud {
   reset(): void {
     this.shown = -1;
     this.setScore(0);
-    this.setGifts(0);
     if (this.delta) this.delta.hidden = true;
     if (this.vignette) this.vignette.hidden = true;
   }

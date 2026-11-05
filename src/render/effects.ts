@@ -9,7 +9,7 @@
  * postprocessing, and particle counts capped. Confetti and sparkle are
  * decorative and never participate in collision (§11).
  */
-import { ROLE } from './palette';
+import { PALETTE, ROLE } from './palette';
 import {
   AdditiveBlending,
   Vector3,
@@ -20,6 +20,8 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   Group,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   Points,
@@ -60,6 +62,158 @@ export function dotTexture(): Texture {
   }
   sharedDot = new CanvasTexture(canvas);
   return sharedDot;
+}
+
+let sharedGlow: Texture | null = null;
+
+/**
+ * Soft radial glow texture for collectible aura halos.
+ *
+ * Warm golden gradient that falls off smoothly to complete transparency,
+ * avoiding point-size artifacts on high-DPI displays.
+ */
+export function glowTexture(): Texture {
+  if (sharedGlow) return sharedGlow;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const center = size / 2;
+    const g = ctx.createRadialGradient(center, center, 0, center, center, center);
+    g.addColorStop(0.0, 'rgba(255, 255, 235, 1.0)');
+    g.addColorStop(0.2, 'rgba(255, 215, 80, 0.85)');
+    g.addColorStop(0.45, 'rgba(255, 185, 45, 0.35)');
+    g.addColorStop(0.75, 'rgba(255, 140, 20, 0.08)');
+    g.addColorStop(1.0, 'rgba(255, 120, 0, 0.0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  sharedGlow = new CanvasTexture(canvas);
+  return sharedGlow;
+}
+
+function crossedQuads(size: number): BufferGeometry {
+  const h = size / 2;
+  const geom = new BufferGeometry();
+  const positions = new Float32Array([
+    // Quad 1: XY (facing Z)
+    -h, -h, 0,
+     h, -h, 0,
+     h,  h, 0,
+    -h,  h, 0,
+    // Quad 2: YZ (facing X)
+    0, -h, -h,
+    0, -h,  h,
+    0,  h,  h,
+    0,  h, -h,
+    // Quad 3: XZ (horizontal halo)
+    -h, 0, -h,
+     h, 0, -h,
+     h, 0,  h,
+    -h, 0,  h,
+  ]);
+  const uvs = new Float32Array([
+    0, 0,  1, 0,  1, 1,  0, 1,
+    0, 0,  1, 0,  1, 1,  0, 1,
+    0, 0,  1, 0,  1, 1,  0, 1,
+  ]);
+  const indices = [
+    0, 1, 2,  0, 2, 3,
+    4, 5, 6,  4, 6, 7,
+    8, 9, 10, 8, 10, 11,
+  ];
+  geom.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geom.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
+  return geom;
+}
+
+export interface GiftGlowOptions {
+  size?: number;
+  color?: number;
+}
+
+/**
+ * Standardized collectible gift aura glow.
+ *
+ * Renders all active collectible gift auras in a single draw call with crossed
+ * quads and soft additive falloff. Replaces noisy sparkle particles with a clean,
+ * breathing golden aura.
+ */
+export class GiftGlowField {
+  readonly group = new Group();
+  private readonly mesh: InstancedMesh;
+  private readonly matrix = new Matrix4();
+  private readonly dummy = new Group();
+  private readonly anchors: Vector3[] = [];
+  private active = 0;
+  private time = 0;
+  private readonly baseSize: number;
+
+  constructor(
+    readonly maxAnchors: number,
+    options: GiftGlowOptions = {},
+  ) {
+    this.baseSize = options.size ?? 1.6;
+    const geometry = crossedQuads(this.baseSize);
+    const material = new MeshBasicMaterial({
+      color: new Color(options.color ?? PALETTE.gold),
+      map: glowTexture(),
+      transparent: true,
+      opacity: 0.85,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+
+    this.mesh = new InstancedMesh(geometry, material, Math.max(1, maxAnchors));
+    this.mesh.frustumCulled = false;
+    this.group.add(this.mesh);
+
+    for (let i = 0; i < maxAnchors; i++) {
+      this.anchors.push(new Vector3());
+      this.matrix.makeTranslation(0, -9999, 0);
+      this.mesh.setMatrixAt(i, this.matrix);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  setAnchors(positions: readonly Vector3[]): void {
+    this.active = Math.min(positions.length, this.maxAnchors);
+    for (let i = 0; i < this.active; i++) {
+      const p = positions[i];
+      if (p) this.anchors[i]?.copy(p);
+    }
+  }
+
+  update(step: number): void {
+    this.time += step;
+    const pulse = 1.0 + Math.sin(this.time * 2.8) * 0.08;
+    const spin = this.time * 0.8;
+
+    for (let i = 0; i < this.maxAnchors; i++) {
+      if (i < this.active) {
+        const a = this.anchors[i]!;
+        this.dummy.position.copy(a);
+        this.dummy.rotation.set(0, spin + i * 0.7, 0);
+        this.dummy.scale.setScalar(pulse);
+        this.dummy.updateMatrix();
+        this.mesh.setMatrixAt(i, this.dummy.matrix);
+      } else {
+        this.matrix.makeTranslation(0, -9999, 0);
+        this.mesh.setMatrixAt(i, this.matrix);
+      }
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshBasicMaterial).dispose();
+    this.group.removeFromParent();
+  }
 }
 
 // ------------------------------------------------------------- sparkle ----

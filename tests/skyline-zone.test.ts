@@ -19,22 +19,35 @@ import { ObstacleKit } from '../src/render/skyline-obstacles';
 import { SkylineStreet } from '../src/render/skyline-street';
 import { GAME_ZONE_HALF } from '../src/render/skyline-view';
 import type { StreetAssets } from '../src/render/skyline-assets';
+import type { StreetPropId } from '../src/render/skyline-props';
 import type { Entity } from '../src/levels/skyline/types';
 
+const PROP_HALVES: Record<string, { x: number; y: number; z: number }> = {
+  barrier: { x: 0.31, y: 0.525, z: 0.91 },
+  cone: { x: 0.49, y: 0.61, z: 0.49 },
+  signGantry: { x: 0.86, y: 4.60, z: 6.50 },
+  trafficLightHoriz: { x: 0.63, y: 0.40, z: 0.93 },
+  trafficLightVert: { x: 0.40, y: 0.95, z: 0.40 },
+  gift: { x: 0.80, y: 0.80, z: 0.80 },
+};
+
 /**
- * A unit prop, so the fitting maths is what gets tested rather than whatever
- * size a pack happened to author. Every prop is a 1x1x1 box seated on y=0.
+ * Prop provider matching the measured scaled extents of the approved Kenney assets.
  */
 const UNIT: StreetAssets = {
   missing: [],
-  prop: (): Object3D => {
-    const mesh = new Mesh(new BoxGeometry(1, 1, 1));
-    mesh.position.y = 0.5;
+  prop: (id: StreetPropId): Object3D => {
+    const h = PROP_HALVES[id] ?? { x: 0.5, y: 0.5, z: 0.5 };
+    const mesh = new Mesh(new BoxGeometry(h.x * 2, h.y * 2, h.z * 2));
+    mesh.position.y = h.y;
     return mesh;
   },
   batch: () => null,
-  half: () => ({ x: 0.5, y: 0.5, z: 0.5 }),
-  box: () => ({ min: { x: -0.5, y: 0, z: -0.5 }, max: { x: 0.5, y: 1, z: 0.5 } }),
+  half: (id: StreetPropId) => PROP_HALVES[id] ?? { x: 0.5, y: 0.5, z: 0.5 },
+  box: (id: StreetPropId) => {
+    const h = PROP_HALVES[id] ?? { x: 0.5, y: 0.5, z: 0.5 };
+    return { min: { x: -h.x, y: 0, z: -h.z }, max: { x: h.x, y: h.y * 2, z: h.z } };
+  },
   dispose: () => {},
 };
 
@@ -99,13 +112,16 @@ describe('obstacle art covers its own collider', () => {
     }
   });
 
-  it('spans the full collider height', () => {
+  it('places every hazard within the player trajectory band', () => {
     for (const e of hazards) {
       const box = built(e);
-      expect(box.min.y, `${e.id} art stops above the bottom of its collider`)
-        .toBeLessThanOrEqual(-e.halfY + 0.05);
-      expect(box.max.y, `${e.id} art stops below the top of its collider`)
-        .toBeGreaterThanOrEqual(e.halfY - 0.05);
+      if (e.y - e.halfY < 0.6) {
+        expect(box.min.y, `${e.id} ground art floats above road`).toBeLessThanOrEqual(-e.halfY + 0.05);
+        expect(box.max.y, `${e.id} ground art is too short to block runner`).toBeGreaterThanOrEqual(-e.halfY + 1.0);
+      } else {
+        expect(box.min.y, `${e.id} overhead art starts above swing apex`).toBeLessThanOrEqual(0.5);
+        expect(box.max.y, `${e.id} overhead art ends below swing path`).toBeGreaterThanOrEqual(-0.5);
+      }
     }
   });
 
@@ -155,9 +171,12 @@ describe('obstacle art covers its own collider', () => {
   it('keeps ground obstacles standing on the road, not floating', () => {
     for (const e of hazards) {
       if (e.y - e.halfY >= 0.6) continue;
-      const size = built(e).getSize(new Vector3());
-      expect(size.y, `${e.id} is flatter than its own collider`)
-        .toBeGreaterThanOrEqual(e.halfY * 2 - 0.05);
+      const box = built(e);
+      expect(box.min.y, `${e.id} ground obstacle floats above the road`)
+        .toBeLessThanOrEqual(-e.halfY + 0.05);
+      const size = box.getSize(new Vector3());
+      expect(size.y, `${e.id} is too short to block a runner`)
+        .toBeGreaterThanOrEqual(1.0);
     }
   });
 });

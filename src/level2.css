@@ -1,25 +1,5 @@
-.skyline-heading { position: absolute; z-index: 20; top: calc(var(--safe-t) + 76px); left: 20px; pointer-events: none; }
-.skyline-heading small { color: var(--ink-dim); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
-.skyline-heading strong { display: block; font-size: 20px; margin-top: 3px; }
-.skyline-instruction { position: absolute; z-index: 20; bottom: calc(var(--safe-b) + 106px); left: 12px; right: 12px; text-align: center; pointer-events: none; text-shadow: 0 2px 8px #080d19; }
-.skyline-instruction strong { display: block; font-size: 17px; }
-.skyline-instruction small { display: block; margin-top: 5px; color: var(--ink-dim); font-size: 11px; }
-.skyline-lanes { position: absolute; z-index: 25; left: 0; right: 0; bottom: calc(var(--safe-b) + 18px); display: grid; grid-template-columns: repeat(3, 1fr); pointer-events: none; text-align: center; }
-.skyline-lanes > span { margin: 0 7px; padding: 9px 4px; border: 1px solid #57769388; border-radius: 14px; color: #a1bdcc; background: #101f33e8; font-size: 12px; }
-.skyline-lanes .selected { color: #ffdda1; border-color: #ffcd78; background: #453626e8; box-shadow: 0 0 20px #ffcd7810; }
-.skyline-modes { position: absolute; z-index: 20; bottom: calc(var(--safe-b) + 66px); width: 100%; display: flex; justify-content: center; gap: 10px; pointer-events: none; font-size: 12px; color: #849bb3; }
-.skyline-modes span { padding: 4px 12px; background: #101f33dd; border-radius: 20px; border: 1px solid #57769355; }
-.skyline-modes .selected { color: #9cf7ff; border-color: #9cf7ff; }
-.skyline-divisions { position: absolute; inset: 0; pointer-events: none; z-index: 10; opacity: .6; transition: opacity .8s; }
-.skyline-divisions.started { opacity: .2; }
-.skyline-divisions i { position: absolute; top: 30%; bottom: 0; width: 1px; background: linear-gradient(transparent, #9ab6cf88); }
-.skyline-divisions i:first-child { left: 33.333%; }
-.skyline-divisions i:last-child { left: 66.666%; }
 [data-level='2'] #btn-replay { width: 66px; border-radius: 20px; letter-spacing: 0; }
 [data-level='2'] #btn-pause { margin-left: 0; }
-[data-level='2'] .hint { bottom: calc(var(--safe-b) + 154px); }
-[data-level='2'] .debug { bottom: calc(var(--safe-b) + 185px); max-height: 40vh; overflow: hidden; }
-@media (prefers-reduced-motion: reduce) { .skyline-divisions { transition: none; } }
 
 /* ?inspect labels. Review-only; never present in a normal session. */
 .inspect-labels { position: fixed; inset: 0; z-index: 40; pointer-events: none; font: 11px var(--font-mono, ui-monospace, monospace); }
@@ -30,8 +10,3 @@
 
 /* ?inspect unlocks the portrait letterbox so the contact sheet fills the window. */
 body[data-inspect='on'] #app { width: 100vw !important; }
-body[data-inspect='on'] .skyline-heading,
-body[data-inspect='on'] .skyline-instruction,
-body[data-inspect='on'] .skyline-lanes,
-body[data-inspect='on'] .skyline-modes,
-body[data-inspect='on'] .skyline-divisions { display: none; }

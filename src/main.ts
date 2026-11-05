@@ -13,7 +13,7 @@
 import { Group } from 'three';
 import { FixedLoop, STEP_S } from './core/loop';
 import { InputRecogniser } from './core/input';
-import { isTouchDevice, Lifecycle } from './core/lifecycle';
+import { Lifecycle } from './core/lifecycle';
 import { POINTS, scoreRun, type RunEvent } from './core/scoring';
 import { LevelRunner } from './levels/runner';
 import { LEVEL_1 } from './levels/level1';
@@ -118,7 +118,6 @@ function onEvent(event: RunEvent): void {
   hud.setScore(run.score);
   if (event.t === 'gift') {
     hud.showReward(POINTS.gift);
-    hud.setGifts(runner.snapshot.giftsCollected + 1);
   }
 }
 
@@ -317,10 +316,11 @@ pauseBtn.addEventListener('click', () => {
 // ---- boot --------------------------------------------------------------
 
 hud.reset();
-// ?clean hides the debug panel, so a review screenshot shows only what a
-// player sees. The panel otherwise overlaps the character.
+debug.setVisible(false);
+const hint = document.getElementById('hint');
+if (hint) hint.hidden = true;
+
 const params = new URLSearchParams(location.search);
-debug.setVisible(!params.has('clean'));
 
 /**
  * `?start=400` fast-forwards the run before play begins.
@@ -340,9 +340,6 @@ if (skipTo > 0) {
   }
   console.info(`[dev] skipped to ${runner.snapshot.travelled.toFixed(0)} units`);
 }
-
-const hint = document.getElementById('hint');
-if (hint) hint.hidden = isTouchDevice();
 
 loop.start();
 

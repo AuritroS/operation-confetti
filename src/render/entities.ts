@@ -33,7 +33,7 @@ import {
 import type { LevelConfig } from '../levels/types';
 import type { TrackedEntity } from '../levels/runner';
 import { PALETTE, ROLE } from './palette';
-import { Searchlight, SparkleField } from './effects';
+import { GiftGlowField, Searchlight } from './effects';
 import type { PropId } from './environment/props';
 
 /** Beyond this an entity is not drawn; fog hides it anyway. */
@@ -87,7 +87,7 @@ export class EntityVisuals {
   private readonly collected = new Map<string, number>();
   /** Authored scale per object, so a pop multiplies rather than replaces it. */
   private readonly baseScale = new Map<string, number>();
-  private readonly sparkle: SparkleField;
+  readonly giftGlow: GiftGlowField;
   private readonly matrix = new Matrix4();
   private readonly scratch = new Vector3();
   private readonly anchors: Vector3[] = [];
@@ -122,29 +122,12 @@ export class EntityVisuals {
     this.lasers.count = 0;
     this.group.add(this.lasers);
 
-    // One sparkle system for every gift plus every laser.
-    /**
-     * Gold, denser than before, and strictly for collectibles.
-     *
-     * The collectible was blue on a navy world — camouflage by hue, even
-     * though its luminance was fine. Gold is the brightest value in the
-     * palette, is already Matthew's trim, and leaves magenta as the only
-     * hazard colour, so the language reduces to: gold take it, magenta
-     * avoid it. Eight small particles also read as nothing much; fourteen
-     * larger ones read as a shimmer.
-     *
-     * Hazards deliberately get none. Feeding them into the same field tinted
-     * every laser and fence gold, which directly contradicts the one rule
-     * the colour language rests on — and they are emissive magenta already,
-     * so they never needed it.
-     */
-    this.sparkle = new SparkleField(tracked.length, {
-      count: 14,
-      radius: 0.44,
-      size: 0.18,
+    // One collectible glow aura batch for all gifts.
+    this.giftGlow = new GiftGlowField(tracked.length, {
+      size: 1.6,
       color: PALETTE.gold,
     });
-    this.group.add(this.sparkle.points);
+    this.group.add(this.giftGlow.group);
 
     let nextBar = 0;
     for (const t of tracked) {
@@ -273,8 +256,8 @@ export class EntityVisuals {
     this.lasers.count = bars;
     this.lasers.instanceMatrix.needsUpdate = true;
     this.driveSpotlights(spotlights, step);
-    this.sparkle.setAnchors(this.anchors);
-    this.sparkle.update(step);
+    this.giftGlow.setAnchors(this.anchors);
+    this.giftGlow.update(step);
   }
 
   /** Write one hazard's bars into the shared batch. Returns how many. */
@@ -368,7 +351,7 @@ export class EntityVisuals {
     this.lasers.geometry.dispose();
     (this.lasers.material as MeshBasicMaterial).dispose();
     this.lasers.removeFromParent();
-    this.sparkle.dispose();
+    this.giftGlow.dispose();
     this.group.removeFromParent();
   }
 }

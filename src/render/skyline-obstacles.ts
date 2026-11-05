@@ -26,11 +26,11 @@
  * correctness for.
  */
 import {
-  Box3,
+  BoxGeometry,
   BufferGeometry,
   Group,
   Mesh,
-  Vector3,
+  MeshBasicMaterial,
   type Material,
   type Object3D,
 } from 'three';
@@ -130,15 +130,27 @@ export class ObstacleKit {
   /**
    * Street-level blockage.
    *
-   * Barriers carry the width because they are the only prop in the pack that
-   * tiles edge to edge without a visible seam; cones sit in front as the
-   * read-at-distance cue, which is what a cone is for.
+   * Barriers carry the width because they tile cleanly without seams.
+   * Scaled uniformly with 1:1:1 aspect ratio to avoid any warping.
+   * Cones sit in front on the road as the read-at-distance cue.
    */
   private ground(group: Group, e: Entity, span: boolean): void {
     const width = e.halfX * 2;
-    this.tile(group, 'barrier', width, -e.halfY, e.halfZ * 0.2, BLOCKING_TURN, e.halfY * 2);
-    // Cones in front, spaced from the width so a lane blocker gets two and
-    // the full-street wall gets five.
+    const half = this.assets.half('barrier');
+    const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
+    const count = span ? Math.max(1, Math.round(width / across)) : 1;
+    // Uniform scale factor so barriers fit the lane or span without distortion
+    const uniformScale = span ? width / (count * across) : width / across;
+
+    for (let i = 0; i < count; i++) {
+      const x = count > 1 ? (i + 0.5) / count * width - width / 2 : 0;
+      const prop = this.one(group, 'barrier', x, -e.halfY, e.halfZ * 0.2, BLOCKING_TURN);
+      if (prop && uniformScale !== 1) {
+        prop.scale.setScalar(uniformScale);
+      }
+    }
+
+    // Cones in front on the road surface
     const cones = span ? 5 : 2;
     for (let i = 0; i < cones; i++) {
       const t = (i + 0.5) / cones;
@@ -151,27 +163,35 @@ export class ObstacleKit {
    *
    * The full-street form is the highway gantry (`signGantry`), whose upright posts
    * stand on the kerbs outside the lanes and whose wide crossbeam spans all 3 lanes.
-   * The single-lane form is a suspended traffic signal head (`trafficLightHoriz` or
-   * `trafficLightVert`) dropped from the overhead streetcar cable line.
+   * The single-lane form is a suspended horizontal traffic signal head (`trafficLightHoriz`)
+   * dropped from the overhead streetcar cable line.
    */
   private overhead(group: Group, e: Entity, span: boolean): void {
-    const clearance = e.y - e.halfY;
     if (span) {
-      this.tile(group, 'signGantry', e.halfX * 2, -e.halfY, 0, BLOCKING_TURN, e.halfY * 2, e.halfZ * 2);
-      for (const side of [-1, 1]) {
-        const leg = this.one(group, 'trafficLightVert', side * 6.2, -e.halfY, 0);
-        if (leg) this.stretch(leg, 0.4, clearance, 0.4, 'down');
-      }
+      // Highway Gantry: wide truss crossbeam spanning all 3 lanes, upright posts on kerbs.
+      // Seated on the road surface (-e.y) so the upright posts stand firmly on the pavements.
+      this.one(group, 'signGantry', 0, -e.y, 0, BLOCKING_TURN);
       return;
     }
-    // Single lane: horizontal traffic light head spanning the lane's collider box,
-    // plus a vertical hanger carrying it up to the overhead cable line.
-    const sign = this.one(group, 'trafficLightHoriz', 0, e.halfY, 0, BLOCKING_TURN);
-    if (sign) this.fit(sign, e.halfX * 2, e.halfY * 2, e.halfZ * 2, 'top');
-    const rise = ANCHOR_HEIGHT - e.y - e.halfY;
+
+    // Single lane: horizontal traffic light head centered in the lane at uniform scale
+    const half = this.assets.half('trafficLightHoriz');
+    const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
+    const sign = this.one(group, 'trafficLightHoriz', 0, 0, 0, BLOCKING_TURN);
+    if (sign) {
+      const uniformScale = (e.halfX * 2) / across;
+      sign.scale.setScalar(uniformScale);
+    }
+
+    // Slender vertical hanger cable connecting the signal head up to the overhead cable line
+    const rise = ANCHOR_HEIGHT - e.y - 0.4;
     if (rise > 0) {
-      const hanger = this.one(group, 'trafficLightVert', 0, e.halfY, 0);
-      if (hanger) this.stretch(hanger, 0.25, rise, 0.25, 'up');
+      const hanger = new Mesh(
+        new BoxGeometry(0.04, rise, 0.04),
+        new MeshBasicMaterial({ color: 0x2e384d }),
+      );
+      hanger.position.set(0, 0.4 + rise / 2, 0);
+      group.add(hanger);
     }
   }
 
@@ -180,10 +200,7 @@ export class ObstacleKit {
    *
    * WRAPPED, not positioned directly. `assets.prop()` returns a clone whose
    * own position already carries the ground-seating correction, so writing
-   * `prop.position` threw that away — and because most pack models happen to
-   * be authored with their base near the origin the error was a fraction of
-   * a unit and invisible, right up until a prop was stretched and the error
-   * scaled with it.
+   * `prop.position` threw that away.
    */
   private one(
     group: Group, id: StreetPropId, x: number, y: number, z: number, turn = 0,
@@ -193,10 +210,6 @@ export class ObstacleKit {
     const holder = new Group();
     holder.position.set(x, y, z);
     if (turn) {
-      // The turn goes on an INNER pivot, so the holder's own scale keeps
-      // meaning world X/Y/Z. Rotating the holder itself would make
-      // `scale.x` stretch along world Z and every fit below would be
-      // silently transposed.
       const pivot = new Group();
       pivot.rotation.y = turn;
       pivot.add(prop);
@@ -206,60 +219,6 @@ export class ObstacleKit {
     }
     group.add(holder);
     return holder;
-  }
-
-  /**
-   * Repeat a prop edge to edge until it covers `width`, then trim the set to
-   * exactly that width so nothing overhangs the collider.
-   */
-  private tile(
-    group: Group,
-    id: StreetPropId,
-    width: number,
-    baseY: number,
-    z: number,
-    turn: number,
-    height?: number,
-    depth?: number,
-  ): void {
-    const half = this.assets.half(id);
-    if (!half) return;
-    // After a quarter turn the prop's Z extent is what lies across the path
-    // and its X extent is what reaches into it. Getting this the wrong way
-    // round scales the piece along the axis it is not spanning.
-    const across = Math.max((turn ? half.z : half.x) * 2, 0.01);
-    const into = Math.max((turn ? half.x : half.z) * 2, 0.01);
-    const count = Math.max(1, Math.ceil(width / across));
-    const step = width / count;
-    for (let i = 0; i < count; i++) {
-      const prop = this.one(group, id, (i + 0.5) / count * width - width / 2, baseY, z, turn);
-      if (!prop) continue;
-      // Squeeze laterally so `count` copies land exactly on `width`, and
-      // stretch vertically when the collider is taller than the prop.
-      prop.scale.x *= step / across;
-      if (height) prop.scale.y *= height / Math.max(half.y * 2, 0.01);
-      if (depth) prop.scale.z *= depth / into;
-    }
-  }
-
-  /** Scale a prop to exactly fill a box, anchored at its top or bottom. */
-  private fit(prop: Object3D, w: number, h: number, d: number, anchor: 'top' | 'bottom'): void {
-    prop.updateMatrixWorld(true);
-    const size = new Box3().setFromObject(prop).getSize(new Vector3());
-    prop.scale.set(
-      (prop.scale.x * w) / Math.max(size.x, 0.01),
-      (prop.scale.y * h) / Math.max(size.y, 0.01),
-      (prop.scale.z * d) / Math.max(size.z, 0.01),
-    );
-    prop.position.y -= anchor === 'top' ? h : 0;
-  }
-
-  /** Stretch a prop along one axis, growing from its seated end. */
-  private stretch(prop: Object3D, x: number, y: number, z: number, from: 'down' | 'up'): void {
-    prop.updateMatrixWorld(true);
-    const size = new Box3().setFromObject(prop).getSize(new Vector3());
-    prop.scale.set(prop.scale.x * x, (prop.scale.y * y) / Math.max(size.y, 0.01), prop.scale.z * z);
-    if (from === 'down') prop.position.y -= y;
   }
 }
 

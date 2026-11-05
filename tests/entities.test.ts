@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { InstancedMesh, Points } from 'three';
+import { InstancedMesh } from 'three';
 import { LevelRunner } from '../src/levels/runner';
 import { LEVEL_1 } from '../src/levels/level1';
 import { DRAW_DISTANCE, EntityVisuals } from '../src/render/entities';
@@ -37,10 +37,9 @@ describe('gameplay visuals are batched', () => {
     visuals.dispose();
   });
 
-  it('draws every sparkle from a single particle system', () => {
+  it('draws collectible glow from a single shared effect', () => {
     const { visuals } = build();
-    const points = visuals.group.children.filter((c) => c instanceof Points);
-    expect(points, 'one SparkleField for the whole level').toHaveLength(1);
+    expect(visuals.giftGlow, 'one GiftGlowField for the whole level').toBeDefined();
     visuals.dispose();
   });
 

@@ -11,7 +11,7 @@ import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower } from './custom';
-import { SparkleField } from './effects';
+import { GiftGlowField, SparkleField } from './effects';
 import { PALETTE } from './palette';
 import { darken, disposeTree, unfog } from './environment/skyline';
 import type { EnvironmentLayer } from './environment/layer';
@@ -110,8 +110,8 @@ export class SkylineScene {
    * level 1's own language, dropped in the level 2 rebuild and restored
    * here; the rose marker does the same job for a hazard.
    */
-  private giftMarks = new SparkleField(10, {
-    color: PALETTE.gold, count: 8, radius: 0.5, size: 7, attenuate: false,
+  private giftMarks = new GiftGlowField(10, {
+    color: PALETTE.gold, size: 3.2,
   });
   /**
    * Smaller and sparser than the first attempt, which at 11px x 3 read as a
@@ -130,7 +130,7 @@ export class SkylineScene {
     this.hero.visible = visible && !this.rigged;
     if (this.rigged) this.rigged.object.visible = visible;
     this.rope.object.visible = visible && this.rope.currentPhase !== 'idle';
-    this.giftMarks.points.visible = visible;
+    this.giftMarks.group.visible = visible;
     this.hazardMarks.points.visible = visible;
     for (const pool of this.anchorPools) pool.visible = visible;
     for (const group of this.contents.values()) group.visible = visible;
@@ -182,12 +182,9 @@ export class SkylineScene {
     this.trims = new InstancedMesh(this.box, this.windowMat, 500);
     for (const mesh of [this.blocks, this.trims]) { mesh.frustumCulled = false; this.root.add(mesh); }
     this.ground = this.cube(this.root, this.groundMat, 0, -1, -60, 28, 2, 260);
-    for (const field of [this.giftMarks, this.hazardMarks]) {
-      // Backdrop rules do not apply: these are read THROUGH the fog on
-      // purpose, which is the whole point of them.
-      (field.points.material as MeshBasicMaterial).fog = false;
-      this.root.add(field.points);
-    }
+    this.root.add(this.giftMarks.group);
+    (this.hazardMarks.points.material as MeshBasicMaterial).fog = false;
+    this.root.add(this.hazardMarks.points);
     for (const layer of [new SkyLayer({ moon: { x: 24, y: 60, z: -120 } })]) {
       this.backdrop.push(layer);
       this.root.add(layer.object);
@@ -489,7 +486,7 @@ export class SkylineScene {
     this.giftMarks.update(dt);
     this.hazardMarks.update(dt);
     if (!this.gameplayVisible) {
-      this.giftMarks.points.visible = false;
+      this.giftMarks.group.visible = false;
       this.hazardMarks.points.visible = false;
       for (const pool of this.anchorPools) pool.visible = false;
       for (const mesh of this.contents.values()) mesh.visible = false;
