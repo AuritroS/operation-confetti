@@ -34,6 +34,20 @@ build order, decisions and evidence.
 - Review tooling writes into `tools/shots/` and takes an explicit base URL.
   Check what a script does before running it; some rebuild assets.
 
+## Looking at things
+
+| URL | Shows |
+| --- | --- |
+| `/` | The campaign: all three levels in sequence |
+| `/?tutorial=N` | The campaign opened at level N with its tutorial sheet up — the only way to review a sheet without playing the levels before it |
+| `/?level=1`, `/?level=2` | A single level's standalone review page, skipping the rehearsal |
+| `/level3.html` | The boss fight alone, with `?debug` for the cue harness |
+| `/?layers=all`, `?layers=clutter` | Level 1 environment layers; the default omits layers that are review-only |
+| `/?start=400` | Fast-forward level 1's standalone page, for looking at its ending |
+
+Captures: `tools/shots/campaign/` for gameplay framing, `story-reference/` for
+asset plates.
+
 ## Habits
 
 - Inspect the changed-file list before every commit.

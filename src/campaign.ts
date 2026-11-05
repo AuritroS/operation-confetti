@@ -55,7 +55,15 @@ const fade = new Fade(app);
 
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
-const jumpTo = Number(params.get('level') ?? 0);
+/**
+ * Open straight at one level.
+ *
+ * `?tutorial=N` is the reviewable form: it lands on that level with the sheet
+ * up, so a tutorial panel can be looked at without playing to it. `?level=N`
+ * does the same for the campaign, though for levels 1 and 2 `entry.ts` sends
+ * that to the standalone page instead.
+ */
+const jumpTo = Number(params.get('tutorial') ?? params.get('level') ?? 0);
 
 /** How a level is built. The shell never reaches inside one. */
 interface StageSpec {

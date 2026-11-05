@@ -185,7 +185,15 @@ export class RouteLevel implements LevelController {
        * across, and nothing is approaching to punish a mistake. Only the
        * lane tween and the character animate; the runner is not stepped, so
        * no travel accrues, no entity resolves and no event can be emitted.
+       *
+       * The environment still updates. `RingPlacer` is what *positions* the
+       * city pool — the buildings are all constructed at z 0 and only spread
+       * out when a layer is told how far the player has come — so skipping
+       * this left four buildings a side stacked on top of each other beside
+       * the player, and a route with nothing along it. It is also what keeps
+       * the sky and clouds alive while the sheet is up.
        */
+      this.environment?.update(0, step);
       this.runner.lanes.update(step);
       this.player.setLean(this.runner.lanes.lean);
       this.player.update(step, true);
