@@ -208,3 +208,25 @@ assumed acknowledgment.
   generated level 1/2 assets in this worktree, not regressions.
 - **Consumable:** now. The user is reviewing levels 1 and 2 visually; if the
   glow reads wrong at those distances the sleeve opacity is the dial.
+
+### 2026-11-06 — `src/core/scoring.ts` incident level widened
+
+- **Owner:** Claude / Level 3, at the user's request.
+- **Paths:** `src/core/scoring.ts` (one line) and this document.
+- **Purpose:** let Level 3 record a player hit as a scoring event, so hearts
+  cost points as well as survival. The user asked for this on 6 November.
+- **Change shape:** `RunEvent`'s incident member goes from
+  `{ t: 'incident'; level: 1 | 2 }` to `{ t: 'incident'; level: Level }`.
+  Type only — `scoreRun` already handled incidents level-generically
+  (`add(ev.level, POINTS.incident)`), and `POINTS.incident` is unchanged at
+  -50, so levels 1 and 2 score exactly as before.
+- **Blast radius:** checked every producer and consumer. `src/levels/runner.ts`
+  (level 1) and `src/levels/skyline/runner.ts` (level 2) emit literals 1 and 2
+  and still typecheck; no consumer narrows an incident's level to `1 | 2`.
+  `worker/index.ts` imports this same module, so the authoritative recompute
+  picks the change up with no Worker edit.
+- **Checks:** `tests/scoring.test.ts` (14), `tests/runner.test.ts` (33) and
+  `tests/skyline.test.ts` (15) all pass unchanged; full typecheck still shows
+  only the 13 known Level 2 baseline diagnostics.
+- **Consumable:** now. Levels 1 and 2 need no change to adopt it.
+
