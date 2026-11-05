@@ -58,6 +58,6 @@ export const TOWER = {
 export const MOON = {
   route: { size: 24, x: 22, y: 26, z: -140 },
   skyline: { size: 28, x: 16, y: 32, z: -155 },
-  /** Left of the tower shaft and above the SkyPod, so nothing occludes it. */
-  boss: { size: 4.6, x: -10.4, y: 12.4, z: -24 },
+  /** Right of the tower, matching levels 1 and 2, and clear of the arch. */
+  boss: { size: 4.6, x: 11.2, y: 12.4, z: -24 },
 } as const;

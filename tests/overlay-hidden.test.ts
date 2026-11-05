@@ -100,7 +100,7 @@ describe('nothing covers the game unless it is meant to', () => {
 describe('markup and code agree', () => {
   it('declares every element the campaign shell toggles', () => {
     const shell = readFileSync('src/campaign.ts', 'utf8');
-    for (const id of ['pause', 'btn-resume', 'banner', 'rotate', 'surface', 'stage', 'boss-readout']) {
+    for (const id of ['pause', 'btn-resume', 'banner', 'rotate', 'surface', 'stage', 'level-hud']) {
       expect(html, `#${id} must exist in index.html`).toContain(`id="${id}"`);
       expect(shell, `#${id} must be referenced by campaign.ts`).toContain(id);
     }

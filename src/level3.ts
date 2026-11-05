@@ -12,6 +12,8 @@
  * the campaign will compute them. A standalone attempt is never submitted.
  */
 import { InputRecogniser, type Gesture } from './core/input';
+import { Hud } from './ui/hud';
+import { BossHud } from './ui/boss-hud';
 import { LEVEL_MAX, POINTS, scoreRun, type RunEvent } from './core/scoring';
 import { FixedLoop } from './core/loop';
 import type { LevelContext } from './core/level';
@@ -31,19 +33,10 @@ const level = new BossLevel();
 const cues = new CueHarness();
 const input = new InputRecogniser(byId('practice-surface'));
 const lane = byId('practice-lane');
-const hearts = byId('boss-hearts');
-const health = byId('boss-health');
-const bossBar = byId('boss-bar');
-const healthFill = byId('boss-health-fill');
-const gun = byId('boss-gun');
-const gunFill = byId('boss-gun-fill');
-const gunLabel = byId('boss-gun-label');
-const delta = byId('boss-delta');
-const vignette = byId('boss-vignette');
-const playerStrip = byId('player-strip');
+const hud = new Hud();
+const bossHud = new BossHud(byId('level-hud'));
 const perf = byId('practice-perf');
 const help = document.querySelector<HTMLElement>('.practice-help')!;
-const score = byId('boss-score');
 const practiceCounts = byId('practice-counts');
 const shots = byId('practice-shots');
 const hits = byId('practice-hits');
@@ -58,22 +51,6 @@ const debug = byId('practice-debug');
 const debugging = new URLSearchParams(location.search).has('debug');
 debug.hidden = !debugging;
 byId('practice-cues').hidden = !debugging;
-
-const HEART = 'M12 20.3l-1.5-1.3C5.4 14.4 2 11.4 2 7.8 2 5 4.2 3 7 3c1.6 0 3.1.7 4 1.9C11.9 3.7 13.4 3 15 3c2.8 0 5 2 5 4.8 0 3.6-3.4 6.6-8.5 11.2l-1.5 1.3z';
-const heartPips = Array.from({ length: 5 }, () => {
-  // Drawn rather than typed: the heart glyph renders as a colour emoji on some
-  // platforms, which would fight the palette and ignore the lost-heart styling.
-  hearts.insertAdjacentHTML('beforeend',
-    `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${HEART}"/></svg>`);
-  return hearts.lastElementChild as SVGElement;
-});
-
-/** Re-run a finished CSS animation on an element that may already be showing. */
-function replay(el: HTMLElement): void {
-  el.hidden = true;
-  void el.offsetWidth;
-  el.hidden = false;
-}
 
 /**
  * The run's event list, owned here exactly as the shell will own it.
@@ -126,8 +103,7 @@ function restart(): void {
   paused = false;
   input.setEnabled(true);
   pausedOverlay.hidden = true;
-  delta.hidden = true;
-  vignette.hidden = true;
+  hud.reset();
   result.hidden = true;
   startButton.hidden = false;
 }
@@ -207,9 +183,7 @@ const loop = new FixedLoop({
     const incidents = runEvents.reduce((n, e) => n + (e.t === 'incident' ? 1 : 0), 0);
     if (incidents > shownIncidents) {
       shownIncidents = incidents;
-      delta.textContent = String(POINTS.incident);
-      replay(delta);
-      replay(vignette);
+      hud.showPenalty(POINTS.incident);
     }
 
     if (level.result !== null) {
@@ -227,29 +201,14 @@ const loop = new FixedLoop({
     level.render();
     const s = level.snapshot;
     lane.textContent = `${s.lane + 1} / 3`;
-    health.textContent = String(s.bossHp);
-    healthFill.style.width = `${s.bossHp}%`;
-    const exposed = s.state === 'playing' && s.beat === 'exposed';
-    bossBar.classList.toggle('exposed', exposed);
-    for (let i = 0; i < heartPips.length; i++) {
-      heartPips[i]!.classList.toggle('lost', i >= s.playerHp);
-    }
-    hearts.setAttribute('aria-label', `${s.playerHp} of 5 hearts`);
-
-    const { ready, progress, jammed } = s.gun;
-    gunFill.style.width = `${progress * 100}%`;
-    gun.classList.toggle('charging', !ready && !jammed);
-    gun.classList.toggle('jammed', jammed);
-    gunLabel.textContent = jammed ? 'JAMMED' : ready ? 'READY' : 'CHARGING';
-
-    score.textContent = String(levelScore());
-    playerStrip.hidden = s.state === 'practice';
+    bossHud.update(s);
+    hud.setScore(levelScore());
     help.hidden = s.state === 'playing';
     practiceCounts.hidden = s.state !== 'practice';
     shots.textContent = String(s.shotCount);
     hits.textContent = String(s.hitCount);
     beat.textContent = statusLine();
-    beat.classList.toggle('exposed', exposed);
+    beat.classList.toggle('exposed', s.state === 'playing' && s.beat === 'exposed');
     if (!debug.hidden) perf.textContent = `${level.drawCalls} draws · ${level.triangles.toLocaleString()} triangles`;
   },
 });

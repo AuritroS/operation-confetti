@@ -1,0 +1,49 @@
+/*
+ * HUD colour, mirrored from `src/render/palette.ts`.
+ *
+ * The CSS used to hand-pick hexes that had drifted from the 3D palette, which
+ * is how Matthew's hearts ended up pink — a colour from Aurora's family — and
+ * his cannon ended up gold-on-gold with her trim. Naming the palette here
+ * means a bar and the character it describes are the same number, and a future
+ * palette change has one obvious place to follow.
+ *
+ * Roles, and nothing borrows across them:
+ *   magenta/purple  Aurora's state only. Her magic and her robe.
+ *   gold/navy       Matthew's state only. palette.ts: "gold is his".
+ *   exposed         Her shield being down. The one "act now" colour.
+ *   fault           Damage and jams. Never anything else.
+ */
+:root {
+  --ink: #18101a;
+  --navy-deep: #1b275c;
+  --navy: #12368f;
+  --blue: #234ca8;
+  --blue-light: #6295e1;
+  --gold: #eaac5b;
+  --purple-deep: #5c175c;
+  --magenta: #cc29c3;
+  --orange-warm: #f29e59;
+  --cyan: #53a6f9;
+  --slate: #1a1f2e;
+  --slate-line: #2b3450;
+  --steel: #46506b;
+
+  /* Roles, named for what they do rather than what colour they are. */
+  --bg: var(--ink);
+  --panel: rgba(27, 39, 92, 0.82);
+  --edge: rgba(98, 149, 225, 0.22);
+  --accent: var(--blue-light);
+  --villain: var(--magenta);
+  --danger: var(--magenta);
+  --ink-fg: #eef2fb;
+  --ink-dim: #9fb0cc;
+  /* A tint of --gold, for small text that needs more lift against the night. */
+  --gold-text: #f7d380;
+  --exposed: #9df6d4;
+  --fault: #ff6a52;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}

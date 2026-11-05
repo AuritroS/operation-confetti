@@ -26,6 +26,7 @@ import { RouteLevel } from './levels/route-level';
 import { SkylineLevel } from './levels/skyline/controller';
 import { BossLevel } from './levels/boss/controller';
 import { Hud } from './ui/hud';
+import { BossHud } from './ui/boss-hud';
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -40,11 +41,12 @@ const pauseOverlay = byId('pause');
 const resumeBtn = byId<HTMLButtonElement>('btn-resume');
 const bannerEl = byId('banner');
 const stageLabel = byId('hud-stage');
-const bossReadout = byId('boss-readout');
+const levelHud = byId('level-hud');
 
 const host = new RendererHost(canvas);
 host.observe();
 const hud = new Hud();
+const bossHud = new BossHud(levelHud);
 
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
@@ -180,25 +182,9 @@ const loop = new FixedLoop({
   },
   render(alpha) {
     current?.render(alpha);
-    if (current instanceof BossLevel) showBossReadout(current);
+    if (current instanceof BossLevel) bossHud.update(current.snapshot);
   },
 });
-
-/**
- * The boss fight's HP and cooldown readouts.
- *
- * Deliberately plain text for now. Level 3's standalone page has the designed
- * bars; giving the campaign the same component means lifting them out of
- * `level3.css` into a shared HUD, which is the next slice of work rather than
- * something to half-do here.
- */
-function showBossReadout(level: BossLevel): void {
-  const s = level.snapshot;
-  bossReadout.hidden = false;
-  bossReadout.textContent = s.state === 'practice'
-    ? 'Practice · swipe to move, tap to fire'
-    : `Matthew ${s.playerHp}/5 · Aurora ${s.bossHp}/100 · ${s.gun.jammed ? 'JAMMED' : s.gun.ready ? 'ready' : 'charging'}`;
-}
 
 // ---- sequencing --------------------------------------------------------
 
@@ -206,7 +192,7 @@ async function mountStage(): Promise<void> {
   switching = true;
   const spec = stage();
   stageLabel.textContent = `${spec.id}/3`;
-  bossReadout.hidden = true;
+  bossHud.setVisible(false);
   hideBanner();
 
   const level = spec.make();

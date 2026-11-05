@@ -13,23 +13,12 @@
     <div id="practice-surface" aria-label="Game area: swipe left or right to change lanes, tap to fire"></div>
     <header class="practice-hud">
       <div><span class="eyebrow">LEVEL 3 / BOSS FIGHT</span><strong>Aurora’s birthday gala</strong></div>
-      <div class="hud-right"><span class="score" id="boss-score">0</span><button id="practice-pause" type="button" aria-label="Pause game">Pause</button></div>
+      <span class="score" id="hud-score">0</span>
     </header>
-    <!-- Aurora is at the top of the frame, so her health lives at the top too. -->
-    <div class="boss-bar" id="boss-bar">
-      <div class="boss-bar-row"><span class="boss-bar-name">AURORA</span><strong id="boss-health">100</strong></div>
-      <div class="boss-bar-track"><i id="boss-health-fill"></i></div>
-    </div>
-    <!-- Matthew is at the bottom, so his hearts and his cannon are too. -->
-    <div class="player-strip" id="player-strip">
-      <div class="hearts" id="boss-hearts" role="img" aria-label="5 of 5 hearts"></div>
-      <div class="gun" id="boss-gun">
-        <div class="gun-track"><i id="boss-gun-fill"></i></div>
-        <span class="gun-label" id="boss-gun-label">READY</span>
-      </div>
-    </div>
-    <div class="boss-delta" id="boss-delta" hidden>-50</div>
-    <div class="boss-vignette" id="boss-vignette" hidden></div>
+    <span class="hud__delta" id="hud-delta" hidden></span>
+    <!-- The boss readouts mount here; the component builds its own markup. -->
+    <div id="level-hud"></div>
+    <div id="vignette" class="vignette" hidden></div>
     <div class="boss-beat" id="boss-beat" aria-live="polite">Practice · no damage</div>
     <div id="practice-scene-status" class="practice-scene-status" role="status">Loading birthday rooftop…</div>
     <div id="practice-debug" class="practice-debug" hidden>Lane <strong id="practice-lane">2 / 3</strong> · <span id="practice-perf"></span></div>

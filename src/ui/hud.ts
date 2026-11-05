@@ -1,3 +1,4 @@
+import './hud.css';
 /**
  * The player-facing HUD (design doc §3).
  *
