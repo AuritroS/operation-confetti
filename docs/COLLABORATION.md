@@ -183,3 +183,28 @@ assumed acknowledgment.
   UVs resolve to `C3`.
 - **Consumable:** now. Rebuild with `node tools/recolour.mjs --only aurora`,
   or `node tools/boss-assets.mjs` for the whole Level 3 set.
+
+### 2026-11-06 — `src/render/custom.ts`, `buildCnTower` antenna
+
+- **Owner:** Claude / Level 3, at the user's request, with levels 1 and 2 to
+  be reviewed by the user before this is considered settled.
+- **Paths:** `src/render/custom.ts` (`buildCnTower` only) and this document.
+- **Purpose:** the CN Tower is a motif across all three levels — level 1 sees
+  it on the skyline, level 2 runs down a street toward it, level 3 stands on
+  it. `assets/aurora.png` shows it at night as a pale mass with a glowing
+  magenta needle. The antenna was matte concrete, which at level 1 and 2
+  distances is invisible; the one part that has to carry at any range is the
+  part that emits.
+- **Change shape:** the spire's material becomes `glow(PALETTE.magenta)` and
+  one additive sleeve mesh is added. No geometry, proportion or dimension is
+  altered, so nothing that measures the tower's bounds changes. Adds one mesh
+  per tower instance; there is one in level 1, one in level 2, one in the
+  gallery.
+- **Callers checked:** `src/render/environment/skyline.ts` (level 1, height
+  52), `src/render/skyline-scene.ts` (level 2, height 78), `src/gallery.ts`
+  (height 14). Level 3 does not use it — it has its own close-up `tower.ts`.
+- **Checks:** full `vitest run` gives an identical 14 failed / 208 passed with
+  and without the change, verified by swapping the file. Those 14 are missing
+  generated level 1/2 assets in this worktree, not regressions.
+- **Consumable:** now. The user is reviewing levels 1 and 2 visually; if the
+  glow reads wrong at those distances the sleeve opacity is the dial.

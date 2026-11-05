@@ -8,6 +8,8 @@ export const BOSS_LAYOUT = {
    * what makes an incoming orb readable.
    */
   playerZ: 5.4,
+  /** Deck clearance Matthew's feet stand at. */
+  playerY: 0.08,
   bossZ: -5.6,
   /**
    * Top of Aurora's dais.

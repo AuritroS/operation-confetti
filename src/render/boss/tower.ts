@@ -33,6 +33,12 @@ import { concrete, concreteDark, gold, luminous, satin } from './materials';
 export const TOWER_AXIS_Z = -16;
 /** Outer edge of the straight terrace the lanes run along. */
 export const TERRACE_HALF_WIDTH = 4.6;
+/**
+ * Tip of the antenna. Exported because the framing test asserts it stays in
+ * frame and clear of the HUD: the whole landmark fitting the portrait frame
+ * is the constraint that sets every proportion above the shaft.
+ */
+export const TOWER_BEACON_Y = 18.3;
 
 function ring(parent: Group, rTop: number, rBottom: number, height: number, y: number, z: number, material: MeshStandardMaterial | MeshBasicMaterial, sides = 28): Mesh {
   const mesh = new Mesh(new CylinderGeometry(rTop, rBottom, height, sides), material);
@@ -100,16 +106,10 @@ function makeShaft(parent: Group): void {
   }
   // Neon risers on the camera-facing faces: the detail that makes it this
   // tower at night rather than a grey column.
-  for (const offset of [-0.92, 0, 0.92]) {
-    const x = offset;
-    const stripZ = z + 1.25 - Math.abs(offset) * 0.22;
-    const strip = new Mesh(new CylinderGeometry(0.075, 0.1, 14.4, 4), neon);
-    strip.position.set(x, 4.6, stripZ);
-    parent.add(strip);
-    const halo = new Mesh(new CylinderGeometry(0.3, 0.36, 14.4, 6), bloom);
-    halo.position.set(x, 4.6, stripZ);
-    parent.add(halo);
-  }
+  // No neon striping on the shaft: distinct strips turned the landmark into a
+  // barber's pole. The shaft stays white concrete inside one soft magenta
+  // sleeve, so the colour reads as light falling on it.
+  ring(parent, 1.42, 2.12, 14.6, 4.6, z, bloom, 12);
 
   // Flared saucer: underside cone, lit window band, shallow cap.
   ring(parent, 2.0, 1.1, 0.6, 12.3, z, concreteDark, 20);
@@ -123,17 +123,14 @@ function makeShaft(parent: Group): void {
 
   // Antenna: a short equipment mast, then a long needle.
   ring(parent, 0.3, 0.45, 2.2, 14.3, z, concreteDark, 8);
-  const mastNeon = new Mesh(new CylinderGeometry(0.11, 0.15, 2.2, 4), neon);
-  mastNeon.position.set(0, 14.3, z + 0.34);
-  parent.add(mastNeon);
   ring(parent, 0.04, 0.22, 2.75, 16.78, z, neon, 6);
   ring(parent, 0.26, 0.52, 2.75, 16.78, z, bloom, 6);
   ring(parent, 0.46, 0.62, 2.3, 14.3, z, bloom, 6);
   const beacon = new Mesh(new SphereGeometry(0.24, 8, 6), luminous(0xff7bf0));
-  beacon.position.set(0, 18.3, z);
+  beacon.position.set(0, TOWER_BEACON_Y, z);
   parent.add(beacon);
   const beaconGlow = new Mesh(new SphereGeometry(0.62, 10, 8), bloom);
-  beaconGlow.position.set(0, 18.3, z);
+  beaconGlow.position.set(0, TOWER_BEACON_Y, z);
   parent.add(beaconGlow);
 }
 

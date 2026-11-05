@@ -10,6 +10,7 @@
  * cost less than a single character.
  */
 import {
+  AdditiveBlending,
   BoxGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
@@ -153,10 +154,26 @@ export function buildCnTower(height = 14): Group {
   upper.position.y = height * 0.74;
   tower.add(upper);
 
-  // Antenna spire.
-  const spire = new Mesh(new CylinderGeometry(0.004, height * 0.012, height * 0.24, 6), concrete);
+  // Antenna spire, lit rather than concrete.
+  //
+  // `assets/aurora.png` shows the tower at night as a pale mass with a glowing
+  // magenta needle, and the tower is a motif in all three levels — level 1
+  // sees it on the skyline, level 2 runs down a street toward it, level 3
+  // stands on it. A grey needle at distance is simply invisible, so the one
+  // part that has to carry at any range is the part that emits.
+  const spire = new Mesh(new CylinderGeometry(0.004, height * 0.012, height * 0.24, 6), glow(PALETTE.magenta));
   spire.position.y = height * 0.89;
   tower.add(spire);
+
+  const spireGlow = new Mesh(
+    new CylinderGeometry(height * 0.012, height * 0.03, height * 0.24, 6),
+    new MeshBasicMaterial({
+      color: 0xff5ae8, transparent: true, opacity: 0.26,
+      depthWrite: false, blending: AdditiveBlending,
+    }),
+  );
+  spireGlow.position.y = height * 0.89;
+  tower.add(spireGlow);
 
   const beacon = new Mesh(new SphereGeometry(height * 0.012, 6, 5), glow(PALETTE.magenta));
   beacon.position.y = height * 1.01;

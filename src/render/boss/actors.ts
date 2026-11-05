@@ -214,7 +214,7 @@ export class BossActors {
     this.hover += step;
     this.bossHolder.position.y = BOSS_LAYOUT.bossStageY + 0.08 + BOSS_LAYOUT.bossFloat
       + Math.sin(this.hover * 0.9) * 0.07;
-    this.matthewHolder.position.set(game.renderX, 0.08, BOSS_LAYOUT.playerZ);
+    this.matthewHolder.position.set(game.renderX, BOSS_LAYOUT.playerY, BOSS_LAYOUT.playerZ);
     this.matthewHolder.rotation.z = -game.lanes.lean * 0.09;
     this.matthewShadow.position.set(game.renderX, 0.05, BOSS_LAYOUT.playerZ);
     if (game.shotCount !== this.lastShotCount) {
