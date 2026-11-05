@@ -138,6 +138,7 @@ for (let i = -1; i <= 7; i++) {
     id: `inspect-road-${i}`,
     prop: i % 4 === 0 ? 'roadCrossing' : 'road',
     x: 0,
+    y: -0.190,
     z: i * TILE,
     facing: { spans: 'along' },
     side: 0,

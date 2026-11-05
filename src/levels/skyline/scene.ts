@@ -194,6 +194,7 @@ for (let i = Math.floor(-MARGIN / TILE) - 1; i <= Math.ceil((ROUTE + MARGIN) / T
     id: `road-${i}`,
     prop: 'road',
     x: 0,
+    y: -0.190,
     z: i * TILE,
     facing: { spans: 'along' },
     side: 0,
