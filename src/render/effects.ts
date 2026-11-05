@@ -27,6 +27,7 @@ import {
   PlaneGeometry,
   Points,
   PointsMaterial,
+  TorusGeometry,
   type Texture,
 } from 'three';
 
@@ -68,10 +69,10 @@ export function dotTexture(): Texture {
 let sharedGlow: Texture | null = null;
 
 /**
- * Soft radial glow texture for collectible aura halos.
+ * Radiant electric neon glow texture for collectible aura halos.
  *
- * Warm golden gradient that falls off smoothly to complete transparency,
- * avoiding point-size artifacts on high-DPI displays.
+ * Multi-tier electric gradient: pure white/ice core transitioning through
+ * saturated cyan neon to transparent additive falloff.
  */
 export function glowTexture(): Texture {
   if (sharedGlow) return sharedGlow;
@@ -83,11 +84,12 @@ export function glowTexture(): Texture {
   if (ctx) {
     const center = size / 2;
     const g = ctx.createRadialGradient(center, center, 0, center, center, center);
-    g.addColorStop(0.0, 'rgba(255, 255, 235, 1.0)');
-    g.addColorStop(0.2, 'rgba(255, 215, 80, 0.85)');
-    g.addColorStop(0.45, 'rgba(255, 185, 45, 0.35)');
-    g.addColorStop(0.75, 'rgba(255, 140, 20, 0.08)');
-    g.addColorStop(1.0, 'rgba(255, 120, 0, 0.0)');
+    g.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+    g.addColorStop(0.12, 'rgba(235, 250, 255, 0.95)');
+    g.addColorStop(0.32, 'rgba(83, 166, 249, 0.82)');
+    g.addColorStop(0.55, 'rgba(70, 150, 255, 0.38)');
+    g.addColorStop(0.80, 'rgba(50, 120, 250, 0.09)');
+    g.addColorStop(1.0, 'rgba(50, 120, 250, 0.0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
   }
@@ -176,6 +178,7 @@ export class GiftGlowField {
   readonly group = new Group();
   private readonly mesh: InstancedMesh;
   private readonly groundMesh: InstancedMesh;
+  private readonly haloMesh: InstancedMesh;
   private readonly matrix = new Matrix4();
   private readonly dummy = new Group();
   private readonly anchors: Vector3[] = [];
@@ -188,13 +191,13 @@ export class GiftGlowField {
     options: GiftGlowOptions = {},
   ) {
     this.baseSize = options.size ?? 1.6;
-    const color = new Color(options.color ?? PALETTE.gold);
+    const color = new Color(options.color ?? PALETTE.cyan);
     const geometry = crossedQuads(this.baseSize);
     const material = new MeshBasicMaterial({
       color,
       map: glowTexture(),
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       blending: AdditiveBlending,
       depthWrite: false,
       side: DoubleSide,
@@ -204,6 +207,20 @@ export class GiftGlowField {
     this.mesh.frustumCulled = false;
     this.group.add(this.mesh);
 
+    // Orbiting electric neon halo ring around the gift
+    const haloGeom = new TorusGeometry(this.baseSize * 0.44, 0.035, 6, 28);
+    haloGeom.rotateX(Math.PI / 2);
+    const haloMat = new MeshBasicMaterial({
+      color: 0x53a6f9,
+      transparent: true,
+      opacity: 0.85,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    });
+    this.haloMesh = new InstancedMesh(haloGeom, haloMat, Math.max(1, maxAnchors));
+    this.haloMesh.frustumCulled = false;
+    this.group.add(this.haloMesh);
+
     // Ground projection pool on the asphalt road surface
     const groundGeom = new PlaneGeometry(this.baseSize * 1.35, this.baseSize * 1.35);
     groundGeom.rotateX(-Math.PI / 2);
@@ -211,7 +228,7 @@ export class GiftGlowField {
       color,
       map: glowTexture(),
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.52,
       blending: AdditiveBlending,
       depthWrite: false,
     });
@@ -224,9 +241,11 @@ export class GiftGlowField {
       this.matrix.makeTranslation(0, -9999, 0);
       this.mesh.setMatrixAt(i, this.matrix);
       this.groundMesh.setMatrixAt(i, this.matrix);
+      this.haloMesh.setMatrixAt(i, this.matrix);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this.groundMesh.instanceMatrix.needsUpdate = true;
+    this.haloMesh.instanceMatrix.needsUpdate = true;
   }
 
   setAnchors(positions: readonly Vector3[]): void {
@@ -252,6 +271,13 @@ export class GiftGlowField {
         this.dummy.updateMatrix();
         this.mesh.setMatrixAt(i, this.dummy.matrix);
 
+        // Orbiting neon ring with floating oscillation
+        this.dummy.position.set(a.x, a.y + Math.sin(this.time * 3.2 + i * 0.8) * 0.08, a.z);
+        this.dummy.rotation.set(Math.sin(this.time * 1.5 + i) * 0.2, spin * 1.4, Math.cos(this.time * 1.5 + i) * 0.2);
+        this.dummy.scale.setScalar(pulse * 1.06);
+        this.dummy.updateMatrix();
+        this.haloMesh.setMatrixAt(i, this.dummy.matrix);
+
         // Projected puddle pool on the road asphalt at y = 0.006
         this.dummy.position.set(a.x, 0.006, a.z);
         this.dummy.rotation.set(0, 0, 0);
@@ -262,10 +288,12 @@ export class GiftGlowField {
         this.matrix.makeTranslation(0, -9999, 0);
         this.mesh.setMatrixAt(i, this.matrix);
         this.groundMesh.setMatrixAt(i, this.matrix);
+        this.haloMesh.setMatrixAt(i, this.matrix);
       }
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this.groundMesh.instanceMatrix.needsUpdate = true;
+    this.haloMesh.instanceMatrix.needsUpdate = true;
   }
 
   dispose(): void {
@@ -273,6 +301,8 @@ export class GiftGlowField {
     (this.mesh.material as MeshBasicMaterial).dispose();
     this.groundMesh.geometry.dispose();
     (this.groundMesh.material as MeshBasicMaterial).dispose();
+    this.haloMesh.geometry.dispose();
+    (this.haloMesh.material as MeshBasicMaterial).dispose();
     this.group.removeFromParent();
   }
 }

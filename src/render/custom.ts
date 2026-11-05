@@ -10,10 +10,14 @@
  * cost less than a single character.
  */
 import {
+  AdditiveBlending,
   BoxGeometry,
+  CanvasTexture,
   CylinderGeometry,
+  DoubleSide,
   ExtrudeGeometry,
   Path,
+  PlaneGeometry,
   Quaternion,
   Shape,
   Group,
@@ -128,41 +132,157 @@ export function buildCrown(radius = 0.2): Group {
  * Appears in both reference images and is what makes the skyline Toronto
  * rather than a generic city. Built tall and thin so it reads in silhouette at
  * any distance; `height` is in world units.
+ *
+ * Upgraded with Level 3's high-fidelity architecture:
+ * - Multi-stage tapered concrete shaft with structural vertical fins/ribs.
+ * - Flared observation SkyPod with illuminated cyan window band and cyan bloom additive sleeve.
+ * - Tapered antenna spire with neon magenta riser sleeve.
+ * - Summit beacon with pulsing additive magenta bloom aura.
  */
 export function buildCnTower(height = 14): Group {
   const tower = new Group();
-  const concrete = matte(0x9aa6b8, 0.85);
-  const lit = glow(PALETTE.cyan, 0.9);
+  const concrete = matte(0xc6cde0, 0.74);
+  const concreteDark = matte(0x97a0ba, 0.8);
+  const neon = new MeshBasicMaterial({ color: 0xcc29c3, fog: false });
+  const cyan = new MeshBasicMaterial({ color: 0x53a6f9, fog: false });
+  const cyanBloom = new MeshBasicMaterial({
+    color: 0x6cc0ff,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    fog: false,
+  });
+  const magentaBloom = new MeshBasicMaterial({
+    color: 0xff5ae8,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    fog: false,
+  });
+  const beaconMat = new MeshBasicMaterial({ color: 0xff7bf0, fog: false });
 
   // Tapered shaft.
-  const shaft = new Mesh(new CylinderGeometry(height * 0.012, height * 0.035, height * 0.72, 10), concrete);
-  shaft.position.y = height * 0.36;
+  const shaft = new Mesh(new CylinderGeometry(height * 0.016, height * 0.032, height * 0.65, 12), concrete);
+  shaft.position.y = height * 0.325;
   tower.add(shaft);
 
-  // Observation pod: the detail that identifies it.
-  const pod = new Mesh(new CylinderGeometry(height * 0.055, height * 0.07, height * 0.05, 12), concrete);
-  pod.position.y = height * 0.66;
-  tower.add(pod);
+  // Structural vertical ribs / buttresses
+  for (const offset of [-1, 1]) {
+    const rib = new Mesh(new CylinderGeometry(height * 0.003, height * 0.006, height * 0.65, 5), concreteDark);
+    rib.position.set(offset * height * 0.022, height * 0.325, -height * 0.008);
+    tower.add(rib);
+  }
 
-  const podRing = new Mesh(new TorusGeometry(height * 0.062, height * 0.008, 6, 14), lit);
-  podRing.rotation.x = Math.PI / 2;
-  podRing.position.y = height * 0.645;
-  tower.add(podRing);
+  // Observation SkyPod: flared underside
+  const flare = new Mesh(new CylinderGeometry(height * 0.052, height * 0.025, height * 0.028, 16), concreteDark);
+  flare.position.y = height * 0.664;
+  tower.add(flare);
 
-  const upper = new Mesh(new CylinderGeometry(height * 0.022, height * 0.03, height * 0.1, 10), concrete);
-  upper.position.y = height * 0.74;
-  tower.add(upper);
+  // Lit cyan observation deck window band
+  const windowBand = new Mesh(new CylinderGeometry(height * 0.052, height * 0.052, height * 0.016, 16), cyan);
+  windowBand.position.y = height * 0.686;
+  windowBand.userData.isNeon = true;
+  tower.add(windowBand);
 
-  // Antenna spire.
-  const spire = new Mesh(new CylinderGeometry(0.004, height * 0.012, height * 0.24, 6), concrete);
-  spire.position.y = height * 0.89;
+  // Additive cyan bloom sleeve
+  const bloomSleeve = new Mesh(new CylinderGeometry(height * 0.058, height * 0.058, height * 0.032, 16), cyanBloom);
+  bloomSleeve.position.y = height * 0.686;
+  bloomSleeve.userData.isNeon = true;
+  tower.add(bloomSleeve);
+
+  // Saucer cap
+  const cap = new Mesh(new CylinderGeometry(height * 0.038, height * 0.052, height * 0.012, 16), concrete);
+  cap.position.y = height * 0.700;
+  tower.add(cap);
+
+  // Cyan neon collar ring
+  const collar = new Mesh(new TorusGeometry(height * 0.054, height * 0.003, 6, 20), cyan);
+  collar.rotation.x = Math.PI / 2;
+  collar.position.y = height * 0.695;
+  collar.userData.isNeon = true;
+  tower.add(collar);
+
+  // Upper pod (radome)
+  const upperPod = new Mesh(new CylinderGeometry(height * 0.018, height * 0.024, height * 0.035, 10), concreteDark);
+  upperPod.position.y = height * 0.725;
+  tower.add(upperPod);
+
+  // Antenna equipment mast
+  const mast = new Mesh(new CylinderGeometry(height * 0.008, height * 0.014, height * 0.065, 8), concreteDark);
+  mast.position.y = height * 0.775;
+  tower.add(mast);
+
+  // Antenna spire needle in neon magenta
+  const spire = new Mesh(new CylinderGeometry(0.002, height * 0.007, height * 0.18, 6), neon);
+  spire.position.y = height * 0.898;
+  spire.userData.isNeon = true;
   tower.add(spire);
 
-  const beacon = new Mesh(new SphereGeometry(height * 0.012, 6, 5), glow(PALETTE.magenta));
-  beacon.position.y = height * 1.01;
+  // Magenta bloom sleeve
+  const spireBloom = new Mesh(new CylinderGeometry(height * 0.006, height * 0.015, height * 0.18, 6), magentaBloom);
+  spireBloom.position.y = height * 0.898;
+  spireBloom.userData.isNeon = true;
+  tower.add(spireBloom);
+
+  // Summit beacon sphere
+  const beacon = new Mesh(new SphereGeometry(height * 0.008, 8, 6), beaconMat);
+  beacon.position.y = height * 0.995;
+  beacon.userData.isNeon = true;
   tower.add(beacon);
 
+  // Beacon glow halo
+  const beaconGlow = new Mesh(new SphereGeometry(height * 0.022, 10, 8), magentaBloom);
+  beaconGlow.position.y = height * 0.995;
+  beaconGlow.userData.isNeon = true;
+  tower.add(beaconGlow);
+
   return tower;
+}
+
+// ----------------------------------------------------------- the Moon ----
+
+/**
+ * Stylized Toronto night moon, shared across all levels.
+ *
+ * A soft, painted moon with radial glow and subtle procedural cratering
+ * that matches the night silhouette from the reference art.
+ */
+export function buildMoon(size = 18): Mesh {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const sky = ctx.createRadialGradient(128, 128, 0, 128, 128, 126);
+    sky.addColorStop(0, '#fcf9da');
+    sky.addColorStop(0.72, '#d7e9ff');
+    sky.addColorStop(0.9, '#91b8ec');
+    sky.addColorStop(1, 'rgba(145, 184, 236, 0)');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 28; i++) {
+      const a = i * 2.39996;
+      const r = Math.sqrt(((i * 37) % 97) / 97) * 89;
+      ctx.beginPath();
+      ctx.fillStyle = i % 3 ? 'rgba(154, 185, 209, 0.13)' : 'rgba(129, 159, 192, 0.17)';
+      ctx.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 4 + (i % 9), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = 'srgb';
+  const mat = new MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+    fog: false,
+  });
+  const moon = new Mesh(new PlaneGeometry(size, size), mat);
+  moon.userData.isNeon = true;
+  return moon;
 }
 
 // ------------------------------------------------------ grapple gadget ----

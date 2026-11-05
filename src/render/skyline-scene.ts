@@ -10,7 +10,7 @@ import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
-import { buildCnTower } from './custom';
+import { buildCnTower, buildMoon } from './custom';
 import { GiftGlowField, shadowTexture } from './effects';
 import { PALETTE } from './palette';
 import { darken, disposeTree, unfog } from './environment/skyline';
@@ -29,11 +29,20 @@ const ANCHOR_POOL = 36;
 
 /** Shared with the asset probe so the landmark uses the actual game model. */
 export function buildSkylineLandmark(): Group {
+  const landmark = new Group();
   const tower = buildCnTower(78);
   tower.position.set(-19, -2, -150);
   darken(tower, 0.45);
   unfog(tower);
-  return tower;
+  landmark.add(tower);
+
+  // The Toronto night moon, framed high above the Queen West canyon
+  const moon = buildMoon(28);
+  moon.position.set(16, 32, -155);
+  unfog(moon);
+  landmark.add(moon);
+
+  return landmark;
 }
 
 export class SkylineScene {

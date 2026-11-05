@@ -9,7 +9,7 @@
  */
 import { Color, Group, Mesh, MeshStandardMaterial, type Object3D } from 'three';
 import { PALETTE } from '../palette';
-import { buildCnTower } from '../custom';
+import { buildCnTower, buildMoon } from '../custom';
 import type { EnvironmentLayer, LayerContext } from './layer';
 import type { PropId } from './props';
 
@@ -49,6 +49,7 @@ export class SkylineLayer implements EnvironmentLayer {
   private readonly items: Object3D[] = [];
   private readonly anchors: { x: number; z: number }[] = [];
   private readonly tower: Group;
+  private readonly moon: Mesh;
 
   constructor(ctx: LayerContext) {
     for (let i = 0; i < COUNT; i++) {
@@ -82,6 +83,12 @@ export class SkylineLayer implements EnvironmentLayer {
     darken(this.tower, 0.5);
     unfog(this.tower);
     this.object.add(this.tower);
+
+    // The Toronto night moon, framed high in the sky to the right
+    this.moon = buildMoon(24);
+    this.moon.position.set(22, 26, -175);
+    unfog(this.moon);
+    this.object.add(this.moon);
   }
 
   /**
@@ -99,10 +106,11 @@ export class SkylineLayer implements EnvironmentLayer {
       item.position.z = anchor.z + drift;
     }
     this.tower.position.z = -165 + travelled * 0.05;
+    this.moon.position.z = -175 + travelled * 0.05;
   }
 
   dispose(): void {
-    disposeTree([...this.items, this.tower]);
+    disposeTree([...this.items, this.tower, this.moon]);
     this.items.length = 0;
     this.object.removeFromParent();
   }
@@ -114,10 +122,12 @@ export function darken(root: Object3D, amount: number): void {
   root.traverse((o) => {
     const mesh = o as Mesh;
     if (!mesh.isMesh) return;
+    if (mesh.userData.isNeon) return; // Keep neon and luminous bloom sleeves bright and radiant!
     const source = mesh.material as MeshStandardMaterial;
+    if (!source || !('color' in source)) return;
     const cloned = source.clone();
     cloned.color.lerp(sky, 1 - amount);
-    cloned.roughness = 1;
+    if ('roughness' in cloned) cloned.roughness = 1;
     mesh.material = cloned;
   });
 }
