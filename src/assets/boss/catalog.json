@@ -8,22 +8,6 @@
     "role": "Only scored gift; gold sparkle field as level 1, not blue"
   },
   {
-    "id": "decorGiftRed",
-    "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_C_red.gltf",
-    "url": "/models/level3/present_C_red.glb",
-    "nativeHeight": 0.462,
-    "targetHeight": 0.46,
-    "role": "Wing scenery, clear of the lane corridor"
-  },
-  {
-    "id": "decorGiftGreen",
-    "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_D_green.gltf",
-    "url": "/models/level3/present_D_green.glb",
-    "nativeHeight": 1.062,
-    "targetHeight": 0.8,
-    "role": "Wing scenery, clear of the lane corridor"
-  },
-  {
     "id": "cannon",
     "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/snowball_cannon.gltf",
     "url": "/models/level3/snowball_cannon.glb",

@@ -63,11 +63,13 @@ describe('Level 3 portrait framing', () => {
     // it closes if the eye height drops or Aurora is pushed further back.
     expect(bossFeet.y - project(0, HERO_HEAD, BOSS_LAYOUT.playerZ).y).toBeGreaterThan(0.15);
 
-    // The stolen cake is the plot object; it may never leave the frame.
-    const cake = project(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.bossStageY + 1.53, BOSS_LAYOUT.cakeZ);
+    // The stolen cake is the plot object; it may never leave the frame, and
+    // held in her magic it has to stay clear of the deck she defends.
+    const cake = project(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.cakeY, BOSS_LAYOUT.cakeZ);
     expect(cake.x).toBeGreaterThan(0.15);
     expect(cake.x).toBeLessThan(0.65);
-    expect(cake.y).toBeGreaterThan(-0.1);
+    expect(cake.y).toBeGreaterThan(0.05);
+    expect(cake.y).toBeLessThan(bossHead.y);
 
     // The whole landmark fits, tip included. This is the constraint that sets
     // every proportion above the shaft, and the shortest viewport is the one

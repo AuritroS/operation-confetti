@@ -1,5 +1,5 @@
 import {
-  Box3, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CatmullRomCurve3,
+  BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CatmullRomCurve3,
   Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, LineSegments,
   Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry,
   SphereGeometry, TorusGeometry, TubeGeometry, Vector3,
@@ -75,8 +75,14 @@ function makeDeck(parent: Group): void {
     block(parent, [2.06, 0.025, laneLength], [x, 0.02, laneCentreZ], laneMats[lane]!);
     block(parent, [1.84, 0.009, 0.07], [x, 0.041, 5.47], gold);
   }
+  // Lane dividers in warm stone, not pink.
+  //
+  // src/render/palette.ts states the rule the whole game rests on: magenta is
+  // Aurora's, and means every hazard and all her magic. A pink divider in the
+  // one level where magenta finally means incoming damage leaves her attacks
+  // nothing to contrast against on the surface they land on.
   for (const x of [-3.32, -1.1, 1.1, 3.32]) {
-    block(parent, [0.025, 0.014, laneLength], [x, 0.048, laneCentreZ], satin(0x916b79, 0.23));
+    block(parent, [0.025, 0.014, laneLength], [x, 0.048, laneCentreZ], satin(0x8d8296, 0.23));
   }
   for (const x of [-4.45, 4.45]) {
     block(parent, [0.27, 0.22, DECK_LENGTH - 0.7], [x, 0.1, DECK_CENTRE_Z], midnight);
@@ -265,7 +271,7 @@ function makeMoonAndSkyline(parent: Group): void {
 
 function makeBalloons(parent: Group): void {
   const balloon = new InstancedMesh(new SphereGeometry(0.32, 12, 9), satin(0xffffff, 0.02, 0.58), 24);
-  const palette = [0x694259, 0x8d6570, 0x685378, 0x526581, 0x9c8062, 0xa59982];
+  const palette = [0x5f2470, 0x8c4a93, 0x7b3a86, 0xc79a52, 0xa9733f, 0xe0c184];
   const dummy = new Object3D();
   const lines: number[] = [];
   let index = 0;
@@ -313,17 +319,17 @@ function makeCandelabra(parent: Group, x: number, z: number): void {
   }
 }
 
+/**
+ * The stolen cake, held in her magic.
+ *
+ * It had a gold plinth and sat beside her as an equal exhibit. The plot says
+ * otherwise: she took it, victory recovers it, defeat leaves with it. Airborne
+ * and tethered, it is visibly hers and visibly out of reach, and both endings
+ * stage themselves — the tether snaps and it falls, or it leaves with her.
+ */
 function makeCakeDisplay(parent: Group, cake: Group): void {
-  const x = BOSS_LAYOUT.cakeX;
-  const z = BOSS_LAYOUT.cakeZ;
-  const stage = BOSS_LAYOUT.bossStageY;
-  cylinder(parent, 0.68, 0.82, 0.18, [x, stage + 0.09, z], gold, 24);
-  cylinder(parent, 0.35, 0.45, 0.82, [x, stage + 0.58, z], satin(0x512559), 20);
-  cylinder(parent, 0.74, 0.47, 0.18, [x, stage + 1.06, z], gold, 24);
-  cylinder(parent, 1.1, 0.93, 0.09, [x, stage + 1.19, z], paleGold, 32);
-  // The stolen cake floats above its platter; Aurora's tether holds it there.
-  const top = stage + 1.53;
-  cake.position.set(x, top, z);
+  const top = BOSS_LAYOUT.cakeY;
+  cake.position.set(BOSS_LAYOUT.cakeX, top, BOSS_LAYOUT.cakeZ);
   const sponge = buildCake();
   sponge.scale.setScalar(1.72);
   cake.add(sponge);
@@ -331,33 +337,46 @@ function makeCakeDisplay(parent: Group, cake: Group): void {
   // Piped cream and red berries turn the small shared cake into the hero prop.
   const cream = satin(0xfff2e3);
   const berry = satin(0xb80e36, 0.06, 0.36);
-  for (const [radius, y, count] of [[0.84, top + 0.45, 24], [0.59, top + 0.98, 16]] as const) {
+  for (const [radius, y, count] of [[0.84, 0.45, 24], [0.59, 0.98, 16]] as const) {
     for (let i = 0; i < count; i++) {
       const a = i / count * Math.PI * 2;
       const px = Math.cos(a) * radius;
       const pz = Math.sin(a) * radius;
-      const swirl = orb(cake, 0.095, [px, y - top, pz], cream, 8);
+      const swirl = orb(cake, 0.095, [px, y, pz], cream, 8);
       swirl.scale.y = 0.72;
-      if (i % 3 === 0) orb(cake, 0.067, [px, y - top + 0.09, pz], berry, 8);
+      if (i % 3 === 0) orb(cake, 0.067, [px, y + 0.09, pz], berry, 8);
     }
   }
   for (let i = 0; i < 10; i++) {
     const a = i / 10 * Math.PI * 2;
     orb(cake, 0.075, [Math.cos(a) * 0.47, 1.2, Math.sin(a) * 0.47], berry, 8);
   }
+  // A shallow magic saucer under it, so nothing reads as unsupported by accident.
   const halo = new Mesh(new TorusGeometry(1.23, 0.025, 6, 48), luminous(0xc56aff, 0.8));
   halo.rotation.x = Math.PI / 2.6;
-  halo.position.set(0, stage + 1.23 - top, 0);
+  halo.position.set(0, -0.3, 0);
   cake.add(halo);
 }
 
+/**
+ * Fallen party paper.
+ *
+ * Gold, cream and amber only. It previously scattered magenta, violet and
+ * blue across the whole playable deck — both signal colours, on the exact
+ * surface lane warnings have to read against. Gold is already the "take it"
+ * colour, but a collectible is distinguished by its animated sparkle rather
+ * than by hue, so still paper on the floor cannot be mistaken for one.
+ */
 function makeScatteredPartyPaper(parent: Group): void {
   const paper = new InstancedMesh(new PlaneGeometry(0.095, 0.17), luminous(0xffffff, 0.95), 64);
-  const colors = [0xf8c776, 0xe475a8, 0xa68be6, 0x82bcea];
+  const colors = [0xf8c776, 0xf2e3c4, 0xe0a860, 0xfff4de];
   const dummy = new Object3D();
   for (let i = 0; i < 64; i++) {
-    const x = -4.55 + (i * 19 % 67) / 67 * 9.1;
-    const z = -8.25 + (i * 23 % 61) / 61 * 13.2;
+    // Shoulders only. The lane corridor stays bare so an attack marking has
+    // a clean surface to land on.
+    const side = i % 2 === 0 ? -1 : 1;
+    const x = side * (3.5 + (i * 19 % 67) / 67 * 1.0);
+    const z = -8.25 + (i * 23 % 61) / 61 * 17.5;
     dummy.position.set(x, 0.058, z);
     dummy.rotation.set(-Math.PI / 2, 0, i * 2.1);
     dummy.updateMatrix();
@@ -401,9 +420,136 @@ function batchArchitecture(root: Group, cake: Group): void {
   }
 }
 
+/**
+ * A wrapped gift, built rather than imported.
+ *
+ * The Holiday Bits presents are Christmas red and green, and tinting cannot
+ * fix that: their colour lives in a texture atlas, and a material tint
+ * multiplies, so red only ever becomes darker red — it cannot gain the blue
+ * that purple needs. `aurora.png` wraps its gifts in plum and gold, so they
+ * are boxes and ribbons here instead. It also keeps the pack's blue present
+ * unique to the scored collectible, which must never share a silhouette with
+ * scenery.
+ */
+function makeGift(parent: Group, x: number, y: number, z: number, size: number, plum: boolean, spin = 0): void {
+  const gift = new Group();
+  const wrap = plum ? satin(0x4a1a56, 0.04, 0.72) : satin(0xb98448, 0.3, 0.46);
+  const ribbon = plum ? paleGold : satin(0x6d2a7c, 0.04, 0.7);
+  const w = size;
+  const h = size * 0.82;
+  gift.add(new Mesh(new BoxGeometry(w, h, w), wrap));
+  for (const axis of [0, 1]) {
+    const band = new Mesh(
+      new BoxGeometry(axis ? w * 1.02 : w * 0.17, h * 1.02, axis ? w * 0.17 : w * 1.02),
+      ribbon,
+    );
+    gift.add(band);
+  }
+  // Two loops and a knot read as a bow at this distance; petals do not.
+  for (const side of [-1, 1]) {
+    const loop = new Mesh(new SphereGeometry(w * 0.17, 7, 5), ribbon);
+    loop.position.set(side * w * 0.17, h * 0.56, 0);
+    loop.scale.set(1, 0.62, 0.7);
+    gift.add(loop);
+  }
+  gift.position.set(x, y + h / 2, z);
+  gift.rotation.y = spin;
+  parent.add(gift);
+}
+
+/**
+ * Gift stacks on the dais steps and at the wings.
+ *
+ * The deck in front of her reads bare, but it cannot be dressed: that floor
+ * is where lane warnings and her strikes land, and anything standing on it
+ * competes with a cue the player has under a second to read. The dais face is
+ * the one surface directly beneath her that play never touches.
+ */
+function makeGiftStacks(parent: Group): void {
+  const step = BOSS_LAYOUT.bossStageY - 1.07;
+  const stage = BOSS_LAYOUT.bossStageY;
+  const placements: readonly (readonly [number, number, number, number, boolean, number])[] = [
+    // Dais steps, directly under her.
+    [-2.42, step, -4.42, 0.74, true, 0.34],
+    [-1.74, step, -4.18, 0.54, false, -0.22],
+    [-2.92, step + 0.5, -4.66, 0.48, false, 0.5],
+    [2.38, step, -4.42, 0.7, false, -0.3],
+    [1.7, step, -4.16, 0.52, true, 0.26],
+    [2.9, step + 0.46, -4.66, 0.46, true, -0.46],
+    // Wings, well clear of the corridor.
+    [-3.86, stage, -6.1, 0.78, true, 0.2],
+    [-4.18, stage, -7.2, 0.96, false, -0.2],
+    [-4.46, stage, -7.85, 0.54, false, 0.4],
+    [3.9, stage, -6.55, 0.88, false, 0.2],
+    [4.26, stage, -7.4, 0.68, true, -0.1],
+  ];
+  for (const [x, y, z, size, plum, spin] of placements) makeGift(parent, x, y, z, size, plum, spin);
+}
+
+/**
+ * Confetti hanging in the air, which is the other half of the party the deck
+ * cannot carry.
+ *
+ * Both side volumes only: `BOSS_LAYOUT.sideDressingMinX` outward. The air over
+ * the lanes is where her magic will travel and where the player has under a
+ * second to read a warning, so nothing decorative drifts through it. Gold and
+ * cream, never the hazard magenta, and one instanced mesh so the whole field
+ * is a single draw.
+ */
+class DriftingConfetti {
+  readonly mesh: InstancedMesh;
+  private readonly seeds: Float32Array;
+  private readonly dummy = new Object3D();
+  private time = 0;
+  private static readonly COUNT = 44;
+  private static readonly TOP = 7.5;
+  private static readonly FALL = 9.0;
+
+  constructor() {
+    this.mesh = new InstancedMesh(
+      new PlaneGeometry(0.1, 0.16),
+      new MeshBasicMaterial({ side: DoubleSide, transparent: true, opacity: 0.92 }),
+      DriftingConfetti.COUNT,
+    );
+    const colors = [0xf6c86f, 0xfff0d4, 0xd9a24e, 0xc9a7dd];
+    this.seeds = new Float32Array(DriftingConfetti.COUNT * 4);
+    for (let i = 0; i < DriftingConfetti.COUNT; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      this.seeds[i * 4] = side * (BOSS_LAYOUT.sideDressingMinX + 0.3 + (i * 13 % 29) / 29 * 2.2);
+      this.seeds[i * 4 + 1] = (i * 17 % 37) / 37;
+      this.seeds[i * 4 + 2] = -7.5 + (i * 23 % 41) / 41 * 17;
+      this.seeds[i * 4 + 3] = 0.45 + (i * 11 % 19) / 19 * 0.5;
+      this.mesh.setColorAt(i, new Color(colors[i % colors.length]!));
+    }
+    this.mesh.frustumCulled = false;
+    this.update(0);
+  }
+
+  update(step: number): void {
+    this.time += step;
+    for (let i = 0; i < DriftingConfetti.COUNT; i++) {
+      const x = this.seeds[i * 4]!;
+      const phase = this.seeds[i * 4 + 1]!;
+      const z = this.seeds[i * 4 + 2]!;
+      const speed = this.seeds[i * 4 + 3]!;
+      const fall = (phase + this.time * speed * 0.055) % 1;
+      this.dummy.position.set(
+        x + Math.sin(this.time * speed + phase * 9) * 0.3,
+        DriftingConfetti.TOP - fall * DriftingConfetti.FALL,
+        z,
+      );
+      this.dummy.rotation.set(this.time * speed * 1.6, this.time * speed * 2.1 + phase * 6, phase * 3);
+      this.dummy.updateMatrix();
+      this.mesh.setMatrixAt(i, this.dummy.matrix);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
 export class BossEnvironment {
   readonly root = new Group();
   readonly cake = new Group();
+  private readonly confetti = new DriftingConfetti();
   private time = 0;
 
   constructor() {
@@ -421,36 +567,23 @@ export class BossEnvironment {
     makeCandelabra(this.root, -3.55, -5.5);
     makeCandelabra(this.root, 3.55, -5.5);
     makeCakeDisplay(this.root, this.cake);
+    makeGiftStacks(this.root);
     makeScatteredPartyPaper(this.root);
     batchArchitecture(this.root, this.cake);
     batchArchitecture(this.cake, new Group());
+    // Added after batching: it animates per frame, so it must stay its own mesh.
+    this.root.add(this.confetti.mesh);
   }
 
   update(step: number): void {
     this.time += step;
-    this.cake.position.y = BOSS_LAYOUT.bossStageY + 1.53 + Math.sin(this.time * 1.4) * 0.055;
+    this.confetti.update(step);
+    this.cake.position.y = BOSS_LAYOUT.cakeY + Math.sin(this.time * 1.4) * 0.075;
   }
 
   addProps(models: ReadonlyMap<string, Group>, catalog: readonly BossProp[]): void {
-    const byId = new Map(catalog.map((item) => [item.id, item]));
-    const place = (id: string, x: number, y: number, z: number, height: number, rotation = 0) => {
-      const model = models.get(id);
-      const spec = byId.get(id);
-      if (!model || !spec) return;
-      const clone = model.clone(true);
-      clone.scale.setScalar(height / spec.nativeHeight);
-      const bounds = new Box3().setFromObject(clone);
-      clone.position.set(x, y - bounds.min.y, z);
-      clone.rotation.y = rotation;
-      this.root.add(clone);
-    };
-    const stage = BOSS_LAYOUT.bossStageY;
-    // Cluster real pack gifts at the wings; the playable deck remains empty.
-    place('decorGiftRed', -3.78, stage, -6.1, 0.78, 0.2);
-    place('decorGiftGreen', -4.12, stage, -7.2, 1.05, -0.2);
-    place('decorGiftRed', -4.4, stage, -7.8, 0.55);
-    place('decorGiftGreen', 3.84, stage, -6.55, 0.96, 0.2);
-    place('decorGiftRed', 4.22, stage, -7.4, 0.7, -0.1);
+    void models;
+    void catalog;
     // The City Builder flanks are gone. They are Level 2's street-canyon
     // assets, and standing them beside the gala made the arena read as more
     // of the chase rather than somewhere we had arrived. The skyline band far

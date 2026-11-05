@@ -3,8 +3,21 @@ import {
   Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D,
   Points, PointsMaterial, TextureLoader, TorusGeometry, TubeGeometry, Vector3,
 } from 'three';
-import { BOSS_PARTICLES } from '../../assets/boss/catalog';
+import { BOSS_ACTORS, BOSS_PARTICLES } from '../../assets/boss/catalog';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
+
+/**
+ * Her height, and the heights her spellcraft hangs at.
+ *
+ * Every offset here used to be an absolute world y authored when the dais was
+ * 1.05 units tall. Raising the dais for the low camera left the halo, glyphs
+ * and motes orbiting her ankles. Anchoring to her own body means the magic
+ * follows her whenever the staging moves again, and radii expressed as
+ * fractions of her height stay in proportion if she is rescaled.
+ */
+const AURORA_HEIGHT = BOSS_ACTORS.aurora.targetHeight;
+const FEET = BOSS_LAYOUT.bossStageY + 0.08 + BOSS_LAYOUT.bossFloat;
+const CHEST = FEET + AURORA_HEIGHT * 0.46;
 
 /** Ambient spellcraft stays behind Aurora; attack warnings will own the floor. */
 export class BossMagic {
@@ -32,14 +45,15 @@ export class BossMagic {
       depthWrite: false, blending: AdditiveBlending,
     });
     for (const [radius, thickness, angle, material] of [
-      [2.18, 0.028, 0.1, outer], [1.86, 0.019, -0.15, inner],
+      [AURORA_HEIGHT * 0.525, 0.028, 0.1, outer],
+      [AURORA_HEIGHT * 0.448, 0.019, -0.15, inner],
     ] as const) {
       const ring = new Mesh(new TorusGeometry(radius, thickness, 6, 64), material);
       ring.rotation.z = angle;
       this.halo.add(ring);
       this.rings.push(ring);
     }
-    this.halo.position.set(0, 3.1, BOSS_LAYOUT.bossZ - 1.05);
+    this.halo.position.set(0, CHEST, BOSS_LAYOUT.bossZ - 1.05);
     this.root.add(this.halo);
     for (const side of [-1, 1]) {
       const seal = new Mesh(
@@ -49,7 +63,7 @@ export class BossMagic {
           depthWrite: false, blending: AdditiveBlending,
         }),
       );
-      seal.position.set(side * 3.5, 3.45, BOSS_LAYOUT.bossZ - 1.65);
+      seal.position.set(side * 3.5, CHEST + 0.35, BOSS_LAYOUT.bossZ - 1.65);
       seal.scale.y = 1.3;
       this.wingSeals.push(seal);
       this.root.add(seal);
@@ -76,22 +90,24 @@ export class BossMagic {
       }),
     );
     this.cakeRing.rotation.x = Math.PI / 2;
-    this.cakeRing.position.set(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.bossStageY + 1.42, BOSS_LAYOUT.cakeZ);
+    this.cakeRing.position.set(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.cakeY - 0.1, BOSS_LAYOUT.cakeZ);
     this.root.add(this.cakeRing);
 
     // A fine tether makes the stolen cake visibly Aurora's captive.
     for (const sign of [-1, 1]) {
+      // From her raised hand up to the cake: the line that says she is
+      // holding it there, and the line that snaps at either ending.
       const path = new CatmullRomCurve3([
-        new Vector3(0.68, 3.55, BOSS_LAYOUT.bossZ + 0.05),
-        new Vector3(1.2, 3.8 + sign * 0.11, BOSS_LAYOUT.bossZ - 0.12),
-        new Vector3(1.77, 3.48 + sign * 0.09, BOSS_LAYOUT.cakeZ - 0.1),
-        new Vector3(BOSS_LAYOUT.cakeX, 2.77, BOSS_LAYOUT.cakeZ),
+        new Vector3(0.72, CHEST + 0.25, BOSS_LAYOUT.bossZ + 0.05),
+        new Vector3(1.25, CHEST + 0.78 + sign * 0.12, BOSS_LAYOUT.bossZ - 0.3),
+        new Vector3(1.75, BOSS_LAYOUT.cakeY - 0.72 + sign * 0.1, BOSS_LAYOUT.cakeZ + 0.2),
+        new Vector3(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.cakeY - 0.3, BOSS_LAYOUT.cakeZ),
       ]);
       const strand = new Mesh(
-        new TubeGeometry(path, 26, 0.013, 4, false),
+        new TubeGeometry(path, 26, 0.022, 4, false),
         new MeshBasicMaterial({
           color: sign > 0 ? 0xe18afa : 0x8c3dce,
-          transparent: true, opacity: 0.48, depthWrite: false,
+          transparent: true, opacity: 0.75, depthWrite: false,
           blending: AdditiveBlending,
         }),
       );
@@ -111,7 +127,7 @@ export class BossMagic {
       }),
     );
     this.root.add(this.motes);
-    this.update(0, BOSS_LAYOUT.bossStageY + 1.53);
+    this.update(0, BOSS_LAYOUT.cakeY);
   }
 
   update(step: number, cakeY: number): void {
@@ -126,10 +142,10 @@ export class BossMagic {
     this.cakeRing.rotation.z = t * 0.18;
     for (let i = 0; i < 22; i++) {
       const a = i / 22 * Math.PI * 2 + t * 0.13;
-      const r = 2.34 + (i % 3) * 0.05;
+      const r = AURORA_HEIGHT * 0.564 + (i % 3) * 0.05;
       this.dummy.position.set(
         Math.cos(a) * r,
-        3.1 + Math.sin(a) * r,
+        CHEST + Math.sin(a) * r,
         BOSS_LAYOUT.bossZ - 0.98,
       );
       this.dummy.rotation.z = a + Math.PI / 2;
@@ -141,7 +157,7 @@ export class BossMagic {
       const a = i * 2.39996 + t * (0.13 + i % 3 * 0.035);
       const radius = 0.6 + (i % 5) * 0.26;
       this.points[i * 3] = Math.cos(a) * radius + (i % 4 === 0 ? BOSS_LAYOUT.cakeX : 0);
-      this.points[i * 3 + 1] = 2.45 + Math.sin(a) * 0.75 + (i % 4 === 0 ? 0.25 : 0);
+      this.points[i * 3 + 1] = CHEST - 0.65 + Math.sin(a) * 0.75 + (i % 4 === 0 ? 0.25 : 0);
       this.points[i * 3 + 2] = BOSS_LAYOUT.bossZ - 0.15 - (i % 3) * 0.3;
     }
     (this.motes.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;

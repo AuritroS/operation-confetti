@@ -88,7 +88,7 @@ function makeShaft(parent: Group): void {
   // One shared additive material, so every glow sleeve in the tower batches
   // into a single extra draw call.
   const bloom = new MeshBasicMaterial({
-    color: 0xff5ae8, transparent: true, opacity: 0.3,
+    color: 0xff5ae8, transparent: true, opacity: 0.17,
     depthWrite: false, blending: AdditiveBlending,
   });
   const cyanBloom = new MeshBasicMaterial({

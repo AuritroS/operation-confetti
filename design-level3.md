@@ -209,10 +209,28 @@ and triangle counts, and exposes the scene graph on `window.level3` so capture
 tooling can measure real bounds instead of assumed coordinates. Shoot the
 viewport matrix with `node tools/boss-capture.mjs --query debug`.
 
-Still open for the next stage: colour discipline (magenta and blue are
-reserved for attacks and gifts but still appear in the lane dividers, the 64
-floor flecks and the red/green scenery presents), the cake tether, foreground
-birthday dressing under Aurora, and the winter trim still on the lantern prop.
+Colour discipline is done. Magenta now appears only where it means something
+— Aurora herself, her magic, and the tower's neon — and the signal colours are
+out of the decor: lane dividers are warm stone, fallen paper is gold and cream
+and sits on the shoulders rather than across the corridor, and the gifts are
+plum and gold.
+
+Note the rule as it is actually practised, which is not what
+`src/render/palette.ts` says in its header. `src/render/entities.ts` records
+the later decision: the collectible was blue on a navy world and read as
+camouflage, so level 1's gift sparkle became gold. The working language is
+**gold take it, magenta avoid it**. Gold is therefore both trim and the
+collectible signal, and what separates them is the *animated sparkle*, not the
+hue — so static gold dressing must never shimmer.
+
+The scenery gifts are procedural. The Holiday Bits presents are Christmas red
+and green and cannot be tinted out of it: their colour is in a texture atlas
+and a material tint multiplies, so red only becomes darker red. It also keeps
+the pack's blue present unique to the scored collectible.
+
+Still open for the next stage: the telegraph vocabulary — lane warning and
+impact states, Aurora's shield, her strike shape, the magic orb — plus the
+cake's recovery and escape poses.
 
 ### Spatial contract
 

@@ -22,8 +22,14 @@ export const BOSS_LAYOUT = {
   bossStageY: 2.6,
   /** She hovers clear of the dais: the last bit of lift is hers, not the architecture's. */
   bossFloat: 0.3,
-  cakeX: 2.25,
-  cakeZ: -5.8,
+  /**
+   * The stolen cake, held aloft in her magic rather than stood on a plinth.
+   * It is the plot object — victory recovers it, defeat leaves with it — so it
+   * stays in frame beside her head and visibly out of Matthew's reach.
+   */
+  cakeX: 2.1,
+  cakeY: 6.1,
+  cakeZ: -6.6,
   deckHalfWidth: 4.8,
   sideDressingMinX: 3.35,
 } as const;

@@ -3,7 +3,6 @@ import {
   InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PointLight, Scene,
   BoxGeometry, DoubleSide, WebGLRenderer, ACESFilmicToneMapping,
 } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BOSS_PROPS } from '../../assets/boss/catalog';
 import type { BossPractice } from '../../levels/boss/practice';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
@@ -75,13 +74,10 @@ export class BossScene {
   }
 
   async load(): Promise<void> {
-    const loader = new GLTFLoader();
-    const selected = BOSS_PROPS.filter((item) => ['decorGiftRed', 'decorGiftGreen'].includes(item.id));
-    const [models] = await Promise.all([
-      Promise.all(selected.map(async (item) => [item.id, (await loader.loadAsync(item.url)).scene] as const)),
-      this.actors.load(),
-    ]);
-    this.environment.addProps(new Map(models), BOSS_PROPS);
+    // Every environment prop is procedural now; only the actors and the
+    // cannon they carry come from GLBs.
+    await this.actors.load();
+    this.environment.addProps(new Map(), BOSS_PROPS);
   }
 
   update(game: BossPractice, step: number): void {
