@@ -282,6 +282,18 @@ export function buildMoon(size = 18): Mesh {
   });
   const moon = new Mesh(new PlaneGeometry(size, size), mat);
   moon.userData.isNeon = true;
+  /*
+   * Drawn as sky, not as geometry.
+   *
+   * It was an ordinary transparent plane competing on depth, so as level 1's
+   * drifted twenty-four units closer over the route it walked into the band
+   * the city buildings occupy and started appearing in front of them and
+   * intersecting. Disabling the depth test and drawing early puts it behind
+   * everything by construction, which is what a moon is: there is no distance
+   * at which a building should be behind it.
+   */
+  mat.depthTest = false;
+  moon.renderOrder = -9;
   return moon;
 }
 

@@ -92,14 +92,15 @@ export class SkylineLayer implements EnvironmentLayer {
       // distance falloff through the darkening above.
       unfog(prop);
       /*
-       * Taller, because they now start at the street rather than in mid-air.
+       * Taller, but no wider.
        *
-       * Basing them at -4 was what made the backdrop float; dropping them to
-       * the real ground costs eight and a half units of visible height, so
-       * the scale goes up to put the skyline back above the roofline. The
-       * silhouette is what the player sees, and it is unchanged.
+       * Grounding these cost eight and a half units of visible height, and
+       * compensating with a uniform scale doubled every footprint too — which
+       * is why the backdrop read as huge rather than tall. The footprint keeps
+       * its original scale and the height is bought on Y alone.
        */
-      prop.scale.multiplyScalar(1.9 + ((i * 11) % 5) * 0.45);
+      const footprint = 0.9 + ((i * 11) % 5) * 0.2;
+      prop.scale.set(footprint, footprint * 2.1, footprint);
       prop.position.set(x, GROUND_Y, z);
       this.items.push(prop);
       this.anchors.push({ x, z });
@@ -143,7 +144,8 @@ export class SkylineLayer implements EnvironmentLayer {
     // changed nothing, and why both sat outside the 160-unit far plane for
     // most of the route. One source of truth, in `look.ts`.
     this.tower.position.z = TOWER.route.z + travelled * 0.05;
-    this.moon.position.z = MOON.route.z + travelled * 0.05;
+    // The moon does not drift. Nothing a player can walk past changes where
+    // the moon is, and its drift is what used to carry it into the city.
   }
 
   dispose(): void {

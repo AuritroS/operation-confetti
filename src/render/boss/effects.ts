@@ -5,7 +5,7 @@ import {
 } from 'three';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { glowTexture } from '../effects';
-import { ROLE } from '../palette';
+import { PALETTE } from '../palette';
 import type { BossCues, CakeSnapshot, OrbImpactSnapshot, OrbSnapshot, ShieldSnapshot, StrikeSnapshot } from '../../levels/boss/telegraph';
 import { endingEase, escapeOffset } from './endings';
 import { AURORA_TORSO, MATTHEW_ORB_IMPACT } from './targets';
@@ -525,18 +525,18 @@ class GiftView {
   constructor() {
     this.root.add(this.box);
     /*
-     * The same gold glow levels 1 and 2 give a collectible.
+     * A glow lit from inside the present, in the present's own colour.
      *
-     * Level 3 rendered a plain blue present with no aura, so the one thing
-     * worth chasing looked different in the last level of the game — the
-     * catalog even called it "plain blue present until cross-level
-     * collectible treatment is agreed". Crossed quads, lit from inside the
-     * box rather than ringed around it, sharing `glowTexture` so a change to
-     * the reward look reaches all three levels at once.
+     * Level 3's collectible is the blue variant, and a gold aura on a blue
+     * box read as two different objects rather than one lit one. Levels 1
+     * and 2 keep the gold their gifts are built around; here the light
+     * matches what it is coming out of. Shares `glowTexture` with them, so
+     * the shape of the reward cue stays identical across all three and only
+     * the hue differs.
      */
     const glowGeometry = new PlaneGeometry(1.05, 1.05);
     const glowMaterial = new MeshBasicMaterial({
-      color: ROLE.collectible,
+      color: PALETTE.blueLight,
       map: glowTexture(),
       transparent: true,
       opacity: 0.85,
