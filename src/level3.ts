@@ -217,7 +217,7 @@ void level.mount(ctx).then(() => {
   sceneStatus.hidden = true;
   // Review hook: `?debug` exposes the mounted level so headless capture tooling
   // can measure real world bounds instead of re-deriving assumed coordinates.
-  if (debugging) (window as unknown as Record<string, unknown>).level3 = { level, runner: level.runner, host, cues };
+  if (debugging) (window as unknown as Record<string, unknown>).level3 = { level, runner: level.runner, host, cues, get scene() { return level.scene; } };
   loop.start();
 }).catch((error: unknown) => {
   sceneStatus.textContent = `Scene asset failed to load: ${String(error)}`;

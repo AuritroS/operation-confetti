@@ -50,10 +50,21 @@ export const BOSS_ANIMATION_LIBRARIES = [
  * screen pixels — invisible, in a game called Operation Confetti. It is
  * deliberately oversized rather than accurate, so the silhouette reads.
  */
+/**
+ * The cannon in Matthew's right hand.
+ *
+ * The final term was PI, which aimed the barrel at Aurora correctly but
+ * rolled the cannon ninety degrees onto its side — its up axis came out along
+ * world +X. The hand bone is not axis-aligned, so this is not derivable on
+ * paper; measured through `?debug` on level3.html, which exposes the scene so
+ * an attachment's real world axes can be read. At PI/2 the cannon's up reads
+ * (0, 0.69, -0.02) and the barrel (0.18, -0.02, -0.67), which is upright and
+ * pointing down the deck at her.
+ */
 export const BOSS_CANNON_MOUNT = {
   handNode: 'handslot.r',
   position: [0, 0, 0],
-  rotationEuler: [-Math.PI / 2, 0, Math.PI],
+  rotationEuler: [-Math.PI / 2, 0, Math.PI / 2],
   scale: 1.05,
   muzzleLocal: [0.08, 0.11, 0.78],
 } as const;

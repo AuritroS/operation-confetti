@@ -140,6 +140,9 @@ export class BossLevel implements LevelController {
     };
   }
 
+  /** The scene, for headless review that measures real world transforms. */
+  get scene(): BossScene | null { return this.view; }
+
   get drawCalls(): number { return this.view?.drawCalls ?? 0; }
   get triangles(): number { return this.view?.triangles ?? 0; }
 

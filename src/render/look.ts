@@ -56,7 +56,17 @@ export const TOWER = {
 } as const;
 
 export const MOON = {
-  route: { size: 24, x: 22, y: 26, z: -140 },
+  /*
+   * High enough to clear the backdrop entirely.
+   *
+   * The tallest backdrop building tops out near y 23, and the moon spanned
+   * 14 to 38 — so its lower half was crossed by the skyline. Because the moon
+   * draws as sky with no depth test, those distant buildings painted over a
+   * nearer moon, which read as the backdrop phasing through it. Lifting the
+   * moon above the skyline removes the overlap rather than arguing about
+   * which should win.
+   */
+  route: { size: 24, x: 22, y: 40, z: -140 },
   skyline: { size: 28, x: 16, y: 32, z: -155 },
   /** Right of the tower, matching levels 1 and 2, and clear of the arch. */
   boss: { size: 4.6, x: 11.2, y: 12.4, z: -24 },
