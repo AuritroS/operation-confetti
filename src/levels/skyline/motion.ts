@@ -1,5 +1,5 @@
 import type { Anchor, Course, Kinematic, Lane, Phase, Point3, RouteSample, TravelMode } from './types';
-import { ACCEL, BAY, COURSE, LAND_TIME, MOTION_LIMIT_X, positionAt, speedAt } from './config';
+import { BAY, COURSE, LAND_TIME, MOTION_LIMIT_X, accelerationAt, positionAt, speedAt } from './config';
 
 const isSkyline = (c: Course): boolean =>
   c.duration === COURSE.duration && Math.abs(c.laneWidth - COURSE.laneWidth) < 1e-4;
@@ -62,8 +62,9 @@ function skyHeight(c: Course, t: number): Axis {
  * - Accelerating as you pull down into the trough.
  * - Decelerating as you climb up to the apex float.
  *
- * Continuous linear speed ramp (Level 1 style):
- * Base velocity accelerates linearly from 9.5 u/s to 14.5 u/s over 45s (a = 0.111 u/s²).
+ * Progressive curved speed ramp:
+ * Base velocity accelerates progressively from 8.0 u/s to 18.0 u/s over 45s via
+ * v(t) = 8.0 + 10.0 * (t / 45)^1.5.
  * Sinusoidal surge is periodic with canyon bay crossings (every 27.2m).
  */
 function forwardMotion(c: Course, t: number, mode: TravelMode): Axis {
@@ -81,7 +82,7 @@ function forwardMotion(c: Course, t: number, mode: TravelMode): Axis {
   }
   const p = positionAt(t);
   const baseV = speedAt(t);
-  const rampA = t >= 0 && t <= COURSE.duration ? ACCEL : 0;
+  const rampA = accelerationAt(t);
   if (mode === 'run') {
     return { p, v: baseV, a: rampA };
   }

@@ -17,33 +17,54 @@ import type { Lane, TravelMode } from './types';
 export const BAY = 27.2;
 
 /**
- * Continuous linear speed ramp:
- * Starts at 9.5 u/s and smoothly accelerates to 14.5 u/s at t=45s (a = 0.111 u/s²).
- * Replaces step gear shifts with zero-jerk, continuous Level 1-style acceleration.
+ * Progressive curved speed ramp (Option 3):
+ * Starts at 8.0 u/s and smoothly accelerates to 18.0 u/s at t=45s via v(t) = v0 + dv * (t/D)^1.5.
+ * - Act 1 (0-11s):  8.0 ->  9.2 u/s (calm warmup, forgiving reactions)
+ * - Act 2 (11-23s): 9.2 -> 11.6 u/s (building momentum through gantry/barricade)
+ * - Act 3 (23-34s): 11.6 -> 14.6 u/s (fast slalom weaves)
+ * - Act 4 (34-45s): 14.6 -> 18.0 u/s (high-octane runaway climax!)
+ *
+ * Integrated distance across 45s: z(45) = 540.0m (v_avg = 12.0 u/s).
  */
-const START_SPEED = 9.5;
-const END_SPEED = 14.5;
+const START_SPEED = 8.0;
+const END_SPEED = 18.0;
 const DURATION = 45;
-export const ACCEL = (END_SPEED - START_SPEED) / DURATION; // 5 / 45 = 1/9 u/s²
+const DELTA_SPEED = END_SPEED - START_SPEED; // 10.0 u/s
+const D_POW_1_5 = Math.pow(DURATION, 1.5); // 45^1.5 ≈ 301.869
+const K_POS = DELTA_SPEED / (2.5 * D_POW_1_5); // 10 / (2.5 * 301.869)
+const K_ACCEL = (1.5 * DELTA_SPEED) / D_POW_1_5; // 15 / 301.869
 
 export function speedAt(t: number): number {
   if (t <= 0) return START_SPEED;
   if (t >= DURATION) return END_SPEED;
-  return START_SPEED + ACCEL * t;
+  return START_SPEED + (DELTA_SPEED / D_POW_1_5) * t * Math.sqrt(t);
 }
+
+export function accelerationAt(t: number): number {
+  if (t <= 0 || t >= DURATION) return 0;
+  return K_ACCEL * Math.sqrt(t);
+}
+
+export const ROUTE_LENGTH = 540.0;
 
 export function positionAt(t: number): number {
   if (t <= 0) return t * START_SPEED;
   const clamped = Math.min(DURATION, t);
-  const z = START_SPEED * clamped + 0.5 * ACCEL * clamped * clamped;
+  const z = START_SPEED * clamped + K_POS * clamped * clamped * Math.sqrt(clamped);
   return t > DURATION ? z + END_SPEED * (t - DURATION) : z;
 }
 
 export function timeAt(z: number): number {
   if (z <= 0) return z / START_SPEED;
-  const maxZ = 540.0;
-  if (z >= maxZ) return DURATION + (z - maxZ) / END_SPEED;
-  return (-START_SPEED + Math.sqrt(START_SPEED * START_SPEED + 2 * ACCEL * z)) / ACCEL;
+  if (z >= ROUTE_LENGTH) return DURATION + (z - ROUTE_LENGTH) / END_SPEED;
+  // Newton-Raphson inversion with initial guess z / v_avg.
+  // 4 unrolled iterations reach machine precision (< 1e-13).
+  let t = z / 12.0;
+  t -= (positionAt(t) - z) / speedAt(t);
+  t -= (positionAt(t) - z) / speedAt(t);
+  t -= (positionAt(t) - z) / speedAt(t);
+  t -= (positionAt(t) - z) / speedAt(t);
+  return t;
 }
 
 /** Route parameters. */
@@ -57,8 +78,6 @@ export const COURSE = {
   groundY: 1.25,
   cycle: 3.2,
 } as const;
-
-export const ROUTE_LENGTH = 540.0;
 
 /**
  * Half-width of the interactive zone.
