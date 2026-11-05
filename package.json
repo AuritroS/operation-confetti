@@ -17,6 +17,7 @@
     "deploy": "npm run build && wrangler deploy",
     "db:push": "node tools/db-push.mjs",
     "db:check": "node tools/db-push.mjs --check",
+    "deploy:secrets": "node tools/deploy-secrets.mjs",
     "assets:inspect": "node tools/inspect-glb.mjs",
     "assets:build": "node tools/build-assets.mjs && node tools/recolour.mjs && node tools/build-asset-index.mjs",
     "tunnel": "node tools/tunnel.mjs",

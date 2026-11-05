@@ -42,9 +42,27 @@ function psql(args, { quiet = false } = {}) {
 
 const conn = psql(['-tAc', 'select current_database()'], { quiet: true });
 if (conn.status !== 0) {
+  const stderr = (conn.stderr ?? '').trim().replace(/postgresql:\/\/\S+/g, '<uri>');
   console.error('\n  could not connect:\n');
-  console.error((conn.stderr ?? '').trim().replace(/postgresql:\/\/\S+/g, '<uri>'));
-  console.error('\n  Check SUPABASE_DB_PASSWORD, and that the project is not paused.\n');
+  console.error(stderr);
+
+  /*
+   * Name resolution is its own diagnosis.
+   *
+   * `db.<ref>.supabase.co` is the direct connection, and newer projects
+   * publish it as AAAA only — so a machine without IPv6 gets "could not
+   * translate host name" and nothing about the password is wrong. The
+   * session pooler answers on IPv4 and takes the same SQL.
+   */
+  if (/translate host name|Name or service not known|nodename nor servname/i.test(stderr)) {
+    console.error('\n  That host did not resolve. It is the direct connection, which newer');
+    console.error('  Supabase projects publish over IPv6 only. Use the session pooler:');
+    console.error('  Dashboard > Connect > Session pooler, then in .env set');
+    console.error('    SUPABASE_DB_HOST=aws-0-<region>.pooler.supabase.com');
+    console.error(`    SUPABASE_DB_USER=postgres.${env.SUPABASE_PROJECT_REF}\n`);
+  } else {
+    console.error('\n  Check SUPABASE_DB_PASSWORD, and that the project is not paused.\n');
+  }
   process.exit(1);
 }
 console.log(`  connected: ${conn.stdout.trim()}`);
