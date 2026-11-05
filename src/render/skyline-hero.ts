@@ -83,7 +83,7 @@ const FACING_Y = Math.PI;
  * end is the one actually on camera, since the anchor sits 7 to 27 units
  * down the street.
  */
-const MUZZLE_LOCAL = new Vector3(0.08, 0.11, 0.78);
+const MUZZLE_LOCAL = new Vector3(0, 0.059, 0.438);
 
 /** How fast the arms settle toward the pose, as an exponential time constant. */
 const ARM_SETTLE = 0.055;
@@ -337,6 +337,11 @@ class RiggedHero implements SkylineHero {
           if (lateral < 0.18) {
             this.reach.addScaledVector(this.axisX, 0.18 - lateral).normalize();
           }
+          // Prevent arm from being dragged backward behind the shoulder coronal plane
+          const forward = this.reach.dot(this.axisZ);
+          if (forward < 0.08) {
+            this.reach.addScaledVector(this.axisZ, 0.08 - forward).normalize();
+          }
           this.tiltToward(this.reach, this.axisX, OUTWARD_TILT);
           this.aim(upper.bone, upper.rest, this.reach, this.grip);
           this.aim(lower.bone, lower.rest, this.reach, this.grip * FOREARM_FOLLOW);
@@ -385,21 +390,39 @@ class RiggedHero implements SkylineHero {
       }
     }
 
-    // Athletic flight soar pose: trailing arms during free-flight soar or unattached descent
+    // Athletic flight soar pose: trailing left arm for balance, forward-held right blaster
     if (!holding && (s.phase === 'flight' || s.phase === 'descend')) {
       this.readBasis();
       const upperR = this.rightArm[0], lowerR = this.rightArm[1];
       const upperL = this.leftArm[0], lowerL = this.leftArm[1];
-      for (const [side, up, low] of [[1, upperR, lowerR], [-1, upperL, lowerL]] as const) {
-        if (up && low) {
-          this.counter
-            .copy(this.axisY).multiplyScalar(-0.35)
-            .addScaledVector(this.axisZ, -0.65)
-            .addScaledVector(this.axisX, side * 0.45)
+
+      // Right arm (holding blaster): held forward and slightly outward, scanning ahead
+      if (upperR && lowerR) {
+        this.counter
+          .copy(this.axisZ).multiplyScalar(0.70)
+          .addScaledVector(this.axisX, 0.35)
+          .addScaledVector(this.axisY, -0.15)
+          .normalize();
+        this.aim(upperR.bone, upperR.rest, this.counter, 0.85);
+        this.aim(lowerR.bone, lowerR.rest, this.counter, 0.85 * FOREARM_FOLLOW);
+        if (this.rightWrist) {
+          this.targetInLowerarm.copy(this.axisZ)
+            .applyQuaternion(lowerR.bone.getWorldQuaternion(this.parentQuat).invert())
             .normalize();
-          this.aim(up.bone, up.rest, this.counter, 0.75);
-          this.aim(low.bone, low.rest, this.counter, 0.75 * FOREARM_FOLLOW);
+          this.wristDiff.setFromUnitVectors(BARREL_LOCAL_IN_WRIST, this.targetInLowerarm);
+          this.rightWrist.quaternion.slerp(this.wristDiff, 0.85);
         }
+      }
+
+      // Left arm (free arm): sweeps back and out for aerodynamic balance
+      if (upperL && lowerL) {
+        this.counter
+          .copy(this.axisY).multiplyScalar(-0.35)
+          .addScaledVector(this.axisZ, -0.65)
+          .addScaledVector(this.axisX, -0.45)
+          .normalize();
+        this.aim(upperL.bone, upperL.rest, this.counter, 0.75);
+        this.aim(lowerL.bone, lowerL.rest, this.counter, 0.75 * FOREARM_FOLLOW);
       }
     }
 

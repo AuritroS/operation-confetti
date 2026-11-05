@@ -34,8 +34,8 @@ export const SOURCES = {
     '/models/src/Rig_Medium_MovementBasic.glb',
   ],
   props: {
-    /** Confetti blaster. The Kenney blaster is gone — see plan.ts. */
-    blaster: '/models/props/snowball_cannon.glb',
+    /** Confetti blaster / grappling gun. Uses Kenney compact blaster for sleek silhouette. */
+    blaster: '/models/props/blaster.glb',
     gift: '/models/props/present_A_blue.glb',
     grappleHook: '/models/props/candycane_small.glb',
   },
@@ -142,8 +142,8 @@ export const ATTACH_OFFSETS = {
   blaster: {
     position: [0, 0, 0] as [number, number, number],
     rotationEuler: [-Math.PI / 2, 0, Math.PI] as [number, number, number],
-    /** The model is 0.95 long against a 2.18-tall character; 1.0 is a cannon. */
-    scale: 0.5,
+    /** Sleek handheld carbine/blaster scale for Matthew's hand */
+    scale: 0.95,
   },
 } as const;
 
