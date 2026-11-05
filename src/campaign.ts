@@ -27,6 +27,8 @@ import { SkylineLevel } from './levels/skyline/controller';
 import { BossLevel } from './levels/boss/controller';
 import { Hud } from './ui/hud';
 import { BossHud } from './ui/boss-hud';
+import { Tutorial, type TutorialCopy } from './ui/tutorial';
+import { Fade } from './ui/fade';
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -47,6 +49,9 @@ const host = new RendererHost(canvas);
 host.observe();
 const hud = new Hud();
 const bossHud = new BossHud(levelHud);
+const app = canvas.parentElement ?? document.body;
+const tutorial = new Tutorial(app);
+const fade = new Fade(app);
 
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
@@ -57,12 +62,38 @@ interface StageSpec {
   readonly id: 1 | 2 | 3;
   readonly title: string;
   readonly make: () => LevelController;
+  /** What the tutorial sheet says before this level is played. */
+  readonly copy: TutorialCopy;
 }
 
 const STAGES: readonly StageSpec[] = [
-  { id: 1, title: 'The Gift Vault', make: () => new RouteLevel(host) },
-  { id: 2, title: 'Skyline Chase', make: () => new SkylineLevel(host) },
-  { id: 3, title: 'One Last Party Trick', make: () => new BossLevel() },
+  {
+    id: 1,
+    title: 'The Gift Vault',
+    make: () => new RouteLevel(host),
+    copy: {
+      chapter: '1 · THE GIFT HEIST',
+      verbs: ['Swipe left or right to change lanes.', 'Collect gifts. Dodge the hazards.'],
+    },
+  },
+  {
+    id: 2,
+    title: 'Skyline Chase',
+    make: () => new SkylineLevel(host),
+    copy: {
+      chapter: '2 · THE SKYLINE CHASE',
+      verbs: ['Swipe up to grapple the next anchor.', 'Swipe left or right to steer, down to drop.'],
+    },
+  },
+  {
+    id: 3,
+    title: 'One Last Party Trick',
+    make: () => new BossLevel(),
+    copy: {
+      chapter: '3 · CAKE SHOWDOWN',
+      verbs: ['Swipe to dodge the marked lanes.', 'Tap to fire confetti when her shield drops.'],
+    },
+  },
 ];
 
 // ---- run state ---------------------------------------------------------
@@ -140,6 +171,12 @@ swingInput.onGesture((g) => {
   else if (g.type === 'restart') void restartCampaign();
 });
 
+/** Leave the rehearsal and begin the scored run. */
+function beginPlay(): void {
+  tutorial.hide();
+  current?.beginPlay();
+}
+
 function useInputFor(id: 1 | 2 | 3): void {
   laneInput.detach();
   swingInput.detach();
@@ -199,13 +236,16 @@ async function mountStage(): Promise<void> {
   await level.mount(ctx);
   current = level;
 
-  // The boss fight opens in its protected practice state; in the campaign
-  // nobody is there to press a button, so it starts as soon as it is shown.
-  if (level instanceof BossLevel) level.startFight();
+  // Every level opens in a rehearsal. The sheet explains the verbs, the
+  // player can try them against the real scene, and nothing counts until
+  // they tap through — which is also what holds the screen while a slow
+  // level finishes building.
+  tutorial.show(spec.copy, beginPlay);
 
   useInputFor(spec.id);
   switching = false;
   if (!lifecycle.isPaused) loop.start();
+  await fade.reveal();
 }
 
 async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
@@ -217,6 +257,9 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
   const last = index >= STAGES.length - 1;
   if (beaten || last) return endCampaign(result);
 
+  // Curtain down before the swap: a level being torn down while another is
+  // built is the one moment the scene is genuinely inconsistent.
+  await fade.cover();
   current?.dispose();
   current = null;
   index++;
@@ -236,6 +279,8 @@ function endCampaign(result: 'complete' | 'defeated'): void {
 }
 
 async function restartCampaign(): Promise<void> {
+  await fade.cover();
+  tutorial.hide();
   current?.dispose();
   current = null;
   events = [];

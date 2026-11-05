@@ -62,6 +62,24 @@ export interface LevelController {
    */
   dispose(): void;
 
-  /** `null` while playing, set once and never cleared when the level ends. */
+  /**
+   * True until `beginPlay`.
+   *
+   * A rehearsal: the verbs work, nothing can score and nothing can hurt. The
+   * one rule every level must honour is that **no `RunEvent` is emitted while
+   * this is true** — a gift picked up in practice must not reach the run.
+   */
+  readonly inPractice: boolean;
+
+  /** Leave practice: reset the level and begin the scored run. */
+  beginPlay(): void;
+
+  /**
+   * `null` while playing, set once and never cleared when the level ends.
+   *
+   * Set only after the level's ending has played, not on the frame it is
+   * won — the shell transitions on this, and cutting away sooner would eat
+   * the celebration.
+   */
   readonly result: LevelOutcome | null;
 }

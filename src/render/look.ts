@@ -71,3 +71,16 @@ export const MOON = {
   /** Right of the tower, matching levels 1 and 2, and clear of the arch. */
   boss: { size: 4.6, x: 11.2, y: 12.4, z: -24 },
 } as const;
+
+/**
+ * How far short of a level's endpoint its gate stands.
+ *
+ * Both gates used to sit exactly at the endpoint, which is the player's own
+ * position on completion, so a level finished with Matthew standing inside
+ * the door. The simulation endpoint has not moved; only the gate has, so he
+ * arrives in front of it with room to celebrate.
+ *
+ * Shared because both levels end this way, and they should end at the same
+ * distance from the same object.
+ */
+export const GATE_GAP = 6;

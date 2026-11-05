@@ -74,6 +74,11 @@ export class BossLevel implements LevelController {
     await this.view.load();
   }
 
+  /** The boss fight has always had this; it is now the shared contract. */
+  get inPractice(): boolean { return this.runner.state === 'practice'; }
+
+  beginPlay(): void { this.startFight(); }
+
   /** Leave the protected practice state and begin scored combat. */
   startFight(): void {
     this.runner.startFight();

@@ -6,6 +6,7 @@ import {
 } from 'three';
 import { Stage } from './stage';
 import type { RendererHost } from './renderer-host';
+import { GATE_GAP } from './look';
 import { SkylineCamera } from './skyline-camera';
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
@@ -279,6 +280,11 @@ export class SkylineScene {
    * The stand-in is hidden rather than removed: it is what the level falls
    * back to, and a failed reload should not leave an empty street.
    */
+  /** Arrival celebration, forwarded to whichever hero is installed. */
+  celebrate(): void {
+    this.rigged?.celebrate?.();
+  }
+
   useHero(hero: SkylineHero): void {
     if (this.rigged) return;
     this.rigged = hero;
@@ -496,7 +502,9 @@ export class SkylineScene {
       pool.instanceMatrix.needsUpdate = true;
     });
     const finish = scrollZ - (this.course.duration === 45 ? ROUTE_LENGTH : this.course.duration * this.course.speed);
-    this.finishDoor.position.z = finish;
+    // Short of the endpoint, so he arrives in front of the gate with room
+    // to celebrate rather than finishing inside the door.
+    this.finishDoor.position.z = finish - GATE_GAP;
     for (const [mesh, count] of [[this.blocks, b], [this.trims, w]] as const) {
       mesh.count = count; mesh.instanceMatrix.needsUpdate = true;
     }

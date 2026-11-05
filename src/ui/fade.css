@@ -1,0 +1,26 @@
+@import './theme.css';
+
+/*
+ * The curtain between levels.
+ *
+ * Above everything except the portrait request, because it has to cover a
+ * level being torn down and another being built — which is the moment the
+ * scene is genuinely inconsistent, and the moment a slow load happens.
+ */
+.fade {
+  position: absolute;
+  z-index: 48;
+  inset: 0;
+  background: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 350ms ease;
+}
+.fade--on {
+  opacity: 1;
+  /* Block input while covered: taps would land on a level nobody can see. */
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade { transition-duration: 1ms; }
+}

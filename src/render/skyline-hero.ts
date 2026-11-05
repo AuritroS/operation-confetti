@@ -144,6 +144,8 @@ const COUNTER_SWAY = 0.03;
 export interface SkylineHero {
   readonly object: Object3D;
   update(s: Snapshot, dt: number, reduced: boolean): void;
+  /** Arrival celebration at the gate. Level 1's hero has the same beat. */
+  celebrate?(): void;
   /**
    * World position midway between the hands, for the cable to start at.
    *
@@ -273,6 +275,8 @@ class RiggedHero implements SkylineHero {
    * for the remaining 0.7s. These record what to fall into, and when.
    */
   private settleTo: string | null = null;
+  /** Set once the run is over, so phase changes stop choosing the clip. */
+  private celebrating = false;
   private settleAt = 0;
 
   constructor(
@@ -319,6 +323,20 @@ class RiggedHero implements SkylineHero {
     if (found < 4) {
       console.warn(`[skyline] only ${found}/4 arm bones found; swing pose degraded`);
     }
+  }
+
+  /**
+   * Arrival at the gate.
+   *
+   * `CLIPS.matthew.cheer` is `Jump_Full_Short`, the same clip level 1 plays,
+   * so both levels end on the same beat. The flag matters because this
+   * hero's clip is otherwise reselected from the swing phase every frame,
+   * which would overwrite the celebration on the next update.
+   */
+  celebrate(): void {
+    this.celebrating = true;
+    this.settleTo = null;
+    this.actor.play(CLIPS.matthew.cheer, { loop: false, clampWhenFinished: true, fade: 0.2 });
   }
 
   update(s: Snapshot, dt: number, reduced: boolean): void {
@@ -552,6 +570,9 @@ class RiggedHero implements SkylineHero {
    * every frame, so the phase is compared against the last one applied.
    */
   private playFor(s: Snapshot): void {
+    // The arrival celebration outranks the phase; letting the phase keep
+    // choosing would overwrite it on the very next frame.
+    if (this.celebrating) return;
     const phase = s.phase;
     if (phase === this.lastPhase) return;
     this.lastPhase = phase;

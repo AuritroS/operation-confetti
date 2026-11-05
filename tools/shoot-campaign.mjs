@@ -37,6 +37,16 @@ await build({ logLevel: 'error', define: { 'import.meta.env.DEV': 'true' }, buil
 const LAUNCH = ['--no-sandbox', '--disable-gpu', '--single-process',
   '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'];
 
+/**
+ * Tap through the tutorial sheet.
+ *
+ * Every level opens in a rehearsal that scores nothing and never ends, so a
+ * check that skipped this would be measuring practice rather than play.
+ */
+async function startLevel(target) {
+  await target.locator('.tutorial__start').click({ timeout: 30_000 });
+}
+
 const problems = [];
 for (const viewport of VIEWPORTS) {
   // One browser per viewport: --single-process tears the whole process down
@@ -61,6 +71,9 @@ for (const viewport of VIEWPORTS) {
 
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
   await page.waitForFunction(() => window.__campaign && !window.__campaign.switching, null, { timeout: 60_000 });
+  await page.waitForTimeout(3500);
+  await page.screenshot({ path: join(SHOTS, `tutorial-${viewport.name}.png`) });
+  await startLevel(page);
   // Hide the debug panel: this is a review of what a player sees.
   await page.evaluate(() => { const d = document.getElementById('debug'); if (d) d.hidden = true; });
 
@@ -76,6 +89,7 @@ for (const viewport of VIEWPORTS) {
       await page.evaluate(() => window.__campaign.skip());
       await page.waitForFunction((w) => window.__campaign.stage === w && !window.__campaign.switching,
         stage + 1, { timeout: 60_000 });
+      await startLevel(page);
     }
   }
   process.stdout.write(`${errors.length ? 'FAIL' : 'ok  '} ${viewport.name}\n`);

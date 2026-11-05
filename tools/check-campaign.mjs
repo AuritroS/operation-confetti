@@ -65,6 +65,16 @@ await page.route('**/*', async (route) => {
   });
 });
 
+/**
+ * Tap through the tutorial sheet.
+ *
+ * Every level now opens in a rehearsal that scores nothing, so a check that
+ * skipped this would be measuring practice rather than play.
+ */
+async function startLevel(target) {
+  await target.locator('.tutorial__start').click({ timeout: 30_000 });
+}
+
 const campaign = () => page.evaluate(() => {
   const c = window.__campaign;
   return c ? { stage: c.stage, score: c.score, switching: c.switching, over: c.over } : null;
@@ -74,6 +84,22 @@ try {
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
   await page.waitForFunction(() => window.__campaign && !window.__campaign.switching, null, { timeout: 60_000 });
 
+  // The rehearsal must cost nothing. Let it run, try the verb, and confirm
+  // the run is untouched — a gift taken in practice reaching the event list
+  // would inflate every score that followed.
+  await page.waitForTimeout(2500);
+  const rehearsed = await page.evaluate(() => ({
+    score: window.__campaign.score,
+    events: window.__campaign.events.length,
+    open: document.querySelector('.tutorial') !== null
+      && !document.querySelector('.tutorial').hidden,
+  }));
+  assert.equal(rehearsed.open, true, 'the tutorial sheet should be up before play');
+  assert.equal(rehearsed.score, 0, 'practice must not score');
+  assert.equal(rehearsed.events, 0, 'practice must emit no run events');
+  console.log('ok  rehearsal scores nothing and emits nothing');
+
+  await startLevel(page);
   let state = await campaign();
   assert.equal(state.stage, 1, 'the campaign must open on level 1');
   console.log(`ok  level 1 mounted, score ${state.score}`);
@@ -87,6 +113,7 @@ try {
     );
     state = await campaign();
     assert.equal(state.stage, expected, `must advance to level ${expected}`);
+    await startLevel(page);
     console.log(`ok  level ${expected} mounted, score ${state.score}`);
   }
 

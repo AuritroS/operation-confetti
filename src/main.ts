@@ -155,6 +155,8 @@ hud.reset();
 debug.setVisible(false);
 
 void level.mount(ctx).then(() => {
+  // A single-level review page, so it skips the rehearsal the campaign shows.
+  level.beginPlay();
   /**
    * `?start=400` fast-forwards the run before play begins.
    *

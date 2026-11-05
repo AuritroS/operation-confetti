@@ -95,6 +95,8 @@ resumeBtn.addEventListener('click', onResume);
 hud.reset();
 input.attach(); lifecycle.attach();
 void level.mount(ctx).then(() => {
+  // A single-level review page, so it skips the rehearsal the campaign shows.
+  level.beginPlay();
   level.render();
   if (!paused) loop.start();
 });

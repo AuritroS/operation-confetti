@@ -4,13 +4,16 @@ import { STEP_S } from '../core/loop';
 import { LevelRunner } from './runner';
 import { LEVEL_1 } from './level1';
 import { Stage } from '../render/stage';
-import { LOOK } from '../render/look';
+import { GATE_GAP, LOOK } from '../render/look';
 import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from '../render/primitives';
 import { EntityVisuals } from '../render/entities';
 import { loadGameplayProps, type PropProvider } from '../render/props-loader';
 import { buildVaultDoor } from '../render/custom';
 import { loadRoguePlayer } from '../render/rogue';
 import { Environment, requestedLayers } from '../render/environment';
+
+/** How long the arrival celebration holds before the level reports done. */
+const ARRIVAL_SECONDS = 1.6;
 
 /** What a HUD or debug panel needs from the route, as plain data. */
 export interface RouteSnapshot {
@@ -71,6 +74,9 @@ export class RouteLevel implements LevelController {
   /** Time since the last collision, for the short red tint reaction. */
   private hitAge = 100;
 
+  /** Seconds left of the arrival celebration before the level reports done. */
+  private ending = 0;
+  inPractice = true;
   result: LevelOutcome | null = null;
 
   constructor(host: LevelContext['host']) {
@@ -81,7 +87,7 @@ export class RouteLevel implements LevelController {
 
     // Hidden until the route end comes into range; `update` reveals it.
     this.vault.visible = false;
-    this.vault.position.set(0, 0, -LEVEL_1.routeLength);
+    this.vault.position.set(0, 0, -(LEVEL_1.routeLength + GATE_GAP));
     this.world.add(this.vault);
     if (!this.hasRooftop) this.world.add(this.markers.group);
     this.world.add(buildRoute(LEVEL_1, { surface: !this.hasRooftop, dimDividers: this.hasRooftop }));
@@ -119,6 +125,18 @@ export class RouteLevel implements LevelController {
   swipe(dir: -1 | 1): void { this.runner.swipe(dir); }
 
   /**
+   * Leave the rehearsal and start the scored run.
+   *
+   * The route is rebuilt so the run begins at the start line: practice froze
+   * travel rather than advancing it, but rebuilding also guarantees no
+   * resolved flag or stale entity survives the rehearsal into the run.
+   */
+  beginPlay(): void {
+    this.restart();
+    this.inPractice = false;
+  }
+
+  /**
    * Replay the route from the start.
    *
    * The runner is rebuilt rather than reset so no resolved flag, event or mesh
@@ -134,6 +152,7 @@ export class RouteLevel implements LevelController {
     this.rebuildEntities();
     this.lastIncidents = 0;
     this.hitAge = 100;
+    this.ending = 0;
     this.player.setHitFlash(false);
     this.player.setBlink(false);
     this.player.setLean(0);
@@ -157,6 +176,33 @@ export class RouteLevel implements LevelController {
   }
 
   update(step: number): void {
+    if (this.inPractice) {
+      /*
+       * A rehearsal with the world held still.
+       *
+       * Level 1's verb is the lane change, and that reads perfectly against
+       * a stationary route: Matthew runs on the spot, a swipe slides him
+       * across, and nothing is approaching to punish a mistake. Only the
+       * lane tween and the character animate; the runner is not stepped, so
+       * no travel accrues, no entity resolves and no event can be emitted.
+       */
+      this.runner.lanes.update(step);
+      this.player.setLean(this.runner.lanes.lean);
+      this.player.update(step, true);
+      this.player.object.position.x = this.runner.lanes.renderX;
+      return;
+    }
+
+    if (this.ending > 0) {
+      // Arrival: he stops short of the gate and celebrates. The level only
+      // reports done once that has played, or the shell cuts it off.
+      this.ending = Math.max(0, this.ending - step);
+      this.player.update(step, false);
+      this.environment?.update(this.runner.snapshot.travelled, step);
+      if (this.ending === 0) this.result = 'complete';
+      return;
+    }
+
     if (this.result !== null) {
       // Keep animating after the run ends, or the celebration never plays and
       // Matthew freezes mid-stride at the vault.
@@ -180,8 +226,8 @@ export class RouteLevel implements LevelController {
 
     // The vault grows out of the fog as the route ends, so the run has a
     // visible goal rather than just a progress bar.
-    this.vault.position.z = -(LEVEL_1.routeLength - snap.travelled);
-    this.vault.visible = LEVEL_1.routeLength - snap.travelled < 70;
+    this.vault.position.z = -(LEVEL_1.routeLength + GATE_GAP - snap.travelled);
+    this.vault.visible = LEVEL_1.routeLength + GATE_GAP - snap.travelled < 70;
 
     if (snap.incidents > this.lastIncidents) {
       this.lastIncidents = snap.incidents;
@@ -189,7 +235,7 @@ export class RouteLevel implements LevelController {
     }
 
     if (snap.complete) {
-      this.result = 'complete';
+      this.ending = ARRIVAL_SECONDS;
       this.player.setBlink(false);
       this.player.celebrate();
     }
