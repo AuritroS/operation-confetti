@@ -1,5 +1,8 @@
 import type { Anchor, Course, Kinematic, Lane, Phase, Point3, RouteSample, TravelMode } from './types';
-import { LAND_TIME, MOTION_LIMIT_X } from './config';
+import { BAY, COURSE, LAND_TIME, MOTION_LIMIT_X, positionAt, speedAt } from './config';
+
+const isSkyline = (c: Course): boolean =>
+  c.duration === COURSE.duration && Math.abs(c.laneWidth - COURSE.laneWidth) < 1e-4;
 
 interface Axis { p: number; v: number; a: number }
 /** Quintic boundary interpolation preserves position, velocity AND acceleration. */
@@ -37,9 +40,18 @@ const zero = (p: number): Axis => ({ p, v: 0, a: 0 });
  * every collision height stay exactly as authored.
  */
 function skyHeight(c: Course, t: number): Axis {
-  const w = 2 * Math.PI / c.cycle;
-  const cos = Math.cos(w * t);
-  const sin = Math.sin(w * t);
+  if (!isSkyline(c)) {
+    const w = 2 * Math.PI / c.cycle;
+    const cos = Math.cos(w * t);
+    const sin = Math.sin(w * t);
+    return { p: 8 - 3 * cos, v: 3 * w * sin, a: 3 * w * w * cos };
+  }
+  const p = positionAt(t);
+  const baseV = speedAt(t);
+  const w = (2 * Math.PI / BAY) * baseV;
+  const theta = (2 * Math.PI / BAY) * p;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
   return { p: 8 - 3 * cos, v: 3 * w * sin, a: 3 * w * w * cos };
 }
 
@@ -47,26 +59,39 @@ function skyHeight(c: Course, t: number): Axis {
  * Forward progress along Z.
  *
  * During swinging, kinetic energy exchanges with potential energy:
- * - Accelerating as you pull down into the trough (peak velocity ~12.2 u/s).
- * - Decelerating as you climb up to the apex float (~4.8 u/s).
+ * - Accelerating as you pull down into the trough.
+ * - Decelerating as you climb up to the apex float.
  *
- * Sinusoidal surge is periodic: sin(w * t) is zero at every bay crossing,
- * so macro course timing, obstacle alignment and 45-second duration never drift.
+ * With act-based step acceleration, forward base velocity progresses:
+ * Act 1: 9.5 u/s -> Act 2: 11.0 u/s -> Act 3: 12.5 u/s -> Act 4: 14.5 u/s.
+ * Sinusoidal surge is periodic with canyon bay crossings (every 27.2m).
  */
 function forwardMotion(c: Course, t: number, mode: TravelMode): Axis {
-  if (mode === 'run') {
-    return { p: t * c.speed, v: c.speed, a: 0 };
+  if (!isSkyline(c)) {
+    if (mode === 'run') {
+      return { p: t * c.speed, v: c.speed, a: 0 };
+    }
+    const w = 2 * Math.PI / c.cycle;
+    const surge = 1.9;
+    const sin2 = Math.sin(2 * w * t);
+    const cos2 = Math.cos(2 * w * t);
+    const v = c.speed + surge * w * (Math.cos(w * t) + 0.16 * sin2);
+    const a = -surge * w * w * (Math.sin(w * t) - 0.32 * cos2);
+    return { p: t * c.speed, v, a };
   }
-  const w = 2 * Math.PI / c.cycle;
-  // Kinetic velocity surge with elastic slingshot tug:
-  // surge * w * cos(w * t) gives macro trough acceleration (4.8 -> 12.2 u/s).
-  // 0.16 * sin(2w * t) delivers the visceral elastic "yank" right as the cable snaps taut.
+  const p = positionAt(t);
+  const baseV = speedAt(t);
+  if (mode === 'run') {
+    return { p, v: baseV, a: 0 };
+  }
+  const w = (2 * Math.PI / BAY) * baseV;
+  const theta = (2 * Math.PI / BAY) * p;
   const surge = 1.9;
-  const sin2 = Math.sin(2 * w * t);
-  const cos2 = Math.cos(2 * w * t);
-  const v = c.speed + surge * w * (Math.cos(w * t) + 0.16 * sin2);
-  const a = -surge * w * w * (Math.sin(w * t) - 0.32 * cos2);
-  return { p: t * c.speed, v, a };
+  const sin2 = Math.sin(2 * theta);
+  const cos2 = Math.cos(2 * theta);
+  const v = baseV + surge * w * (Math.cos(theta) + 0.16 * sin2);
+  const a = -surge * w * w * (Math.sin(theta) - 0.32 * cos2);
+  return { p, v, a };
 }
 
 /**
@@ -82,8 +107,17 @@ function forwardMotion(c: Course, t: number, mode: TravelMode): Axis {
  *   the forward momentum soar. Cable never passes behind Matthew.
  */
 function swingPhase(c: Course, t: number): { phase: Phase; bay: number | null } {
-  const u = (t / c.cycle) - Math.floor(t / c.cycle);
-  const nextBay = Math.floor(t / c.cycle) + 1;
+  if (!isSkyline(c)) {
+    const u = (t / c.cycle) - Math.floor(t / c.cycle);
+    const nextBay = Math.floor(t / c.cycle) + 1;
+    if (u >= 0.50 && u < 0.995) {
+      return { phase: 'swing', bay: nextBay };
+    }
+    return { phase: 'flight', bay: null };
+  }
+  const p = positionAt(t);
+  const u = (p / BAY) - Math.floor(p / BAY);
+  const nextBay = Math.floor(p / BAY) + 1;
   if (u >= 0.50 && u < 0.995) {
     return { phase: 'swing', bay: nextBay };
   }
@@ -94,16 +128,21 @@ function swingPhase(c: Course, t: number): { phase: Phase; bay: number | null } 
 export const ANCHOR_HEIGHT = 19;
 
 export function upperAnchorAtBay(c: Course, lane: Lane, bay: number): Anchor {
-  const z = bay * c.cycle * c.speed;
+  const z = isSkyline(c) ? bay * BAY : bay * c.cycle * c.speed;
   return { id: `anchor-${bay}-${lane}`, lane, kind: 'upper', x: lane * c.laneWidth,
     y: 17.6, z };
 }
 
 export function upperAnchor(c: Course, lane: Lane, t: number): Anchor {
-  return upperAnchorAtBay(c, lane, Math.round(t / c.cycle));
+  if (!isSkyline(c)) {
+    return upperAnchorAtBay(c, lane, Math.round(t / c.cycle));
+  }
+  const p = positionAt(t);
+  return upperAnchorAtBay(c, lane, Math.round(p / BAY));
 }
 export function lowerAnchor(c: Course, lane: Lane, time: number): Anchor {
-  return { id: `lower-${lane}-${time}`, lane, kind: 'lower', x: lane * c.laneWidth, y: 0.6, z: time * c.speed + 6 };
+  const z = isSkyline(c) ? positionAt(time) + 6 : time * c.speed + 6;
+  return { id: `lower-${lane}-${time}`, lane, kind: 'lower', x: lane * c.laneWidth, y: 0.6, z };
 }
 
 /** Both travel modes exist in every lane and share the same forward progress. */
@@ -201,14 +240,17 @@ export class Motion {
     } else if (isLaunch) {
       // Launching from street up into the air: grapple forward to the next bay ahead
       phase = 'launch';
-      const bayAhead = Math.max(1, Math.ceil(t / this.c.cycle));
+      const bayAhead = isSkyline(this.c)
+        ? Math.max(1, Math.ceil((positionAt(t) + 1) / BAY))
+        : Math.max(1, Math.ceil(t / this.c.cycle));
       const forwardAnchor = upperAnchorAtBay(this.c, tr.lane, bayAhead);
       anchor = t - tr.start < 0.09 ? null : (target.anchor ?? forwardAnchor);
     } else {
       // Airborne transfer between lanes:
       // Grapple the forward anchor in the new lane immediately on input so the cable pulls Matthew across.
       phase = 'transfer';
-      const bayAhead = Math.max(1, Math.ceil((k.p.z + 1) / (this.c.cycle * this.c.speed)));
+      const pitch = isSkyline(this.c) ? BAY : this.c.cycle * this.c.speed;
+      const bayAhead = Math.max(1, Math.ceil((k.p.z + 1) / pitch));
       anchor = upperAnchorAtBay(this.c, tr.lane, bayAhead);
     }
 

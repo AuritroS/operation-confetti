@@ -39,6 +39,7 @@ import type { StreetPropId } from './skyline-props';
 import { SCENE, BAY, FACADE_X, KERB_X, MARGIN } from '../levels/skyline/scene';
 import type { SceneDefinition } from '../levels/skyline/scene';
 import { SKYLINE } from '../levels/skyline/course';
+import { ROUTE_LENGTH, positionAt } from '../levels/skyline/config';
 import { resolveAnchor, resolvePlacement, resolveWire, type ResolvedWire } from './skyline-resolve';
 
 export { FACADE_X, KERB_X, MARGIN };
@@ -90,7 +91,7 @@ export class SkylineStreet {
      * not a hair: at 0.05 it z-fought the road and the painted lane markings
      * dissolved into a grey wash.
      */
-    const route = SKYLINE.duration * SKYLINE.speed;
+    const route = ROUTE_LENGTH;
     const geometry = new PlaneGeometry(220, route + MARGIN * 2 + 120);
     const material = new MeshStandardMaterial({ color: 0x131d30, roughness: 1 });
     const ground = new Mesh(geometry, material);
@@ -165,7 +166,7 @@ export class SkylineStreet {
     const span = FACADE_X * 2;
     for (const e of this.layout.encounters) {
       if (e.assembly !== 'hangingSign') continue;
-      const z = e.t * SKYLINE.speed;
+      const z = positionAt(e.t);
       let previous: Vector3 | null = null;
       for (let i = 0; i <= WIRE_SEGMENTS; i++) {
         const t = i / WIRE_SEGMENTS;
@@ -178,7 +179,7 @@ export class SkylineStreet {
     }
 
     // Longitudinal streetcar trolley wires running along the 3 lanes down the route
-    const totalRouteZ = SKYLINE.duration * SKYLINE.speed;
+    const totalRouteZ = ROUTE_LENGTH;
     const startZ = -MARGIN;
     const endZ = totalRouteZ + MARGIN;
     const zStep = 10;

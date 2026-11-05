@@ -15,18 +15,22 @@ import { route } from './motion';
 import {
   ASSEMBLY,
   BAND,
+  BAY,
   COURSE,
   GAME_ZONE_HALF,
   PLAYER_HALF,
   ROUTE_LENGTH,
   bandBox,
+  positionAt,
+  speedAt,
+  timeAt,
   type AssemblyId,
   type Encounter,
 } from './config';
 import { SCENE } from './scene';
 import type { Course, Entity } from './types';
 
-export { BAND, GAME_ZONE_HALF, PLAYER_HALF, ROUTE_LENGTH };
+export { BAND, BAY, GAME_ZONE_HALF, PLAYER_HALF, ROUTE_LENGTH, positionAt, speedAt, timeAt };
 
 export const SKYLINE: Course = {
   duration: COURSE.duration,
@@ -47,7 +51,7 @@ export const SKYLINE: Course = {
  */
 function toEntity(e: Encounter): Entity {
   const spec = ASSEMBLY[e.assembly];
-  const z = e.t * COURSE.speed;
+  const z = positionAt(e.t);
 
   if (spec.kind === 'gift') {
     const at = route(SKYLINE, e.lane, e.t, e.mode ?? 'swing').p;

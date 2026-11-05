@@ -7,7 +7,7 @@
  */
 import { Motion, route } from './motion';
 import { hits, SkylineRunner } from './runner';
-import { PLAYER_HALF } from './config';
+import { PLAYER_HALF, ROUTE_LENGTH, timeAt } from './config';
 import { SKYLINE } from './course';
 import { RULES, scoreRun } from '../../core/scoring';
 import { LANES, type Course, type Direction, type Entity, type Lane, type TravelMode } from './types';
@@ -86,8 +86,9 @@ function measure(c: Course, from: State, to: State, order: Order): number {
 
 /** Test a settled route over the entire contact window, including swing phase. */
 function touches(c: Course, e: Entity, state: State): boolean {
-  const start = Math.max(0, (e.z - e.halfZ - PLAYER_HALF.z) / c.speed);
-  const end = Math.min(c.duration, (e.z + e.halfZ + PLAYER_HALF.z) / c.speed);
+  const isSkyline = c.duration === 45;
+  const start = Math.max(0, isSkyline ? timeAt(e.z - e.halfZ - PLAYER_HALF.z) : (e.z - e.halfZ - PLAYER_HALF.z) / c.speed);
+  const end = Math.min(c.duration, isSkyline ? timeAt(e.z + e.halfZ + PLAYER_HALF.z) : (e.z + e.halfZ + PLAYER_HALF.z) / c.speed);
   if (start > end) return false;
   const frames = Math.max(1, Math.ceil((end - start) * 120));
   let previous = route(c, state.lane, start, state.mode).p;
@@ -100,9 +101,10 @@ function touches(c: Course, e: Entity, state: State): boolean {
 }
 
 export function beats(c: Course = SKYLINE): Beat[] {
+  const isSkyline = c.duration === 45;
   const grouped = new Map<number, Entity[]>();
   for (const e of c.entities) {
-    const time = e.z / c.speed;
+    const time = +(isSkyline ? timeAt(e.z) : e.z / c.speed).toFixed(3);
     const list = grouped.get(time) ?? [];
     list.push(e); grouped.set(time, list);
   }
@@ -209,10 +211,11 @@ export const clean = (outcome: Outcome, c: Course = SKYLINE): boolean => outcome
 
 export function solve(c: Course = SKYLINE): Result {
   const target = scoredGifts(c);
+  const maxZ = c.duration === 45 ? ROUTE_LENGTH : c.duration * c.speed;
   const invalid = [c.duration, c.speed, c.laneWidth, c.cycle].some(n => !Number.isFinite(n) || n <= 0) ||
     !Number.isFinite(c.groundY) || new Set(c.entities.map(e => e.id)).size !== c.entities.length ||
     c.entities.some(e => ![e.x, e.y, e.z, e.halfX, e.halfY, e.halfZ].every(Number.isFinite) ||
-      e.halfX < 0 || e.halfY < 0 || e.halfZ < 0 || e.z < 0 || e.z > c.duration * c.speed);
+      e.halfX < 0 || e.halfY < 0 || e.halfZ < 0 || e.z < 0 || e.z > maxZ);
   if (invalid || target > RULES.giftsPerLevel) return { failure: {
     reason: invalid ? 'Invalid course dimensions, encounter bounds or duplicate entity IDs.' :
       `${target} scored gifts exceed the scoring rule cap of ${RULES.giftsPerLevel}.`,

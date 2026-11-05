@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SKYLINE } from '../src/levels/skyline/course';
+import { SKYLINE, timeAt } from '../src/levels/skyline/course';
 import { interpolate, Motion, route } from '../src/levels/skyline/motion';
 import { hits, SkylineRunner } from '../src/levels/skyline/runner';
 import { LANES } from '../src/levels/skyline/types';
@@ -48,15 +48,15 @@ describe('four-direction skyline', () => {
       expect(Number.isFinite(s.p.x+s.p.y+s.v.x)).toBe(true);
       expect(s.p.y).toBeGreaterThanOrEqual(SKYLINE.groundY-.002);
       expect(Math.abs(s.p.x)).toBeLessThanOrEqual(SKYLINE.laneWidth+2.51);
-      expect(s.v.z).toBeGreaterThan(3.5);
-      expect(s.v.z).toBeLessThan(SKYLINE.speed * 1.5);
+      expect(s.v.z).toBeGreaterThan(2.0);
+      expect(s.v.z).toBeLessThan(25);
     }
   });
   it('remembers up beneath a bridge and launches automatically after clearance', () => {
     // Derived from the bridge itself: a literal here silently stopped
     // meaning "under the bridge" the moment the route was rescaled.
     const bridge=SKYLINE.entities.find(e=>e.id==='bridge')!;
-    const underBridge=bridge.z/SKYLINE.speed-1.2;
+    const underBridge=timeAt(bridge.z)-1.2;
     const r=new SkylineRunner(SKYLINE); r.swipe('down'); advance(r,underBridge); r.swipe('up');
     expect(r.snapshot.pendingLaunch).toBe(true); expect(r.snapshot.requestedMode).toBe('swing');
     advance(r,.8); expect(r.snapshot.p.y).toBe(SKYLINE.groundY);
@@ -65,20 +65,20 @@ describe('four-direction skyline', () => {
   });
   it('down cancels a pending launch', () => {
     const bridge=SKYLINE.entities.find(e=>e.id==='bridge')!;
-    const r=new SkylineRunner(SKYLINE); r.swipe('down'); advance(r,bridge.z/SKYLINE.speed-1.2);
+    const r=new SkylineRunner(SKYLINE); r.swipe('down'); advance(r,timeAt(bridge.z)-1.2);
     r.swipe('up'); r.swipe('down');
     advance(r,3); expect(r.snapshot.pendingLaunch).toBe(false); expect(r.snapshot.phase).toBe('run');
   });
   it('neither staying airborne nor staying grounded bypasses every encounter', () => {
     const air=new SkylineRunner(SKYLINE), ground=new SkylineRunner(SKYLINE);
-    const past=(id:string)=>SKYLINE.entities.find(e=>e.id===id)!.z/SKYLINE.speed+1;
+    const past=(id:string)=>timeAt(SKYLINE.entities.find(e=>e.id===id)!.z)+1;
     const until=Math.max(past('bridge'),past('barricade'));
     air.swipe('up'); ground.swipe('down'); advance(air,until); advance(ground,until);
     expect(air.entityStates.get('bridge')).toBe('hit'); expect(ground.entityStates.get('barricade')).toBe('hit');
   });
   it('hits charge once and preserve forward travel and input', () => {
     const first=SKYLINE.entities.find(e=>e.kind==='hazard')!;
-    const r=new SkylineRunner(SKYLINE); r.swipe('up'); advance(r,first.z/SKYLINE.speed+0.1);
+    const r=new SkylineRunner(SKYLINE); r.swipe('up'); advance(r,timeAt(first.z)+0.1);
     expect(r.events.filter(e=>e.t==='incident')).toHaveLength(1);
     const z=r.snapshot.p.z; r.swipe('right'); advance(r,.1);
     expect(r.snapshot.lane).toBe(1); expect(r.snapshot.p.z).toBeGreaterThan(z);

@@ -19,7 +19,7 @@
  * disagree.
  */
 import { describe, expect, it } from 'vitest';
-import { SKYLINE } from '../src/levels/skyline/course';
+import { SKYLINE, timeAt } from '../src/levels/skyline/course';
 import { Motion } from '../src/levels/skyline/motion';
 import type { Entity, Lane, TravelMode } from '../src/levels/skyline/types';
 
@@ -55,7 +55,7 @@ function transitionCost(fromLane: Lane, toLane: Lane, fromMode: TravelMode, toMo
 
 const hazards = SKYLINE.entities.filter((e) => e.kind === 'hazard');
 const gifts = SKYLINE.entities.filter((e) => e.kind === 'gift');
-const timeOf = (e: Entity) => e.z / SKYLINE.speed;
+const timeOf = (e: Entity) => timeAt(e.z);
 
 describe('transition costs', () => {
   it('charges more for a mode change than a lane change', () => {

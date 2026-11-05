@@ -35,7 +35,7 @@
  * has somewhere to be going.
  */
 import type { Lane } from './types';
-import { COURSE, ROUTE_LENGTH, type AssemblyId, type Encounter } from './config';
+import { BAY, ROUTE_LENGTH, type AssemblyId, type Encounter } from './config';
 
 export type { AssemblyId, Encounter };
 
@@ -125,18 +125,12 @@ export const KERB_X = 7.4;
 /** How far the scene extends past each end of the route. */
 export const MARGIN = 60;
 
-/**
- * Building pitch equals the swing cycle's ground distance.
- *
- * One building pair per swing, so every wire has a facade on each side to
- * hang from and the canyon rhythm matches the rhythm the player feels.
- */
-export const BAY = COURSE.cycle * COURSE.speed;
+export { BAY };
 
 const ROUTE = ROUTE_LENGTH;
 
 const FIRST_BAY = -2;
-const LAST_BAY = 16;
+const LAST_BAY = 22;
 
 /** Curated fixed architectural sequences for each side of the Queen West canyon. */
 const LEFT_WALL_TOWERS: readonly string[] = [
@@ -156,9 +150,15 @@ const LEFT_WALL_TOWERS: readonly string[] = [
   'towerC', // Bay 11 (Z = 299.2)
   'towerA', // Bay 12 (Z = 326.4)
   'towerA', // Bay 13 (Z = 353.6)
-  'towerE', // Bay 14 (Z = 380.8) - Finish
+  'towerE', // Bay 14 (Z = 380.8)
   'towerA', // Bay 15 (Z = 408.0)
   'towerE', // Bay 16 (Z = 435.2)
+  'towerG', // Bay 17 (Z = 462.4)
+  'towerC', // Bay 18 (Z = 489.6)
+  'towerE', // Bay 19 (Z = 516.8)
+  'towerA', // Bay 20 (Z = 544.0) - Finish is at Z=533.5
+  'towerG', // Bay 21 (Z = 571.2)
+  'towerE', // Bay 22 (Z = 598.4)
 ];
 
 const RIGHT_WALL_TOWERS: readonly string[] = [
@@ -178,9 +178,15 @@ const RIGHT_WALL_TOWERS: readonly string[] = [
   'towerG', // Bay 11 (Z = 299.2)
   'towerE', // Bay 12 (Z = 326.4)
   'towerG', // Bay 13 (Z = 353.6)
-  'towerC', // Bay 14 (Z = 380.8) - Finish
+  'towerC', // Bay 14 (Z = 380.8)
   'towerE', // Bay 15 (Z = 408.0)
   'towerA', // Bay 16 (Z = 435.2)
+  'towerC', // Bay 17 (Z = 462.4)
+  'towerG', // Bay 18 (Z = 489.6)
+  'towerA', // Bay 19 (Z = 516.8)
+  'towerE', // Bay 20 (Z = 544.0) - Finish is at Z=533.5
+  'towerC', // Bay 21 (Z = 571.2)
+  'towerA', // Bay 22 (Z = 598.4)
 ];
 
 /** One Kenney tile is the whole street, kerbs and all; 19 is its scaled width. */

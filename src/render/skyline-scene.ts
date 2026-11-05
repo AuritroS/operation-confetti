@@ -21,7 +21,7 @@ import { ObstacleKit } from './skyline-obstacles';
 import type { SkylineHero } from './skyline-hero';
 import { SkylineRope } from './skyline-rope';
 import { LANES } from '../levels/skyline/types';
-import { LAND_TIME } from '../levels/skyline/config';
+import { BAY, LAND_TIME, ROUTE_LENGTH } from '../levels/skyline/config';
 import type { Course, Point3, Snapshot } from '../levels/skyline/types';
 
 /** Anchor markers drawn at once, across all three state pools. */
@@ -423,14 +423,14 @@ export class SkylineScene {
      * floated them above the carriageway. The Kenney road carries its own
      * painted markings, so there is nothing left for them to do.
      */
-    const BAY = this.course.cycle * this.course.speed;
-    const playerBay = Math.floor(scrollZ / BAY);
+    const bayPitch = this.course.duration === 45 ? BAY : this.course.cycle * this.course.speed;
+    const playerBay = Math.floor(scrollZ / bayPitch);
     const targetBay = playerBay + 1;
     const activeId = s.anchor?.id;
 
     const anchorCounts = [0, 0, 0];
     for (let bay = Math.max(0, playerBay - 1); bay <= playerBay + 8; bay++) {
-      const wireZ = bay * BAY;
+      const wireZ = bay * bayPitch;
       for (const lane of LANES) {
         const id = `anchor-${bay}-${lane}`;
         const pos = this.street?.anchors.get(id) ?? {
@@ -468,7 +468,7 @@ export class SkylineScene {
       pool.count = anchorCounts[i] ?? 0;
       pool.instanceMatrix.needsUpdate = true;
     });
-    const finish = scrollZ - this.course.duration * this.course.speed;
+    const finish = scrollZ - (this.course.duration === 45 ? ROUTE_LENGTH : this.course.duration * this.course.speed);
     this.instance(this.trims, w++, 0, 17, finish, 24, 0.5, 0.5);
     for (const side of [-1, 1]) this.instance(this.trims, w++, side * 12, 8.5, finish, 0.5, 17, 0.5);
     for (const [mesh, count] of [[this.blocks, b], [this.trims, w]] as const) {

@@ -14,27 +14,58 @@
  */
 import type { Lane, TravelMode } from './types';
 
-/** Route parameters. `duration` x `speed` is the route length in units. */
+export const BAY = 27.2;
+
+/**
+ * Act-based step acceleration schedule:
+ * Act 1 (0-11s): 9.5 u/s (warmup)
+ * Act 2 (11-23s): 11.0 u/s (+16%, canyon rush)
+ * Act 3 (23-34s): 12.5 u/s (+32%, slalom weaves)
+ * Act 4 (34-45s): 14.5 u/s (+53%, climax sprint)
+ */
+export const ACT_SPEEDS = [
+  { until: 11, speed: 9.5 },
+  { until: 23, speed: 11.0 },
+  { until: 34, speed: 12.5 },
+  { until: 45, speed: 14.5 },
+] as const;
+
+export function speedAt(t: number): number {
+  if (t < 11) return 9.5;
+  if (t < 23) return 11.0;
+  if (t < 34) return 12.5;
+  return 14.5;
+}
+
+export function positionAt(t: number): number {
+  if (t <= 0) return 0;
+  if (t < 11) return t * 9.5;
+  if (t < 23) return 104.5 + (t - 11) * 11.0;
+  if (t < 34) return 236.5 + (t - 23) * 12.5;
+  return 374.0 + Math.min(11, t - 34) * 14.5;
+}
+
+export function timeAt(z: number): number {
+  if (z <= 0) return 0;
+  if (z <= 104.5) return z / 9.5;
+  if (z <= 236.5) return 11 + (z - 104.5) / 11.0;
+  if (z <= 374.0) return 23 + (z - 236.5) / 12.5;
+  return 34 + Math.min(11, (z - 374.0) / 14.5);
+}
+
+/** Route parameters. */
 export const COURSE = {
   duration: 45,
-  /**
-   * Scaled with the lane width when the world was halved, so apparent speed
-   * is unchanged: halving the world and halving the camera stand-off leaves
-   * the same angular motion on screen.
-   */
-  speed: 8.5,
-  /**
-   * Halved from 6 so the camera could come from 36 units to 18. At the old
-   * stand-off Matthew filled 5.3% of the frame against level 1's 22.3%.
-   */
+  /** Weighted average speed across the 4 acts (533.5 / 45). */
+  speed: 11.855,
+  startSpeed: 9.5,
+  endSpeed: 14.5,
   laneWidth: 3.2,
-  /** Where the runner puts the hero's ORIGIN when running, not its soles. */
   groundY: 1.25,
-  /** Swing period in seconds. Also the bay pitch of the terrace. */
   cycle: 3.2,
 } as const;
 
-export const ROUTE_LENGTH = COURSE.duration * COURSE.speed;
+export const ROUTE_LENGTH = positionAt(COURSE.duration);
 
 /**
  * Half-width of the interactive zone.
