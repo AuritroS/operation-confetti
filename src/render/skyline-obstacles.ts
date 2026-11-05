@@ -131,28 +131,37 @@ export class ObstacleKit {
 
   /**
    * Ground obstacles (Option A):
-   * - Single-lane (laneBlock): Clean row of 3 traffic cones across the lane.
-   * - Full-street (barricade): Solid wall of 5 construction barriers spanning all 3 lanes.
+   * - Single-lane (laneBlock): 2 heavy-duty traffic cones scaled 1.45x (height 1.77m,
+   *   chest-high on Matthew) spanning the lane edge-to-edge.
+   * - Full-street (barricade): 3 large highway-scale construction barriers scaled 1.68x
+   *   uniformly (height 1.77m), each barrier directly covering one of the 3 lanes.
    * Distinct reads: cones mean "detour around lane", barriers mean "street blocked".
    */
   private ground(group: Group, e: Entity, span: boolean): void {
     const width = e.halfX * 2;
 
     if (!span) {
-      // Single lane: Traffic cones spanning the lane edge-to-edge
+      // Single lane: 2 heavy-duty traffic cones scaled 1.45x (height 1.77m, chest-high)
       const half = this.assets.half('cone');
       const coneHalfX = half ? half.x : 0.49;
+      const coneScale = 1.45;
+      const effectiveRadius = coneHalfX * coneScale;
       // Position two cones so their outer edges align with the lane collider boundaries
-      const xOffset = Math.max(0, e.halfX - coneHalfX);
-      this.one(group, 'cone', -xOffset, -e.halfY, 0);
-      this.one(group, 'cone', xOffset, -e.halfY, 0);
+      const xOffset = Math.max(0, e.halfX - effectiveRadius);
+      for (const side of [-1, 1]) {
+        const cone = this.one(group, 'cone', side * xOffset, -e.halfY, 0);
+        if (cone) {
+          cone.scale.setScalar(coneScale);
+        }
+      }
       return;
     }
 
-    // Full-street barricade: 5 construction barriers tiled across all 3 lanes
+    // Full-street barricade: 3 large highway construction barriers scaled 1.68x uniformly (height 1.77m)
+    // Seamlessly tiled so each barrier directly commands one lane of the 3-lane street
     const half = this.assets.half('barrier');
     const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
-    const count = 5;
+    const count = 3;
     const uniformScale = width / (count * across);
 
     for (let i = 0; i < count; i++) {
@@ -168,10 +177,10 @@ export class ObstacleKit {
    * Overhead obstacles:
    * - Full-street bridge: Highway Gantry (signGantry) elevated so the truss clears y ~ 12.5m
    *   (above the swing apex) and sign panels hang across the corridor y in [6.5, 12m].
-   * - Single-lane hangingSign: Heavy-duty cantilever mast-arm overhead sign assembly
-   *   holding both the Warning Diamond (upper) and STOP Sign (lower) across the lane.
-   *   Blocks the swing corridor y in [6.8m, 11.2m] from any flight angle while leaving
-   *   the road clear underneath (y in [0, 6.8m]) for runners to dive/run under.
+   * - Single-lane hangingSign: 3 Warning Diamonds stacked vertically in the lane, suspended
+   *   directly from the overhead streetcar cable (y = 19m) that Matthew anchors to.
+   *   Blocks the swing corridor y in [6.3m, 11.7m] from any flight angle while leaving
+   *   the road clear underneath (y in [0, 6.3m]) with over 3.9m of headroom for runners.
    */
   private overhead(group: Group, e: Entity, span: boolean): void {
     if (span) {
@@ -184,58 +193,46 @@ export class ObstacleKit {
       return;
     }
 
-    // Single lane: Cantilever mast-arm holding both Warning Diamond and STOP signs
-    // The vertical mast column sits on the side of the lane nearest the kerb
-    const mastSide = e.x > 0 ? 1 : -1;
-    const mastX = mastSide * (e.halfX - 0.08);
+    // Single lane: 3 Warning Diamonds stacked vertically in the lane,
+    // suspended directly from the overhead streetcar cable (y = 19m) that Matthew anchors to.
+    const half = this.assets.half('signWarningDiamond');
+    const across = Math.max((half ? half.z : 0.87) * 2, 0.01);
+    const uniformScale = (e.halfX * 2) / across;
+    const signHeight = across * uniformScale;
 
-    // Upper Sign: Warning Diamond (covering swing apex, world y ~ 9.2m to 11.0m)
-    const upperSign = this.one(group, 'signWarningDiamond', 0, 0.2, 0, BLOCKING_TURN);
-    if (upperSign) {
-      const half = this.assets.half('signWarningDiamond');
-      const across = Math.max((half ? half.z : 0.87) * 2, 0.01);
-      const uniformScale = (e.halfX * 2) / across;
-      upperSign.scale.setScalar(uniformScale);
+    // Stack 3 Warning Diamonds vertically:
+    // Lower diamond: world y ~ 6.3m to 8.1m (blocks low-trough swing)
+    // Middle diamond: world y ~ 8.1m to 9.9m (blocks mid-level flight)
+    // Upper diamond: world y ~ 9.9m to 11.7m (blocks high-apex swing)
+    const yOffsets = [-signHeight * 1.5, -signHeight * 0.5, signHeight * 0.5];
+    for (const yBase of yOffsets) {
+      const sign = this.one(group, 'signWarningDiamond', 0, yBase, 0, BLOCKING_TURN);
+      if (sign) {
+        sign.scale.setScalar(uniformScale);
+      }
     }
 
-    // Lower Sign: STOP Sign (covering swing trough/mid height, world y ~ 7.1m to 8.9m)
-    const lowerSign = this.one(group, 'signStopOctagon', 0, -1.9, 0, BLOCKING_TURN);
-    if (lowerSign) {
-      const half = this.assets.half('signStopOctagon');
-      const across = Math.max((half ? half.z : 0.82) * 2, 0.01);
-      const uniformScale = (e.halfX * 2) / across;
-      lowerSign.scale.setScalar(uniformScale);
-    }
+    // Central structural steel mounting spine connecting the 3 signs together
+    const totalSpan = signHeight * 3;
+    const spineMat = new MeshBasicMaterial({ color: 0x2e384d });
+    const spine = new Mesh(new BoxGeometry(0.12, totalSpan, 0.12), spineMat);
+    spine.position.set(0, 0, -0.05);
+    group.add(spine);
 
-    // Cantilever upright mast column
-    const mastHeight = 4.8;
-    const mast = new Mesh(
-      new BoxGeometry(0.14, mastHeight, 0.14),
-      new MeshBasicMaterial({ color: 0x2e384d }),
-    );
-    mast.position.set(mastX, 0.2, -0.05);
-    group.add(mast);
-
-    // Horizontal cantilever crossbeams spanning the lane behind the signs
-    const armWidth = Math.abs(mastX) * 2;
-    const armMat = new MeshBasicMaterial({ color: 0x2e384d });
-    for (const yArm of [-1.1, 0.2, 1.1]) {
-      const arm = new Mesh(new BoxGeometry(armWidth, 0.09, 0.09), armMat);
-      arm.position.set(0, yArm, -0.05);
-      group.add(arm);
-    }
-
-    // Structural suspension cable connecting the mast up to the streetcar wire line
+    // Dual vertical suspension hanger cables dropping from the streetcar wire line at y = 19m
     const cableTop = ANCHOR_HEIGHT - e.y;
-    const mastTop = 0.2 + mastHeight / 2;
-    const rise = cableTop - mastTop;
+    const signTop = signHeight * 1.5;
+    const rise = cableTop - signTop;
     if (rise > 0) {
-      const cable = new Mesh(
-        new BoxGeometry(0.04, rise, 0.04),
-        armMat,
-      );
-      cable.position.set(mastX, mastTop + rise / 2, -0.05);
-      group.add(cable);
+      for (const side of [-0.55, 0.55]) {
+        const cable = new Mesh(new BoxGeometry(0.04, rise, 0.04), spineMat);
+        cable.position.set(side, signTop + rise / 2, -0.05);
+        group.add(cable);
+      }
+      // Top wire clamp bar attaching onto the streetcar overhead wire
+      const clampBar = new Mesh(new BoxGeometry(1.3, 0.06, 0.06), spineMat);
+      clampBar.position.set(0, cableTop, -0.05);
+      group.add(clampBar);
     }
   }
 
