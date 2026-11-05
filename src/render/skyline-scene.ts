@@ -11,7 +11,7 @@ import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower } from './custom';
-import { GiftGlowField, shadowTexture, SparkleField } from './effects';
+import { GiftGlowField, shadowTexture } from './effects';
 import { PALETTE } from './palette';
 import { darken, disposeTree, unfog } from './environment/skyline';
 import type { EnvironmentLayer } from './environment/layer';
@@ -113,14 +113,6 @@ export class SkylineScene {
   private giftMarks = new GiftGlowField(10, {
     color: PALETTE.gold, size: 3.2,
   });
-  /**
-   * Smaller and sparser than the first attempt, which at 11px x 3 read as a
-   * magenta blob large enough to hide the obstacle underneath it. A marker
-   * that obscures the thing it marks has defeated itself.
-   */
-  private hazardMarks = new SparkleField(18, {
-    color: PALETTE.magenta, count: 2, radius: 0.3, size: 6, attenuate: false,
-  });
   private markBuffer: Vector3[] = [];
   private landmark: Object3D | null = null;
   private gameplayVisible = true;
@@ -133,7 +125,6 @@ export class SkylineScene {
     this.playerShadow.visible = visible;
     this.rope.object.visible = visible && this.rope.currentPhase !== 'idle';
     this.giftMarks.group.visible = visible;
-    this.hazardMarks.points.visible = visible;
     for (const pool of this.anchorPools) pool.visible = visible;
     for (const group of this.contents.values()) group.visible = visible;
   }
@@ -185,8 +176,6 @@ export class SkylineScene {
     for (const mesh of [this.blocks, this.trims]) { mesh.frustumCulled = false; this.root.add(mesh); }
     this.ground = this.cube(this.root, this.groundMat, 0, -1, -60, 28, 2, 260);
     this.root.add(this.giftMarks.group);
-    (this.hazardMarks.points.material as MeshBasicMaterial).fog = false;
-    this.root.add(this.hazardMarks.points);
     for (const layer of [new SkyLayer({ moon: { x: 24, y: 60, z: -120 } })]) {
       this.backdrop.push(layer);
       this.root.add(layer.object);
@@ -487,29 +476,24 @@ export class SkylineScene {
     }
     this.visibleEntities.clear();
     const giftAt: Vector3[] = [];
-    const hazardAt: Vector3[] = [];
     for (const e of this.course.entities) {
       const mesh = this.contents.get(e.id)!;
       mesh.visible = !states.has(e.id) && e.z > scrollZ - 3 && e.z < scrollZ + ENTITY_DRAW_AHEAD;
       mesh.position.set(e.x, e.y, scrollZ - e.z);
       if (mesh.visible) {
         this.visibleEntities.add(e.id);
-        // Marker at the top of a ground obstacle and the underside of an
-        // overhead one: in both cases the edge the player has to clear.
-        const marker = this.markBuffer[giftAt.length + hazardAt.length] ??= new Vector3();
-        const lift = e.kind === 'gift' ? 0 : e.y - this.course.groundY > 3 ? -e.halfY : e.halfY;
-        marker.set(e.x, e.y + lift, scrollZ - e.z);
-        (e.kind === 'gift' ? giftAt : hazardAt).push(marker);
+        if (e.kind === 'gift') {
+          const marker = this.markBuffer[giftAt.length] ??= new Vector3();
+          marker.set(e.x, e.y, scrollZ - e.z);
+          giftAt.push(marker);
+        }
       }
       // Gift bounds stay aligned with the visible box; no rotating collider mismatch.
     }
     this.giftMarks.setAnchors(giftAt);
-    this.hazardMarks.setAnchors(hazardAt);
     this.giftMarks.update(dt);
-    this.hazardMarks.update(dt);
     if (!this.gameplayVisible) {
       this.giftMarks.group.visible = false;
-      this.hazardMarks.points.visible = false;
       for (const pool of this.anchorPools) pool.visible = false;
       for (const mesh of this.contents.values()) mesh.visible = false;
       this.rope.object.visible = false;
@@ -543,7 +527,6 @@ export class SkylineScene {
     this.boxes?.dispose();
     this.labels?.dispose();
     this.giftMarks.dispose();
-    this.hazardMarks.dispose();
     this.playerShadow.geometry.dispose();
     (this.playerShadow.material as MeshBasicMaterial).dispose();
     this.playerShadow.removeFromParent();

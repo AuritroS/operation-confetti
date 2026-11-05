@@ -128,70 +128,95 @@ export class ObstacleKit {
   }
 
   /**
-   * Street-level blockage.
-   *
-   * Barriers carry the width because they tile cleanly without seams.
-   * Scaled uniformly with 1:1:1 aspect ratio to avoid any warping.
-   * Cones sit in front on the road as the read-at-distance cue.
+   * Ground obstacles (Option A):
+   * - Single-lane (laneBlock): Clean row of 3 traffic cones across the lane.
+   * - Full-street (barricade): Solid wall of 5 construction barriers spanning all 3 lanes.
+   * Distinct reads: cones mean "detour around lane", barriers mean "street blocked".
    */
   private ground(group: Group, e: Entity, span: boolean): void {
     const width = e.halfX * 2;
-    const half = this.assets.half('barrier');
-    const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
-    const count = span ? Math.max(1, Math.round(width / across)) : 1;
-    // Uniform scale factor so barriers fit the lane or span without distortion
-    const uniformScale = span ? width / (count * across) : width / across;
 
-    for (let i = 0; i < count; i++) {
-      const x = count > 1 ? (i + 0.5) / count * width - width / 2 : 0;
-      const prop = this.one(group, 'barrier', x, -e.halfY, e.halfZ * 0.2, BLOCKING_TURN);
-      if (prop && uniformScale !== 1) {
-        prop.scale.setScalar(uniformScale);
-      }
+    if (!span) {
+      // Single lane: Traffic cones spanning the lane edge-to-edge
+      const half = this.assets.half('cone');
+      const coneHalfX = half ? half.x : 0.49;
+      // Position two cones so their outer edges align with the lane collider boundaries
+      const xOffset = Math.max(0, e.halfX - coneHalfX);
+      this.one(group, 'cone', -xOffset, -e.halfY, 0);
+      this.one(group, 'cone', xOffset, -e.halfY, 0);
+      return;
     }
 
-    // Cones in front on the road surface
-    const cones = span ? 5 : 2;
-    for (let i = 0; i < cones; i++) {
-      const t = (i + 0.5) / cones;
-      this.one(group, 'cone', (t - 0.5) * width, -e.halfY, e.halfZ * 0.9);
+    // Full-street barricade: 5 construction barriers tiled across all 3 lanes
+    const half = this.assets.half('barrier');
+    const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
+    const count = 5;
+    const uniformScale = width / (count * across);
+
+    for (let i = 0; i < count; i++) {
+      const x = (i + 0.5) / count * width - width / 2;
+      const barrier = this.one(group, 'barrier', x, -e.halfY, 0, BLOCKING_TURN);
+      if (barrier && uniformScale !== 1) {
+        barrier.scale.setScalar(uniformScale);
+      }
     }
   }
 
   /**
-   * Overhead blockage.
-   *
-   * The full-street form is the highway gantry (`signGantry`), whose upright posts
-   * stand on the kerbs outside the lanes and whose wide crossbeam spans all 3 lanes.
-   * The single-lane form is a suspended horizontal traffic signal head (`trafficLightHoriz`)
-   * dropped from the overhead streetcar cable line.
+   * Overhead obstacles:
+   * - Full-street bridge: Highway Gantry (signGantry) elevated so the truss clears y ~ 12.5m
+   *   (above the swing apex) and sign panels hang across the corridor y in [6.5, 12m].
+   * - Single-lane hangingSign: Vertically stacked traffic signal rig (trafficLightVert +
+   *   trafficLightHoriz) suspended from the cable, blocking the swing corridor y in [6.5, 12m]
+   *   while leaving the road clear underneath for runners to dive/run under.
    */
   private overhead(group: Group, e: Entity, span: boolean): void {
     if (span) {
-      // Highway Gantry: wide truss crossbeam spanning all 3 lanes, upright posts on kerbs.
-      // Seated on the road surface (-e.y) so the upright posts stand firmly on the pavements.
-      this.one(group, 'signGantry', 0, -e.y, 0, BLOCKING_TURN);
+      // Highway Gantry: elevated truss spanning all 3 lanes, posts on kerbs
+      // Scaled by 1.35 uniformly so the truss reaches y ~ 12.5m, clearing Matthew's apex
+      const gantry = this.one(group, 'signGantry', 0, -e.y, 0, BLOCKING_TURN);
+      if (gantry) {
+        gantry.scale.setScalar(1.35);
+      }
       return;
     }
 
-    // Single lane: horizontal traffic light head centered in the lane at uniform scale
-    const half = this.assets.half('trafficLightHoriz');
-    const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
-    const sign = this.one(group, 'trafficLightHoriz', 0, 0, 0, BLOCKING_TURN);
-    if (sign) {
-      const uniformScale = (e.halfX * 2) / across;
-      sign.scale.setScalar(uniformScale);
+    // Single lane: Multi-head vertical signal rig in the lane
+    // Upper vertical head at local y = +1.3 (world y = 10.3m, covering apex swing height)
+    const upperHead = this.one(group, 'trafficLightVert', 0, 1.3, 0);
+    if (upperHead) {
+      upperHead.scale.setScalar(1.15);
     }
 
-    // Slender vertical hanger cable connecting the signal head up to the overhead cable line
-    const rise = ANCHOR_HEIGHT - e.y - 0.4;
+    // Lower horizontal head at local y = -1.2 (world y = 7.8m, covering trough/mid swing height)
+    const lowerHead = this.one(group, 'trafficLightHoriz', 0, -1.2, 0, BLOCKING_TURN);
+    if (lowerHead) {
+      const half = this.assets.half('trafficLightHoriz');
+      const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
+      const uniformScale = (e.halfX * 2) / across;
+      lowerHead.scale.setScalar(uniformScale);
+    }
+
+    // Central mounting mast connecting the upper and lower heads
+    const mastHeight = 4.8;
+    const mast = new Mesh(
+      new BoxGeometry(0.12, mastHeight, 0.12),
+      new MeshBasicMaterial({ color: 0x2e384d }),
+    );
+    mast.position.set(0, 0.2, 0);
+    group.add(mast);
+
+    // Slender vertical suspension cable connecting the rig up to the streetcar cable line
+    const cableTop = ANCHOR_HEIGHT - e.y;
+    const mastTop = 0.2 + mastHeight / 2;
+    const rise = cableTop - mastTop;
     if (rise > 0) {
-      const hanger = new Mesh(
+      const cable = new Mesh(
         new BoxGeometry(0.04, rise, 0.04),
         new MeshBasicMaterial({ color: 0x2e384d }),
       );
-      hanger.position.set(0, 0.4 + rise / 2, 0);
-      group.add(hanger);
+      cable.position.set(0, mastTop + rise / 2, 0);
+      group.add(cable);
     }
   }
 
