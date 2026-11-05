@@ -108,7 +108,7 @@ const STAGES: readonly StageSpec[] = [
     id: 2,
     title: 'Skyline Chase',
     make: () => new SkylineLevel(host),
-    beat: BEATS.vault,
+    beat: BEATS.chase,
     copy: {
       chapter: '2 · THE SKYLINE CHASE',
       controls: [

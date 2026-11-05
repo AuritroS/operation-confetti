@@ -20,7 +20,9 @@ export type StoryImage = 'matthew' | 'aurora' | 'matthew-aurora';
  * `zoom` of 1 shows the artwork fitted to the panel; above 1 it is enlarged
  * about `origin`. The origin has to sit *on* the subject, because scaling
  * holds that point still and pushes everything else outward — an origin
- * beside a face enlarges the face straight out of frame. Positioning alone was not enough:
+ * beside a face enlarges the face straight out of frame. Keep the origin a
+ * little above a head rather than level with it, or the crown of the head
+ * is the first thing the crop takes. Positioning alone was not enough:
  * the panel frame is close to the illustrations' own aspect, so there was
  * barely any overflow to pan within and every reframing of the two-shot came
  * out looking like the same picture. Enlarging first is what creates the room
@@ -70,11 +72,22 @@ export const BEATS = {
     ],
     next: 'Next',
   },
-  vault: {
-    id: 'vault',
-    image: 'matthew-aurora',
-    // In on Matthew. She is behind him and out of the frame's attention.
-    framing: { zoom: 1.7, origin: '20% 45%' },
+  chase: {
+    id: 'chase',
+    /*
+     * The cover art, serving a second beat.
+     *
+     * This was the rooftop two-shot, which put Aurora at his shoulder while
+     * she says "keep up" from a distance — the picture argued with the line.
+     * Here he is mid-grapple, using the present he has just found, and she
+     * is off-panel, which is what "distant" means.
+     *
+     * The zoom is doing real work: it crops the painted title out of frame
+     * so the image can be used away from the cover. The title sits to the
+     * right of his head, so holding the frame left of it is what removes it.
+     */
+    image: 'matthew',
+    framing: { zoom: 1.7, origin: '28% 33%' },
     lines: [
       { who: 'MATTHEW', text: 'Okay. These are good presents.' },
       { who: 'AURORA', text: 'Keep up.' },
@@ -96,7 +109,7 @@ export const BEATS = {
     id: 'win',
     image: 'matthew-aurora',
     // In on her and the cake, with Matthew's reach just out of frame.
-    framing: { zoom: 1.5, origin: '68% 26%' },
+    framing: { zoom: 1.45, origin: '33% 28%' },
     lines: [
       { who: 'AURORA', text: 'Save me a slice?' },
       { who: 'MATTHEW', text: "You're on cleanup." },
@@ -106,8 +119,9 @@ export const BEATS = {
   loss: {
     id: 'loss',
     image: 'aurora',
-    // The cake, held high and leaving with her.
-    framing: { zoom: 1.6, origin: '76% 28%' },
+    // Her and the cake, close. The intro uses this artwork wide, so the
+    // ending has to be a different distance or it reads as a repeat.
+    framing: { zoom: 1.55, origin: '70% 26%' },
     lines: [
       { who: 'AURORA', text: "I'll save you a slice." },
       { who: 'MATTHEW', text: "You'd better." },
