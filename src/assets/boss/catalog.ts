@@ -25,7 +25,13 @@ export const BOSS_ACTORS = {
   aurora: {
     url: '/models/aurora.glb',
     source: 'assets/KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb',
-    targetHeight: 4.15,
+    /**
+     * Visible height, not bounding-box height. With the hat excluded from the
+     * fit she needs this much to read ~1.6x Matthew on screen at the low
+     * camera: the lens is far closer to him than to her, so perspective eats
+     * most of a raw height ratio.
+     */
+    targetHeight: 4.7,
     hideMeshes: ['Mage_Hat'],
     clips: { idle: 'Idle_B', raise: 'Use_Item', cast: 'Throw', hit: 'Hit_A', defeat: 'Death_A' },
   },
@@ -36,12 +42,19 @@ export const BOSS_ANIMATION_LIBRARIES = [
   '/models/level3/animations/Rig_Medium_MovementBasic.glb',
 ] as const;
 
-/** Level 2's proven right-hand mount, copied from the committed manifest. */
+/**
+ * Level 2's right-hand mount, enlarged for this camera.
+ *
+ * Level 2's 0.5 scale is correct for a 2.385-unit hero seen close. Here Matthew
+ * is 1.55 units and much further from the lens, which put the cannon at 11
+ * screen pixels — invisible, in a game called Operation Confetti. It is
+ * deliberately oversized rather than accurate, so the silhouette reads.
+ */
 export const BOSS_CANNON_MOUNT = {
   handNode: 'handslot.r',
   position: [0, 0, 0],
   rotationEuler: [-Math.PI / 2, 0, Math.PI],
-  scale: 0.5,
+  scale: 1.05,
   muzzleLocal: [0.08, 0.11, 0.78],
 } as const;
 

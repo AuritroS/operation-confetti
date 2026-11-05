@@ -1,4 +1,7 @@
-import { Box3, CircleGeometry, Group, Mesh, MeshBasicMaterial, Vector3 } from 'three';
+import {
+  AdditiveBlending, BackSide, Box3, CircleGeometry, Group, Mesh, MeshBasicMaterial, Object3D,
+  Vector3,
+} from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AssetBundle, type Actor } from '../../assets/characters';
 import { BOSS_ACTORS, BOSS_ANIMATION_LIBRARIES, BOSS_CANNON_MOUNT, BOSS_PROPS } from '../../assets/boss/catalog';
@@ -6,12 +9,89 @@ import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { buildCrown } from '../custom';
 import type { BossPractice } from '../../levels/boss/practice';
 
+const _point = new Vector3();
+
+/**
+ * Bounds of what will actually be drawn.
+ *
+ * `Box3.setFromObject` ignores `visible`, so a hidden mesh still inflates the
+ * box. Aurora's hidden Mage hat is a 2.9 x 2.0 x 3.1 bind-pose slab: fitting
+ * against it made her 18% shorter on screen than the number asked for, which
+ * is why she measured 4.15 units tall and still read as Matthew's size.
+ */
+function visibleBox(root: Object3D): Box3 {
+  const box = new Box3();
+  root.updateWorldMatrix(true, true);
+  const visit = (object: Object3D): void => {
+    if (!object.visible) return;
+    const geometry = (object as Mesh).geometry;
+    const position = geometry?.getAttribute?.('position');
+    if (position) {
+      for (let i = 0; i < position.count; i++) {
+        box.expandByPoint(_point.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld));
+      }
+    }
+    for (const child of object.children) visit(child);
+  };
+  visit(root);
+  return box;
+}
+
 function fitActor(actor: Actor, targetHeight: number): void {
   const root = actor.root;
-  const original = new Box3().setFromObject(root);
+  const original = visibleBox(root);
   root.scale.setScalar(targetHeight / Math.max(0.001, original.getSize(new Vector3()).y));
-  const fitted = new Box3().setFromObject(root);
+  const fitted = visibleBox(root);
   root.position.y -= fitted.min.y;
+}
+
+/**
+ * Aurora's crown, hovering clear above her hair.
+ *
+ * `buildCrown` makes a flat ring of constant radius; her hair is a tilted,
+ * non-cylindrical dome. There is no height at which such a ring fits it — it
+ * is either inside the dome and invisible, or outside it and reading as a
+ * halo, which is what three passes of radius tuning kept trading between.
+ *
+ * So it does not sit on her at all: it floats above the hair with a magenta
+ * underglow, which suits a self-appointed queen and, more practically, cannot
+ * clip. The hair is skinned, so anything conformed to the bind pose would
+ * break the moment she animates into a cast.
+ */
+function floatCrown(actor: Actor, head: Object3D): Group | null {
+  const headMesh = actor.root.getObjectByName('Mage_Head');
+  if (!headMesh) return null;
+  const bounds = visibleBox(headMesh);
+  const size = bounds.getSize(new Vector3());
+  const centre = bounds.getCenter(new Vector3());
+  const boneScale = head.getWorldScale(_point).x || 1;
+  const radius = (size.x * 0.38) / boneScale;
+
+  const crown = buildCrown(radius);
+  // The aura is the crown's own geometry again, grown slightly and drawn
+  // back-faces-only in additive magenta. That traces the band and every point
+  // instead of hanging a blob behind them, and it costs one extra draw rather
+  // than a texture. A flat ring was tried first and fails here: the lens is
+  // nearly level with her crown, so a horizontal torus is seen edge-on and
+  // reads as a drawn line.
+  const aura = buildCrown(radius);
+  const auraMaterial = new MeshBasicMaterial({
+    color: 0xcc29c3, transparent: true, opacity: 0.34,
+    side: BackSide, depthWrite: false, blending: AdditiveBlending,
+  });
+  aura.traverse((object) => {
+    if (object instanceof Mesh) object.material = auraMaterial;
+  });
+  aura.scale.setScalar(1.12);
+  crown.add(aura);
+
+  head.updateWorldMatrix(true, false);
+  // Barely clear of the hair: enough that nothing intersects when she casts,
+  // little enough that it still reads as hers rather than as scenery.
+  crown.position.copy(head.worldToLocal(
+    new Vector3(centre.x, bounds.max.y + size.y * 0.025, centre.z),
+  ));
+  return crown;
 }
 
 function shadow(): Mesh {
@@ -26,6 +106,8 @@ export class BossActors {
   private matthew: Actor | null = null;
   private aurora: Actor | null = null;
   private matthewHolder = new Group();
+  private readonly bossHolder = new Group();
+  private hover = 0;
   private shotPose = 0;
   private lastShotCount = 0;
   private readonly matthewShadow = shadow();
@@ -52,15 +134,16 @@ export class BossActors {
     aurora.hideMeshes(BOSS_ACTORS.aurora.hideMeshes);
     fitActor(aurora, BOSS_ACTORS.aurora.targetHeight);
     aurora.play(BOSS_ACTORS.aurora.clips.idle);
-    const crown = buildCrown(0.22);
-    crown.position.y = 0.42;
-    aurora.attach('head', crown);
-    const bossHolder = new Group();
-    bossHolder.position.set(0, BOSS_LAYOUT.bossStageY + 0.08, BOSS_LAYOUT.bossZ);
+    const headBone = aurora.root.getObjectByName('head');
+    if (!headBone) throw new Error('Aurora head node missing');
+    const crown = floatCrown(aurora, headBone);
+    if (!crown) throw new Error('Aurora head mesh missing');
+    headBone.add(crown);
+    this.bossHolder.position.set(0, BOSS_LAYOUT.bossStageY + 0.08 + BOSS_LAYOUT.bossFloat, BOSS_LAYOUT.bossZ);
     // A slight forward lean aims her crown and shoulders down the runway.
-    bossHolder.rotation.x = 0.065;
-    bossHolder.add(aurora.root);
-    this.root.add(bossHolder);
+    this.bossHolder.rotation.x = 0.065;
+    this.bossHolder.add(aurora.root);
+    this.root.add(this.bossHolder);
 
     const cannon = await new GLTFLoader().loadAsync(BOSS_PROPS.find((item) => item.id === 'cannon')!.url);
     const mount = BOSS_CANNON_MOUNT;
@@ -75,6 +158,11 @@ export class BossActors {
   }
 
   update(game: BossPractice, step: number): void {
+    // She hovers: a slow, shallow drift that never changes her hit position
+    // enough to matter, but stops her reading as standing on furniture.
+    this.hover += step;
+    this.bossHolder.position.y = BOSS_LAYOUT.bossStageY + 0.08 + BOSS_LAYOUT.bossFloat
+      + Math.sin(this.hover * 0.9) * 0.07;
     this.matthewHolder.position.set(game.renderX, 0.08, BOSS_LAYOUT.playerZ);
     this.matthewHolder.rotation.z = -game.lanes.lean * 0.09;
     this.matthewShadow.position.set(game.renderX, 0.05, BOSS_LAYOUT.playerZ);

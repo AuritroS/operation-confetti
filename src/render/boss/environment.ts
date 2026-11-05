@@ -61,22 +61,36 @@ function ribbon(parent: Group, points: Vector3[], radius: number, mat: MeshStand
 }
 
 /** The long clear run is a dark inlaid carpet; its fine gold boundaries reveal the lane perspective. */
+/**
+ * Near edge of the deck.
+ *
+ * The low camera sits at z 15 and its bottom ray meets the floor plane around
+ * z 11, so a deck ending at the old 7.35 left a band of void across the bottom
+ * of the frame. The floor has to run past the lens, not stop behind it.
+ */
+const DECK_NEAR_Z = 12.2;
+const DECK_FAR_Z = -9.15;
+const DECK_LENGTH = DECK_NEAR_Z - DECK_FAR_Z;
+const DECK_CENTRE_Z = (DECK_NEAR_Z + DECK_FAR_Z) / 2;
+
 function makeDeck(parent: Group): void {
-  block(parent, [10.2, 0.38, 16.5], [0, -0.25, -0.9], satin(0x19223b));
-  block(parent, [9.8, 0.07, 15.8], [0, -0.025, -0.9], satin(0x27314b));
+  block(parent, [10.2, 0.38, DECK_LENGTH], [0, -0.25, DECK_CENTRE_Z], satin(0x19223b));
+  block(parent, [9.8, 0.07, DECK_LENGTH - 0.7], [0, -0.025, DECK_CENTRE_Z], satin(0x27314b));
   const laneMats = [satin(0x202b47), satin(0x263454), satin(0x202b47)];
+  const laneLength = DECK_NEAR_Z - (-5.1);
+  const laneCentreZ = (DECK_NEAR_Z + -5.1) / 2;
   for (let lane = 0; lane < 3; lane++) {
     const x = BOSS_LAYOUT.laneCentres[lane]!;
-    block(parent, [2.06, 0.025, 11.7], [x, 0.02, 0.75], laneMats[lane]!);
+    block(parent, [2.06, 0.025, laneLength], [x, 0.02, laneCentreZ], laneMats[lane]!);
     block(parent, [1.84, 0.009, 0.07], [x, 0.041, 5.47], gold);
   }
   for (const x of [-3.32, -1.1, 1.1, 3.32]) {
-    block(parent, [0.025, 0.014, 11.7], [x, 0.048, 0.75], satin(0x916b79, 0.23));
+    block(parent, [0.025, 0.014, laneLength], [x, 0.048, laneCentreZ], satin(0x916b79, 0.23));
   }
   for (const x of [-4.95, 4.95]) {
-    block(parent, [0.27, 0.22, 15.8], [x, 0.1, -0.9], midnight);
-    block(parent, [0.16, 0.06, 15.8], [x, 0.23, -0.9], gold);
-    for (const z of [-4.6, -2.3, 0, 2.3, 4.6]) {
+    block(parent, [0.27, 0.22, DECK_LENGTH - 0.7], [x, 0.1, DECK_CENTRE_Z], midnight);
+    block(parent, [0.16, 0.06, DECK_LENGTH - 0.7], [x, 0.23, DECK_CENTRE_Z], gold);
+    for (const z of [-4.6, -2.3, 0, 2.3, 4.6, 7.4, 10.2]) {
       cylinder(parent, 0.08, 0.11, 0.92, [x, 0.68, z], midnight, 10);
       orb(parent, 0.09, [x, 1.18, z], luminous(0xffc471), 8);
     }
@@ -91,8 +105,25 @@ function makeDeck(parent: Group): void {
   }
 }
 
-/** A three-step oval dais reads as a theatrical boss stage rather than a bare box. */
+/** Height of the authored stepped cap; anything above that is plinth. */
+const DAIS_STEPS_HEIGHT = 1.07;
+/** How far the whole stage sits above the deck beyond its own steps. */
+const STAGE_LIFT = Math.max(0, BOSS_LAYOUT.bossStageY - DAIS_STEPS_HEIGHT);
+
+/**
+ * A three-step oval dais reads as a theatrical boss stage rather than a bare box.
+ *
+ * The steps keep their authored proportions; the extra elevation the low camera
+ * needs comes from a plinth underneath, because stretching the steps themselves
+ * to 2.6 units turns a dais into a wedding cake.
+ */
 function makeDais(parent: Group): void {
+  if (STAGE_LIFT > 0.01) {
+    const plinth = cylinder(parent, 4.62, 4.78, STAGE_LIFT, [0, STAGE_LIFT / 2, -6.2], satin(0x241a3c), 48);
+    plinth.scale.z = 0.48;
+    const reveal = cylinder(parent, 4.66, 4.66, 0.1, [0, STAGE_LIFT - 0.05, -6.2], gold, 48);
+    reveal.scale.z = 0.48;
+  }
   const tiers = [
     { r: 4.5, y: 0.17, h: 0.34, z: -6.25, mat: satin(0x301a42) },
     { r: 4.18, y: 0.46, h: 0.28, z: -6.43, mat: gold },
@@ -101,11 +132,11 @@ function makeDais(parent: Group): void {
     { r: 3.68, y: 1.035, h: 0.07, z: -6.48, mat: satin(0x4d245a) },
   ];
   for (const tier of tiers) {
-    const mesh = cylinder(parent, tier.r, tier.r, tier.h, [0, tier.y, tier.z], tier.mat, 48);
+    const mesh = cylinder(parent, tier.r, tier.r, tier.h, [0, tier.y + STAGE_LIFT, tier.z], tier.mat, 48);
     mesh.scale.z = 0.48;
   }
   // Inset medallion behind Aurora, thin enough to keep shots and spell cues legible.
-  const medallion = cylinder(parent, 1.4, 1.4, 0.018, [0, 1.085, BOSS_LAYOUT.bossZ], satin(0x7d4474, 0.2), 32);
+  const medallion = cylinder(parent, 1.4, 1.4, 0.018, [0, BOSS_LAYOUT.bossStageY + 0.035, BOSS_LAYOUT.bossZ], satin(0x7d4474, 0.2), 32);
   medallion.scale.z = 0.64;
 }
 
@@ -177,8 +208,8 @@ function makeSideWings(parent: Group): void {
       jewel.rotation.z = Math.PI / 4;
     }
     // The shoulder beyond the parapet reads as a real roof edge, not empty space.
-    block(parent, [0.45, 0.8, 8.5], [side * 5.38, 0.3, -1.0], stone);
-    block(parent, [0.53, 0.08, 8.5], [side * 5.38, 0.75, -1.0], satin(0x7b7290, 0.2));
+    block(parent, [0.45, 0.8, 20.0], [side * 5.38, 0.3, 1.6], stone);
+    block(parent, [0.53, 0.08, 20.0], [side * 5.38, 0.75, 1.6], satin(0x7b7290, 0.2));
   }
 }
 
@@ -264,14 +295,14 @@ function makeBalloons(parent: Group): void {
       const col = i % 3;
       const row = Math.floor(i / 3);
       const x = side * (4.31 + col * 0.25 + (row % 2) * 0.08);
-      const y = 2.2 + row * 0.58 + (col % 2) * 0.18;
+      const y = 2.2 + STAGE_LIFT + row * 0.58 + (col % 2) * 0.18;
       const z = -7.1 + (col - 1) * 0.29;
       dummy.position.set(x, y, z);
       dummy.scale.set(0.91, 1.18, 0.83);
       dummy.updateMatrix();
       balloon.setMatrixAt(index, dummy.matrix);
       balloon.setColorAt(index, new Color(palette[(i + (side + 1) * 2) % palette.length]!));
-      lines.push(x, y - 0.35, z, x + side * 0.14, 1.08, z);
+      lines.push(x, y - 0.35, z, x + side * 0.14, 1.08 + STAGE_LIFT * 0.4, z);
       index++;
     }
   }
@@ -283,7 +314,7 @@ function makeBalloons(parent: Group): void {
   for (const side of [-1, 1]) {
     ribbon(parent, Array.from({ length: 12 }, (_, i) => {
       const t = i / 11;
-      return new Vector3(side * (4.4 + Math.sin(t * Math.PI * 3) * 0.15), 1.3 + t * 3.9, -6.75 + Math.sin(t * Math.PI * 4) * 0.12);
+      return new Vector3(side * (4.4 + Math.sin(t * Math.PI * 3) * 0.15), 1.3 + STAGE_LIFT * 0.4 + t * (3.9 + STAGE_LIFT), -6.75 + Math.sin(t * Math.PI * 4) * 0.12);
     }), 0.018, paleGold);
   }
 }
@@ -400,7 +431,12 @@ export class BossEnvironment {
     makeMoonAndSkyline(this.root);
     makeDeck(this.root);
     makeDais(this.root);
-    makeArchitecture(this.root);
+    // The proscenium is authored for a 1.05 stage. Scaling it vertically keeps
+    // its base on the deck while its arch still clears Aurora's crown.
+    const architecture = new Group();
+    makeArchitecture(architecture);
+    architecture.scale.y = (6.38 + STAGE_LIFT * 1.95) / 6.38;
+    this.root.add(architecture);
     makeSideWings(this.root);
     makeBalloons(this.root);
     makeCandelabra(this.root, -3.55, -5.5);

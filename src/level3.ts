@@ -20,7 +20,11 @@ const pausedOverlay = byId('practice-paused');
 const pauseButton = byId<HTMLButtonElement>('practice-pause');
 const sceneStatus = byId('practice-scene-status');
 const debug = byId('practice-debug');
-debug.hidden = !new URLSearchParams(location.search).has('debug');
+const debugging = new URLSearchParams(location.search).has('debug');
+debug.hidden = !debugging;
+// Review hook: `?debug` exposes the scene graph so headless capture tooling can
+// measure real world bounds instead of re-deriving assumed coordinates.
+if (debugging) (window as unknown as Record<string, unknown>).level3 = { game, view };
 void view.load().then(() => { sceneStatus.hidden = true; }).catch((error: unknown) => {
   sceneStatus.textContent = `Scene asset failed to load: ${String(error)}`;
 });

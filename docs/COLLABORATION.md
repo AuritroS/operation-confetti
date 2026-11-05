@@ -154,3 +154,32 @@ Before relying on shared edits, record: owner, affected paths/API, purpose,
 commit or patch, checks performed, and when the other stream can consume it.
 The user can point Claude to this document; Codex has not messaged Claude or
 assumed acknowledgment.
+
+### 2026-11-05 — Level 3 stream handed to Claude
+
+- **Owner:** Claude, at the user's direction. The ownership table above assigns
+  Level 3 to Codex; that is superseded. Claude now owns both streams, so the
+  boundary is between *checkouts and paths*, not between agents. The Level 2
+  work in the original checkout is still untouched by this branch.
+
+### 2026-11-05 — `tools/recolour.mjs`, Aurora cell `C3`
+
+- **Owner:** Claude / Level 3.
+- **Paths:** `tools/recolour.mjs` (the `aurora` recipe only) and this document.
+  A coordinated-integration file, so it is logged rather than assumed.
+- **Purpose:** the KayKit Mage's belt satchel is a teal that appears nowhere in
+  `src/render/palette.ts`. It is painted into the shared `mage_texture` atlas,
+  not separate geometry, so it cannot be hidden at runtime — only recoloured.
+  Mapped to `P.gold` so it reads as part of her gold-and-purple regalia.
+- **Change shape:** additive. One cell added to one recipe; no other character,
+  cell, or tool behaviour is touched.
+- **Blast radius:** `/models/aurora.glb` is consumed only by `src/assets/boss/`
+  (Level 3) and `src/probe-characters.ts` (a dev probe page). Levels 1 and 2
+  load `matthew` and `guard` only, so no gameplay outside Level 3 is affected.
+- **Finding worth keeping:** the cell must be identified by mapping a mesh's
+  UVs to the 8x4 grid, not by locating the colour in the atlas. The first
+  attempt targeted `G3`, which holds a visually identical teal swatch that no
+  mesh references; the recolour ran clean and changed nothing. `Mage_Body`'s
+  UVs resolve to `C3`.
+- **Consumable:** now. Rebuild with `node tools/recolour.mjs --only aurora`,
+  or `node tools/boss-assets.mjs` for the whole Level 3 set.
