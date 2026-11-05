@@ -71,7 +71,26 @@ await page.route('**/*', async (route) => {
  * Every level now opens in a rehearsal that scores nothing, so a check that
  * skipped this would be measuring practice rather than play.
  */
+/**
+ * Clear any comic panel that is up.
+ *
+ * The cover has no skip, so it takes a Next; the first story panel then takes
+ * a Skip, which suppresses every later beat for the run. A check that walked
+ * through all of them would be timing the comic rather than the game.
+ */
+async function dismissStory(target) {
+  for (let i = 0; i < 4; i++) {
+    const panel = target.locator('.story:not([hidden])');
+    if (!(await panel.count())) return;
+    const skip = target.locator('.story__skip:visible');
+    if (await skip.count()) await skip.click();
+    else await target.locator('.story__next').click();
+    await target.waitForTimeout(250);
+  }
+}
+
 async function startLevel(target) {
+  await dismissStory(target);
   await target.locator('.tutorial__start').click({ timeout: 30_000 });
 }
 
@@ -82,6 +101,7 @@ const campaign = () => page.evaluate(() => {
 
 try {
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
+  await dismissStory(page);
   await page.waitForFunction(() => window.__campaign && !window.__campaign.switching, null, { timeout: 60_000 });
 
   // The rehearsal must cost nothing. Let it run, try the verb, and confirm

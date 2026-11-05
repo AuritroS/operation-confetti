@@ -40,6 +40,7 @@ build order, decisions and evidence.
 | --- | --- |
 | `/` | The campaign: all three levels in sequence |
 | `/?tutorial=N` | The campaign opened at level N with its tutorial sheet up — the only way to review a sheet without playing the levels before it |
+| `/?story=<id>` | One comic panel, held up for review. Ids: `title`, `intro`, `vault`, `rooftop`, `win`, `loss` |
 | `/?level=1`, `/?level=2` | A single level's standalone review page, skipping the rehearsal |
 | `/level3.html` | The boss fight alone, with `?debug` for the cue harness |
 | `/?layers=all`, `?layers=clutter` | Level 1 environment layers; the default omits layers that are review-only |

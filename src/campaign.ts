@@ -29,6 +29,8 @@ import { Hud } from './ui/hud';
 import { BossHud } from './ui/boss-hud';
 import { Tutorial, type TutorialCopy } from './ui/tutorial';
 import { Fade } from './ui/fade';
+import { StoryPlayer } from './ui/story';
+import { BEATS, type StoryBeat } from './story/script';
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -51,7 +53,22 @@ const hud = new Hud();
 const bossHud = new BossHud(levelHud);
 const app = canvas.parentElement ?? document.body;
 const tutorial = new Tutorial(app);
+const story = new StoryPlayer(app);
 const fade = new Fade(app);
+/**
+ * Skipping is remembered for the run.
+ *
+ * A player who skipped the opening does not want the next panel either, and
+ * being asked again at every seam is the thing "skip" was pressed to avoid.
+ * A replay starts a new run and offers them again.
+ */
+let storySkipped = false;
+
+/** Show a beat unless the player has opted out of the comic. */
+async function tell(beat: StoryBeat | undefined): Promise<void> {
+  if (!beat || storySkipped) return;
+  if (await story.show(beat)) storySkipped = true;
+}
 
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
@@ -72,6 +89,8 @@ interface StageSpec {
   readonly make: () => LevelController;
   /** What the tutorial sheet says before this level is played. */
   readonly copy: TutorialCopy;
+  /** The comic beat shown before this level, if it has one. */
+  readonly beat?: StoryBeat;
 }
 
 const STAGES: readonly StageSpec[] = [
@@ -79,6 +98,7 @@ const STAGES: readonly StageSpec[] = [
     id: 1,
     title: 'The Gift Vault',
     make: () => new RouteLevel(host),
+    beat: BEATS.intro,
     copy: {
       chapter: '1 · THE GIFT HEIST',
       controls: [{ icons: ['left', 'right'], label: 'Change lane' }],
@@ -88,6 +108,7 @@ const STAGES: readonly StageSpec[] = [
     id: 2,
     title: 'Skyline Chase',
     make: () => new SkylineLevel(host),
+    beat: BEATS.vault,
     copy: {
       chapter: '2 · THE SKYLINE CHASE',
       controls: [
@@ -101,6 +122,7 @@ const STAGES: readonly StageSpec[] = [
     id: 3,
     title: 'One Last Party Trick',
     make: () => new BossLevel(),
+    beat: BEATS.rooftop,
     copy: {
       chapter: '3 · CAKE SHOWDOWN',
       controls: [
@@ -247,8 +269,11 @@ async function mountStage(): Promise<void> {
   bossHud.setVisible(false);
   hideBanner();
 
+  // The panel goes up before the level is built, so the comic is what the
+  // player looks at while it loads rather than a black screen.
+  const telling = tell(spec.beat);
   const level = spec.make();
-  await level.mount(ctx);
+  await Promise.all([level.mount(ctx), telling]);
   current = level;
 
   // Every level opens in a rehearsal. The sheet explains the verbs, the
@@ -270,7 +295,7 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
 
   const beaten = result === 'defeated';
   const last = index >= STAGES.length - 1;
-  if (beaten || last) return endCampaign(result);
+  if (beaten || last) { await endCampaign(result); return; }
 
   // Curtain down before the swap: a level being torn down while another is
   // built is the one moment the scene is genuinely inconsistent.
@@ -281,12 +306,14 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
   await mountStage();
 }
 
-function endCampaign(result: 'complete' | 'defeated'): void {
+async function endCampaign(result: 'complete' | 'defeated'): Promise<void> {
   campaignOver = true;
   switching = false;
-  loop.stop();
   laneInput.detach();
   swingInput.detach();
+  // Let the level's own ending play out, then close on the comic.
+  await tell(result === 'complete' ? BEATS.win : BEATS.loss);
+  loop.stop();
   const total = scoreRun(events).total;
   banner(`${result === 'complete' ? 'Cake recovered!' : 'Aurora escaped'}  ·  ${total}`);
   // Keep drawing the ending; the simulation is finished but the scene is not.
@@ -300,6 +327,7 @@ async function restartCampaign(): Promise<void> {
   current = null;
   events = [];
   campaignOver = false;
+  storySkipped = false;
   index = startIndex();
   hud.reset();
   hideBanner();
@@ -342,8 +370,29 @@ if (debug) {
 // ---- boot --------------------------------------------------------------
 
 hud.reset();
+StoryPlayer.preload();
 index = startIndex();
 if (jumpTo >= 1 && jumpTo <= 3) {
   console.info(`[dev] jumped to level ${jumpTo}; this run is not a campaign result`);
 }
-void mountStage();
+
+void (async () => {
+  /*
+   * `?story=<id>` holds one panel up for review.
+   *
+   * Looking at the loss ending otherwise means losing the boss fight, and
+   * looking at any of them means playing to that seam. The panel simply
+   * stays up; nothing is mounted behind it.
+   */
+  const only = params.get('story');
+  if (only) {
+    const beat = (BEATS as Record<string, StoryBeat | undefined>)[only];
+    if (beat) { await story.show(beat); return; }
+    console.warn(`[dev] no story beat "${only}". Try: ${Object.keys(BEATS).join(', ')}`);
+  }
+
+  // The cover opens the game. It is skipped when jumping straight to a level,
+  // because the point of that jump is to reach the level.
+  if (jumpTo === 0) await story.show(BEATS.title);
+  await mountStage();
+})();

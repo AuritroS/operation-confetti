@@ -162,7 +162,14 @@ const PRUNE = [
 ];
 
 /** Story panels, resized from the originals. */
-const STORY = ['assets/matthew.png', 'assets/aurora.png'];
+/**
+ * The comic's artwork.
+ *
+ * Three images carry every story beat. `matthew.png` has its title baked in,
+ * so it is the cover and nothing else; the other two are reframed by CSS and
+ * recaptioned to serve several moments each.
+ */
+const STORY = ['assets/matthew.png', 'assets/aurora.png', 'assets/matthew-aurora.png'];
 
 const warnings = [];
 

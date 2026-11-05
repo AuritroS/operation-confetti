@@ -7,11 +7,12 @@
  *
  * `?tutorial=N` is different from `?level=N`: it opens the *campaign* at that
  * level with its tutorial sheet up, which is the only way to look at a sheet
- * without playing the levels before it.
+ * without playing the levels before it. `?story=<id>` does the same for a
+ * single comic panel.
  */
 const params = new URLSearchParams(location.search);
 const level = params.get('level');
-if (params.has('tutorial')) {
+if (params.has('tutorial') || params.has('story')) {
   void import('./campaign');
 } else if (level === '1') {
   void import('./main');
