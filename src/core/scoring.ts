@@ -28,7 +28,7 @@ export type Level = 1 | 2 | 3;
 
 export type RunEvent =
   | { t: 'gift'; level: Level }
-  | { t: 'incident'; level: 1 | 2 }
+  | { t: 'incident'; level: Level }
   | { t: 'routeComplete'; level: 1 | 2 }
   | { t: 'bossDamage'; amount: number }
   | { t: 'victory' }

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Level 3 asset selection</title>
+  <link rel="stylesheet" href="/src/assets/boss/review.css" />
+</head>
+<body>
+  <main>
+    <header><span>LEVEL 3 / ASSET REVIEW</span><h1>Christmas birthday showdown</h1><p>Select an asset to inspect its silhouette and proposed size. Drag to orbit; scroll or pinch to zoom.</p></header>
+    <div class="review-grid">
+      <section class="viewer">
+        <canvas id="asset-canvas" aria-label="Rotatable preview of selected 3D asset"></canvas>
+        <div class="viewer-note">Drag to orbit · Scroll to zoom</div>
+      </section>
+      <section class="details">
+        <label for="asset-select">Selected asset</label>
+        <select id="asset-select"></select>
+        <h2 id="asset-title"></h2>
+        <p id="asset-role"></p>
+        <dl><div><dt>Proposed height</dt><dd id="asset-height"></dd></div><div><dt>Export</dt><dd id="asset-export"></dd></div></dl>
+        <p id="asset-status" role="status"></p>
+        <p class="review-link"><a href="/level3.html">Return to control practice</a></p>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/src/assets/boss/review.ts"></script>
+</body>
+</html>

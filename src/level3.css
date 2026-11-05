@@ -1,0 +1,153 @@
+/*
+ * HUD colour, mirrored from `src/render/palette.ts`.
+ *
+ * The CSS used to hand-pick hexes that had drifted from the 3D palette, which
+ * is how Matthew's hearts ended up pink — a colour from Aurora's family — and
+ * his cannon ended up gold-on-gold with her trim. Naming the palette here
+ * means a bar and the character it describes are the same number, and a future
+ * palette change has one obvious place to follow.
+ *
+ * Roles, and nothing borrows across them:
+ *   magenta/purple  Aurora's state only. Her magic and her robe.
+ *   gold/navy       Matthew's state only. palette.ts: "gold is his".
+ *   exposed         Her shield being down. The one "act now" colour.
+ *   fault           Damage and jams. Never anything else.
+ */
+:root {
+  --ink: #18101a;
+  --navy-deep: #1b275c;
+  --navy: #12368f;
+  --blue: #234ca8;
+  --gold: #eaac5b;
+  --purple-deep: #5c175c;
+  --magenta: #cc29c3;
+  --slate-line: #2b3450;
+  /* A tint of --gold, for small text that needs more lift against the night. */
+  --gold-text: #f7d380;
+  --exposed: #9df6d4;
+  --fault: #ff6a52;
+}
+
+:root { font: 500 16px/1.4 system-ui, sans-serif; color: #f8f4eb; background: #090f1d; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+button { font: inherit; color: inherit; cursor: pointer; }
+#practice { position: relative; width: 100vw; height: 100dvh; max-width: min(100vw, 62dvh); margin: auto; overflow: hidden; background: #17243c; }
+#practice-stage, #practice-surface { position: absolute; inset: 0; width: 100%; height: 100%; }
+#practice-surface { z-index: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
+.practice-hud { position: absolute; z-index: 2; top: max(16px, env(safe-area-inset-top)); left: 18px; right: 18px; display: flex; justify-content: space-between; gap: 12px; align-items: start; pointer-events: none; }
+.practice-hud div { display: grid; gap: 2px; }
+.eyebrow { color: var(--gold-text); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.practice-hud strong { font-size: 20px; }
+.hud-right { display: flex; align-items: center; gap: 10px; }
+.score { font-size: 19px; font-weight: 800; color: var(--gold-text); text-shadow: 0 2px 6px #06101f; }
+.practice-hud button, .practice-overlay button { pointer-events: auto; border: 1px solid #b9cde1; border-radius: 999px; background: #263b5c; padding: 7px 15px; }
+.practice-message { position: absolute; z-index: 2; top: max(172px, calc(env(safe-area-inset-top) + 158px)); left: 8%; right: 8%; text-align: center; color: #fff4ce; font-size: 13px; font-weight: 800; text-shadow: 0 2px 8px #071024; pointer-events: none; }
+.practice-scene-status { position: absolute; z-index: 3; top: 49%; left: 10%; right: 10%; text-align: center; padding: 12px; border-radius: 10px; background: #13213edc; color: #fff2d4; font-size: 13px; }
+.practice-debug { position: absolute; z-index: 3; bottom: 90px; left: 10px; padding: 5px 7px; border-radius: 6px; background: #11203bd9; font: 11px/1.3 monospace; pointer-events: none; }
+.practice-help { position: absolute; z-index: 2; bottom: max(20px, env(safe-area-inset-bottom)); left: 10px; right: 10px; text-align: center; font-size: 13px; line-height: 1.6; pointer-events: none; text-shadow: 0 2px 5px #061021; }
+.practice-help span { font-size: 11px; color: #c0cfdf; }
+.practice-help button { pointer-events: auto; margin-bottom: 8px; border: 1px solid #ffdf9a; border-radius: 999px; background: #6b2c70; padding: 8px 20px; font-weight: 800; }
+.boss-beat { position: absolute; z-index: 2; top: max(146px, calc(env(safe-area-inset-top) + 132px)); left: 18px; right: 18px; text-align: center; font-size: 12px; font-weight: 800; color: #ffe4a4; text-shadow: 0 2px 5px #081024; pointer-events: none; }
+.boss-beat.exposed { color: #9df6d4; }
+.practice-overlay { position: absolute; z-index: 4; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #101b30dc; }
+.practice-overlay strong { font-size: 30px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+
+/* Cue review legend, shown only with ?debug alongside the draw counter. */
+.practice-cues {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 104px;
+  font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #c9b7e8;
+  background: rgba(10, 8, 24, 0.72);
+  border-radius: 6px;
+  padding: 5px 8px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/*
+ * Combat readouts.
+ *
+ * Each fighter's state sits at the end of the frame that fighter occupies:
+ * Aurora's health across the top under her, Matthew's hearts and cannon along
+ * the bottom under him. The player never has to learn which number is whose,
+ * and nothing crosses the three lanes in the middle where the read happens.
+ */
+.boss-bar {
+  position: absolute; z-index: 2;
+  top: max(94px, calc(env(safe-area-inset-top) + 80px));
+  left: 18px; right: 18px;
+  pointer-events: none;
+}
+.boss-bar-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.boss-bar-name { font-size: 10px; font-weight: 800; letter-spacing: .14em; color: #e6c7ff; }
+.boss-bar-row strong { font-size: 13px; color: var(--gold-text); font-variant-numeric: tabular-nums; }
+.boss-bar-track {
+  height: 9px; border-radius: 999px; overflow: hidden;
+  background: #18101acc; border: 1px solid #ffffff1f;
+}
+.boss-bar-track i {
+  display: block; height: 100%; width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--purple-deep), var(--magenta));
+  transform-origin: left center;
+  transition: width .18s ease-out;
+}
+/* Her shield being down is the only chance to move this bar, so the bar says so. */
+.boss-bar.exposed .boss-bar-track { border-color: color-mix(in srgb, var(--exposed) 65%, transparent); box-shadow: 0 0 10px #4fe3b53d; }
+
+.player-strip {
+  position: absolute; z-index: 2;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 6px));
+  left: 18px; right: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  pointer-events: none;
+}
+.hearts { display: flex; gap: 5px; }
+.hearts svg { width: 19px; height: 19px; display: block; }
+.hearts svg path { fill: var(--gold); stroke: none; transition: fill .15s ease-out; }
+/* A spent heart hollows out rather than dimming: a filled shape at low
+   contrast is hard to count at a glance, an outline is not. */
+.hearts .lost path { fill: #18101a99; stroke: var(--slate-line); stroke-width: 2; }
+
+/* The cannon: a precise readout to back up the glow on the muzzle itself. */
+.gun { display: grid; gap: 3px; justify-items: end; min-width: 92px; }
+.gun-track { width: 92px; height: 6px; border-radius: 999px; background: #18101acc; border: 1px solid #ffffff1f; overflow: hidden; }
+.gun-track i { display: block; height: 100%; width: 100%; border-radius: 999px; background: var(--gold); }
+.gun-label { font-size: 9px; font-weight: 800; letter-spacing: .12em; color: var(--gold-text); }
+.gun.charging .gun-track i { background: var(--blue); }
+.gun.charging .gun-label { color: #9fb0d2; }
+/* A jam has to look like a fault, not a slow reload, or the rule goes unlearned. */
+.gun.jammed .gun-track { border-color: #ff8d7aa8; }
+.gun.jammed .gun-track i { background: linear-gradient(90deg, #c23b32, var(--fault)); }
+.gun.jammed .gun-label { color: #ff9d8c; }
+
+/* The same penalty language levels 1 and 2 use: a floating cost and an edge pulse. */
+.boss-delta {
+  position: absolute; z-index: 3; left: 0; right: 0;
+  bottom: max(86px, calc(env(safe-area-inset-bottom) + 74px));
+  text-align: center; font-size: 26px; font-weight: 800; color: var(--fault);
+  text-shadow: 0 2px 10px #0a0f1f; pointer-events: none;
+  animation: delta-rise .9s ease-out forwards;
+}
+@keyframes delta-rise {
+  from { opacity: 0; transform: translateY(10px) scale(.86); }
+  25%  { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-26px) scale(1); }
+}
+.boss-vignette {
+  position: absolute; z-index: 3; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 70px 14px #c2313166;
+  animation: vignette-pulse .5s ease-out forwards;
+}
+@keyframes vignette-pulse { from { opacity: 1; } to { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-delta, .boss-vignette { animation-duration: .01ms; }
+  .boss-bar-track i { transition: none; }
+}

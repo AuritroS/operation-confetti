@@ -125,7 +125,13 @@ const RECIPES = [
     id: 'aurora',
     source: 'Mage',
     texture: 'mage_texture.png',
-    note: 'Purple and gold. A2 is the robe, C2 the cape, already magenta-ish.',
+    note:
+      'Purple and gold. A2 is the robe, C2 the cape, already magenta-ish. ' +
+      'C3 is the Mage\u2019s belt satchel: a teal that exists nowhere in the ' +
+      'project palette and reads as a leftover from the source pack against ' +
+      'her purple and gold. Found by mapping Mage_Body\u2019s UVs to the ' +
+      'grid \u2014 the atlas also holds unused teal swatches, so picking a ' +
+      'cell by eye off the texture recolours nothing.',
     cells: {
       A2: P.purpleDeep, // robe
       B2: P.purpleDeep, // hat (hidden at runtime, recoloured for consistency)
@@ -133,6 +139,7 @@ const RECIPES = [
       D3: P.plumBlack,  // legs and boots
       H2: P.plumBlack,  // leg accents
       F1: P.gold,       // body trim
+      C3: P.gold,       // belt satchel, off-palette teal in the source
       A1: SKIN.aurora,  // face and hands
     },
   },

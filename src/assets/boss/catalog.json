@@ -1,0 +1,18 @@
+[
+  {
+    "id": "collectibleGift",
+    "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_A_blue.gltf",
+    "url": "/models/level3/present_A_blue.glb",
+    "nativeHeight": 0.662,
+    "targetHeight": 0.9,
+    "role": "Only scored gift; plain blue present until cross-level collectible treatment is agreed"
+  },
+  {
+    "id": "cannon",
+    "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/snowball_cannon.gltf",
+    "url": "/models/level3/snowball_cannon.glb",
+    "nativeHeight": 0.714,
+    "targetHeight": 0.357,
+    "role": "Level 2's handheld cannon; reuse its right-hand mount and muzzle"
+  }
+]

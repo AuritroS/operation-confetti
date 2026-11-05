@@ -30,3 +30,4 @@ tools/shots/
 # isolated parallel development checkouts and local temporary files
 .worktrees/
 .local-tmp/
+public/level3-particles/

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#10172c" />
+  <title>Level 3 · Aurora's birthday gala</title>
+  <link rel="stylesheet" href="/src/level3.css" />
+</head>
+<body>
+  <main id="practice">
+    <canvas id="practice-stage" aria-hidden="true"></canvas>
+    <div id="practice-surface" aria-label="Game area: swipe left or right to change lanes, tap to fire"></div>
+    <header class="practice-hud">
+      <div><span class="eyebrow">LEVEL 3 / BOSS FIGHT</span><strong>Aurora’s birthday gala</strong></div>
+      <div class="hud-right"><span class="score" id="boss-score">0</span><button id="practice-pause" type="button" aria-label="Pause game">Pause</button></div>
+    </header>
+    <!-- Aurora is at the top of the frame, so her health lives at the top too. -->
+    <div class="boss-bar" id="boss-bar">
+      <div class="boss-bar-row"><span class="boss-bar-name">AURORA</span><strong id="boss-health">100</strong></div>
+      <div class="boss-bar-track"><i id="boss-health-fill"></i></div>
+    </div>
+    <!-- Matthew is at the bottom, so his hearts and his cannon are too. -->
+    <div class="player-strip" id="player-strip">
+      <div class="hearts" id="boss-hearts" role="img" aria-label="5 of 5 hearts"></div>
+      <div class="gun" id="boss-gun">
+        <div class="gun-track"><i id="boss-gun-fill"></i></div>
+        <span class="gun-label" id="boss-gun-label">READY</span>
+      </div>
+    </div>
+    <div class="boss-delta" id="boss-delta" hidden>-50</div>
+    <div class="boss-vignette" id="boss-vignette" hidden></div>
+    <div class="boss-beat" id="boss-beat" aria-live="polite">Practice · no damage</div>
+    <div id="practice-message" class="practice-message">Swipe to switch lanes · tap to fire</div>
+    <div id="practice-scene-status" class="practice-scene-status" role="status">Loading birthday rooftop…</div>
+    <div id="practice-debug" class="practice-debug" hidden>Lane <strong id="practice-lane">2 / 3</strong> · <span id="practice-perf"></span></div>
+    <div id="practice-cues" class="practice-cues" hidden>1 strike · 2 orb · 3 shield · 4 block · 5 gift · 6 take · 7 win · 8 lose · 9 clear</div>
+    <div id="practice-paused" class="practice-overlay" hidden>
+      <strong>Paused</strong><span>Tap Resume or press P</span>
+      <button id="practice-resume" type="button">Resume</button>
+    </div>
+    <div id="boss-result" class="practice-overlay" hidden>
+      <strong id="boss-result-title"></strong><span id="boss-result-detail"></span>
+      <button id="boss-restart" type="button">Practice again</button>
+    </div>
+    <footer class="practice-help"><button id="boss-start" type="button">Begin fight</button><br /><span id="practice-counts">Practice: <strong id="practice-shots">0</strong> shots · <strong id="practice-hits">0</strong> hits</span><br />Swipe left/right · Tap to fire<br /><span>Practice shots cannot hurt anyone</span><br /><span>Keyboard: ← → / A D · short Space · P pause · R reset</span></footer>
+  </main>
+  <script type="module" src="/src/level3.ts"></script>
+</body>
+</html>
