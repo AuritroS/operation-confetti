@@ -1,5 +1,6 @@
 import type { PerspectiveCamera } from 'three';
 import type { Snapshot } from '../levels/skyline/types';
+import { INSPECTING } from './skyline-inspect';
 import {
   CAMERA_ASPECT_PULLBACK,
   CAMERA_ASPECT_REFERENCE,
@@ -25,6 +26,36 @@ import {
  */
 const CLOSEUP = 0.45;
 
+/**
+ * `?inspect` framing: high, back, and looking down the contact sheet.
+ *
+ * A gameplay camera eighteen units back sees three props at a time, which
+ * is exactly the round-trip the inspection frame exists to remove.
+ */
+const INSPECT_DEFAULT = { x: 52, y: 48, z: 46, lookX: 0, lookY: 4, lookZ: -46 };
+
+/**
+ * Overridable from the URL: `?inspect&cam=x,y,z,lookY,lookZ`.
+ *
+ * Framing a contact sheet is a judgement, and round-tripping through a code
+ * change for every nudge is the cost this tool exists to remove.
+ */
+const INSPECT_VIEW = (() => {
+  if (typeof location === 'undefined') return INSPECT_DEFAULT;
+  const raw = new URLSearchParams(location.search).get('cam');
+  if (!raw) return INSPECT_DEFAULT;
+  const n = raw.split(',').map(Number);
+  if (n.length < 3 || n.some((v) => !Number.isFinite(v))) return INSPECT_DEFAULT;
+  return {
+    x: n[0] as number,
+    y: n[1] as number,
+    z: n[2] as number,
+    lookX: 0,
+    lookY: n[3] ?? INSPECT_DEFAULT.lookY,
+    lookZ: n[4] ?? INSPECT_DEFAULT.lookZ,
+  };
+})();
+
 /** Keep the three routes horizontally stable while gently tracking altitude. */
 export class SkylineCamera {
   private focusY = FOCUS_START;
@@ -49,6 +80,14 @@ export class SkylineCamera {
   }
 
   update(s: Snapshot, dt: number, reduced: boolean): void {
+    if (INSPECTING) {
+      // Oblique rather than straight down the street: a camera at roof
+      // height looks onto the roofs, and a camera at street level hides the
+      // far half behind the near half.
+      this.camera.position.set(INSPECT_VIEW.x, INSPECT_VIEW.y, INSPECT_VIEW.z);
+      this.camera.lookAt(INSPECT_VIEW.lookX, INSPECT_VIEW.lookY, INSPECT_VIEW.lookZ);
+      return;
+    }
     const blend = this.initialized ? 1 - Math.exp(-dt * FOCUS_SETTLE) : 1;
     this.initialized = true;
     const follow = reduced ? FOCUS_FOLLOW_REDUCED : FOCUS_FOLLOW;

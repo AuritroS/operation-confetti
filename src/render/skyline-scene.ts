@@ -2,11 +2,13 @@ import {
   BoxGeometry, BufferGeometry, Color, Float32BufferAttribute, FogExp2, Group,
   DirectionalLight,
   InstancedMesh, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, MeshStandardMaterial,
-  Object3D, OctahedronGeometry, Vector3,
+  Object3D, OctahedronGeometry, Vector2, Vector3,
 } from 'three';
 import { Stage } from './stage';
 import { SkylineCamera } from './skyline-camera';
 import { SkylineStreet } from './skyline-street';
+import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
+import { INSPECT, INSPECTING, InspectLabels, travelArrows } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower } from './custom';
 import { SparkleField } from './effects';
@@ -78,6 +80,8 @@ export class SkylineScene {
   private backdrop: EnvironmentLayer[] = [];
   private fill: DirectionalLight;
   private kit: ObstacleKit | null = null;
+  private boxes: SkylineBoxes | null = null;
+  private labels: InspectLabels | null = null;
   /** Anchor gantries, instanced: one per visible anchor. */
   private gantries: InstancedMesh | null = null;
   /** Ground markers under a low anchor, so the descent lands on something. */
@@ -120,7 +124,14 @@ export class SkylineScene {
      * the fog's reach, so the clip edge was visible. 230 puts it past where
      * anything is drawn.
      */
-    this.stage.scene.fog = new FogExp2(0x111e32, FOG_DENSITY);
+    /**
+     * `?inspect` thins the fog and lifts the lights.
+     *
+     * The night palette is right for play and wrong for a contact sheet:
+     * you cannot judge which way a lamp arm points if the lamp is a
+     * silhouette. Review legibility beats atmosphere here.
+     */
+    this.stage.scene.fog = new FogExp2(0x111e32, INSPECTING ? FOG_DENSITY * 0.25 : FOG_DENSITY);
     this.stage.camera.far = CAMERA_FAR;
     this.stage.camera.near = CAMERA_NEAR;
     this.stage.camera.updateProjectionMatrix();
@@ -134,8 +145,8 @@ export class SkylineScene {
      * with it because its camera is close; here it made Matthew a cut-out.
      * Local to this scene, so level 1's lighting is untouched.
      */
-    const fill = new DirectionalLight(0xbcd2ff, 1.25);
-    fill.position.set(3, 14, 26);
+    const fill = new DirectionalLight(0xbcd2ff, INSPECTING ? 3.2 : 1.25);
+    fill.position.set(INSPECTING ? 30 : 3, INSPECTING ? 34 : 14, 26);
     this.fill = fill;
     this.stage.scene.add(fill);
     this.stage.scene.add(this.root); this.stage.observe();
@@ -225,8 +236,21 @@ export class SkylineScene {
 
   useAssets(assets: StreetAssets): void {
     if (this.street) return;
-    this.street = new SkylineStreet(assets, this.course.duration * this.course.speed);
+    /**
+     * `?inspect` swaps the layout, not the code path: the contact sheet is
+     * built by the same resolver and the same street builder, so what is
+     * reviewed is what ships.
+     */
+    this.street = new SkylineStreet(assets, INSPECTING ? INSPECT : undefined);
     this.root.add(this.street.object);
+    if (INSPECTING) {
+      this.street.object.add(travelArrows());
+      this.labels = new InspectLabels(document.body);
+    }
+    if (SHOW_BOXES) {
+      this.boxes = new SkylineBoxes(assets, this.street.anchors, this.course.entities);
+      this.root.add(this.boxes.object);
+    }
     // The flat box floor and the instanced blocks were standing in for the
     // road and the canyon. Both are now real, so retire the stand-ins rather
     // than leaving them to z-fight with what replaced them.
@@ -321,6 +345,7 @@ export class SkylineScene {
     let b = 0, w = 0;
     if (this.street) {
       this.street.update(s.p.z);
+      this.boxes?.update(s.p.z);
     } else {
       // Primitive stand-in, used only until the GLBs resolve.
       const base = Math.floor(s.p.z / 20) * 20;
@@ -439,7 +464,13 @@ export class SkylineScene {
       entities: this.course.entities.filter((e) => this.visibleEntities.has(e.id)).map((e) => ({ id: e.id, point: project(e) })),
       draws: this.stage.drawCalls, triangles: this.stage.triangles };
   }
-  render(): void { this.stage.render(); }
+  render(): void {
+    if (this.labels) {
+      const size = this.stage.renderer.getSize(new Vector2());
+      this.labels.update(this.stage.camera, size.x, size.y, this.street?.object.position.z ?? 0);
+    }
+    this.stage.render();
+  }
   reset(): void { this.camera.reset(); }
   dispose(): void {
     this.root.removeFromParent(); this.box.dispose(); this.diamond.dispose();
@@ -449,6 +480,8 @@ export class SkylineScene {
     this.fill.removeFromParent();
     this.fill.dispose();
     this.street?.dispose();
+    this.boxes?.dispose();
+    this.labels?.dispose();
     this.gantries?.dispose();
     this.lowMarks?.dispose();
     this.giftMarks.dispose();

@@ -59,7 +59,7 @@ function stub(): StreetAssets {
 
 describe('the environment is preset, not recycled', () => {
   it('never changes its instance census across a whole run', () => {
-    const street = new SkylineStreet(stub(), ROUTE);
+    const street = new SkylineStreet(stub());
     const initial = JSON.stringify(street.census);
     expect(Object.keys(street.census).length, 'nothing was placed at all').toBeGreaterThan(3);
 
@@ -75,7 +75,7 @@ describe('the environment is preset, not recycled', () => {
   });
 
   it('moves the whole world with one transform', () => {
-    const street = new SkylineStreet(stub(), ROUTE);
+    const street = new SkylineStreet(stub());
     street.update(123);
     expect(street.object.position.z, 'the group is not following the player').toBe(123);
     // And nothing else about it moved.
@@ -87,7 +87,7 @@ describe('the environment is preset, not recycled', () => {
   it('covers the route and a margin past both ends', () => {
     // Neither end of the street may ever come into frame.
     expect(MARGIN, 'no run-off at the ends of the route').toBeGreaterThan(40);
-    const street = new SkylineStreet(stub(), ROUTE);
+    const street = new SkylineStreet(stub());
     const road = street.census['road'] ?? 0;
     const crossing = street.census['roadCrossing'] ?? 0;
     // Enough surface for the route plus both margins, at 17 units a tile.

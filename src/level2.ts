@@ -13,6 +13,11 @@ import { loadSkylineHero } from './render/skyline-hero';
 import { DebugPanel, Hud } from './ui/hud';
 
 document.body.dataset['level'] = '2';
+// Review-only: the portrait letterbox is correct for play and useless for a
+// contact sheet, where the whole point is to see everything at once.
+if (new URLSearchParams(location.search).has('inspect')) {
+  document.body.dataset['inspect'] = 'on';
+}
 document.title = 'Skyline Chase · Operation Confetti';
 const app = document.getElementById('app')!;
 const surface = document.getElementById('surface')!;

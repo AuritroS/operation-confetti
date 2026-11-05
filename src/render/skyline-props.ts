@@ -30,6 +30,24 @@
 /** Level 2 world units per real-world metre. See the derivation above. */
 export const UNITS_PER_METRE = 1.363;
 
+/** An axis in the prop's own authored file. */
+export type Axis = '+X' | '-X' | '+Z' | '-Z';
+
+/**
+ * A named point on a prop: a plane of its measured box, at an ABSOLUTE
+ * height.
+ *
+ * Height is absolute, not a fraction. A fraction seemed natural and was
+ * wrong: the towers scale to between 22 and 36 units, so "62% up the wall"
+ * strung the overhead between 14 and 22 and the wires visibly zigzagged
+ * down the street. Real streetcar wire runs at a constant height above the
+ * road, and a constant anchor height is also the one the player can learn.
+ */
+export interface AttachPoint {
+  readonly face: 'front' | 'back';
+  readonly y: number;
+}
+
 export interface StreetPropSpec {
   readonly url: string;
   /** Uniform scale applied at load. Always measured, never 1. */
@@ -46,6 +64,28 @@ export interface StreetPropSpec {
    * nudge the scale until it looks right.
    */
   readonly metres: number;
+  /**
+   * Which way the readable / working face points in the AUTHORED file.
+   *
+   * Measured, never assumed. Every rotation bug in this level came from
+   * reconciling authored orientation against placement intent ad hoc at the
+   * call site: building facades are +Z and streetlight arms are -Z, so the
+   * same "turn it toward the street" rule produced a correct facade and a
+   * lamp pointing into the wall it was bolted to.
+   *
+   * Placements declare intent (`faces: 'street'`) and the resolver does the
+   * reconciliation once, here.
+   */
+  readonly front?: Axis;
+  /**
+   * The axis of its LENGTH, for props that block rather than face.
+   *
+   * A barrier has no meaningful front; what matters is that its long side
+   * lies across the player's path rather than down it.
+   */
+  readonly long?: 'X' | 'Z';
+  /** Named points other objects attach to, as fractions of this prop's box. */
+  readonly points?: Readonly<Record<string, AttachPoint>>;
 }
 
 /** KayKit prop, staged to `/models/props`. */
@@ -55,7 +95,8 @@ const P = (
   expect: readonly [number, number],
   metres: number,
   role: string,
-): StreetPropSpec => ({ url: `/models/props/${file}.glb`, scale, expect, metres, role });
+  orient: Partial<StreetPropSpec> = {},
+): StreetPropSpec => ({ url: `/models/props/${file}.glb`, scale, expect, metres, role, ...orient });
 
 /**
  * Kenney City Kit Roads prop, staged to `/models/city`.
@@ -75,22 +116,37 @@ const K = (
   expect: readonly [number, number],
   role: string,
   scale: number = KENNEY,
+  orient: Partial<StreetPropSpec> = {},
 ): StreetPropSpec => ({
   url: `/models/city/${file}.glb`,
   scale,
   expect,
   metres: 0,
   role,
+  ...orient,
 });
+
+/**
+ * Where streetcar wire is bracketed to a facade.
+ *
+ * Deliberately the same height the gameplay anchors already use, so the
+ * cable and the thing the rope grabs are one number rather than two that
+ * drifted 6.8 units apart.
+ */
+const WIRE_BRACKET = { bracket: { face: 'front', y: 19 } } as const;
 
 export const STREET_PROPS = {
   // ---- the canyon (KayKit, street scale) --------------------------------
   // Base-less variants only: the A-F exports carry a plinth that holds the
   // facade off the tarmac, which is right in a skyline band and wrong here.
-  towerA: P('building_A_withoutBase', 15.8, [22, 27], 18.0, 'canyon wall, low block'),
-  towerC: P('building_C_withoutBase', 12.1, [25, 30], 20.0, 'canyon wall, narrow tower'),
-  towerE: P('building_E_withoutBase', 13.0, [27, 32], 21.5, 'canyon wall, wide mid-rise'),
-  towerG: P('building_G_withoutBase', 15.0, [31, 36], 24.8, 'canyon wall, tall tower'),
+  towerA: P('building_A_withoutBase', 15.8, [22, 27], 18.0, 'canyon wall, low block',
+    { front: '+Z', points: WIRE_BRACKET }),
+  towerC: P('building_C_withoutBase', 12.1, [25, 30], 20.0, 'canyon wall, narrow tower',
+    { front: '+Z', points: WIRE_BRACKET }),
+  towerE: P('building_E_withoutBase', 13.0, [27, 32], 21.5, 'canyon wall, wide mid-rise',
+    { front: '+Z', points: WIRE_BRACKET }),
+  towerG: P('building_G_withoutBase', 15.0, [31, 36], 24.8, 'canyon wall, tall tower',
+    { front: '+Z', points: WIRE_BRACKET }),
 
   // ---- the street surface (Kenney) --------------------------------------
   /**
@@ -102,15 +158,28 @@ export const STREET_PROPS = {
    * the kerb. 17 puts the carriageway at about +/-4.25, which contains the
    * whole interactive zone.
    */
-  road: K('road-straight', [0.25, 0.4], 'street surface, one tile is the whole street', 17),
-  roadCrossing: K('road-crossing', [0.25, 0.4], 'street surface, pedestrian crossing', 17),
+  /**
+   * The carriageway runs along the tile's X axis, not its Z.
+   *
+   * Deduced from `road-side`, which is 1.00 x 0.02 x 1.31: the extra 0.31 is
+   * its raised pavement, and it extends along Z. A pavement runs BESIDE a
+   * road, so the road itself runs along X. Placed unrotated on a street that
+   * runs along Z, every lane marking ran across the street instead of down
+   * it.
+   */
+  road: K('road-straight', [0.25, 0.4], 'street surface, one tile is the whole street', 17,
+    { long: 'X' }),
+  roadCrossing: K('road-crossing', [0.25, 0.4], 'street surface, pedestrian crossing', 17,
+    { long: 'X' }),
 
   // ---- anchors ----------------------------------------------------------
   // A cable strung across the street is the most legible "grab that" a city
   // offers, and it already spans all three lanes at once.
-  anchorSpan: K('electricity-side-wide', [6.0, 7.5], 'anchor carrier, facade to facade'),
-  anchorWires: K('electricity-wires-wide', [1.0, 1.8], 'anchor cable'),
-  anchorPole: K('electricity-pole-wide', [6.0, 7.5], 'anchor mast, where no facade is near'),
+  anchorSpan: K('electricity-side-wide', [6.0, 7.5], 'wire bracket, one per facade', KENNEY,
+    { front: '+Z', long: 'X' }),
+  anchorWires: K('electricity-wires-wide', [1.0, 1.8], 'anchor cable', KENNEY, { long: 'X' }),
+  anchorPole: K('electricity-pole-wide', [6.0, 7.5], 'anchor mast, where no facade is near',
+    KENNEY, { long: 'X' }),
   /**
    * Ground marker under a low anchor.
    *
@@ -119,27 +188,33 @@ export const STREET_PROPS = {
    * carriageway — anything with height would be an obstacle the runner has
    * never heard of.
    */
-  lowAnchor: K('road-crossing', [0.04, 0.1], 'low-anchor landing marking', 3),
+  lowAnchor: K('road-crossing', [0.04, 0.1], 'low-anchor landing marking', 3, { long: 'X' }),
 
   // ---- overhead obstacles ------------------------------------------------
-  bridgeDeck: K('road-bridge', [6.0, 7.5], 'the bridge, spanning every lane'),
+  bridgeDeck: K('road-bridge', [6.0, 7.5], 'the bridge, spanning every lane', KENNEY, { long: 'Z' }),
   bridgePillar: K('bridge-pillar-wide', [6.0, 7.5], 'bridge support, carried to the road'),
-  signGantry: K('sign-highway-wide', [8.5, 10.0], 'overhead sign, single lane'),
-  signHanging: K('road-sign-empty-hanging', [5.5, 7.0], 'overhead sign, single lane'),
-  lightHanging: K('traffic-light-hanging', [6.0, 7.5], 'hanging signal, single lane'),
+  signGantry: K('sign-highway-wide', [8.5, 10.0], 'overhead sign, gantry', KENNEY,
+    { front: '-X', long: 'Z' }),
+  signHanging: K('road-sign-empty-hanging', [5.5, 7.0], 'overhead sign, single lane', KENNEY,
+    { front: '-Z', long: 'Z' }),
+  lightHanging: K('traffic-light-hanging', [6.0, 7.5], 'hanging signal, single lane', KENNEY,
+    { front: '-Z', long: 'Z' }),
 
   // ---- ground obstacles ---------------------------------------------------
-  barrier: K('construction-barrier', [1.3, 2.1], 'road works barrier'),
+  barrier: K('construction-barrier', [1.3, 2.1], 'road works barrier', KENNEY, { long: 'Z' }),
   cone: K('construction-cone', [0.9, 1.5], 'road works cone'),
-  fence: K('construction-fence', [2.0, 2.8], 'road works fence'),
+  fence: K('construction-fence', [2.0, 2.8], 'road works fence', KENNEY, { long: 'Z' }),
   workLight: K('construction-light', [2.5, 3.4], 'road works beacon'),
-  dumpster: K('dumpster', [2.3, 3.1], 'street clutter'),
+  dumpster: K('dumpster', [2.3, 3.1], 'street clutter', KENNEY, { long: 'Z' }),
 
   // ---- dressing ----------------------------------------------------------
-  streetlight: K('light-curved', [8.0, 9.5], 'street lighting'),
-  streetlightDouble: K('light-curved-double', [8.0, 9.5], 'street lighting, both sides'),
-  trafficLight: K('traffic-light', [6.0, 7.5], 'junction dressing'),
-  streetSign: K('road-sign-street', [5.5, 7.0], 'pavement dressing'),
+  // The lamp arm reaches -Z, the OPPOSITE of a building facade. Applying
+  // the facade rule to it pointed every arm into the wall behind it.
+  streetlight: K('light-curved', [8.0, 9.5], 'street lighting', KENNEY, { front: '-Z' }),
+  streetlightDouble: K('light-curved-double', [8.0, 9.5], 'street lighting, both arms', KENNEY,
+    { long: 'Z' }),
+  trafficLight: K('traffic-light', [6.0, 7.5], 'junction dressing', KENNEY, { front: '+Z' }),
+  streetSign: K('road-sign-street', [5.5, 7.0], 'pavement dressing', KENNEY, { front: '+Z' }),
 
   // ---- gameplay ----------------------------------------------------------
   /**

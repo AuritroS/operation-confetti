@@ -1,322 +1,226 @@
 /**
- * Level 2 street canyon — a PRESET environment the camera moves through.
+ * Builds the level 2 street from the scene definition.
  *
- * Environment only. Nothing here knows what a gift, a hazard or an anchor is,
- * and nothing here may enter the interactive zone — see `GAME_ZONE_HALF` and
- * `tests/skyline-zone.test.ts`, which fails if it does.
- *
- * ---- why this is built once, not recycled -------------------------------
- *
- * The previous version was a recycling ring: every frame it derived a first
- * index from the player's distance, rewrote a window of instance matrices and
- * set `.count`. That is a sliding window which creates and destroys, and
- * every popping bug this level has had was a boundary bug on it — including
- * the one that shipped, where a sign error culled towers twenty-four units
- * IN FRONT of the player, so buildings evaporated before you reached them.
- *
- * Fixing that sign would have removed one instance of the bug, not the
- * category. So there is no window any more. The whole route's environment is
- * placed once at construction and never touched again; the frame loop moves
- * one parent group. Nothing is created, nothing is destroyed, and therefore
- * nothing can pop — structurally, not by tuning.
- *
- * It costs almost nothing. The route is 383 units; with a 60-unit margin at
- * each end that is 30 towers and 30 road tiles, against the 20 and 22 the
- * recycling window was already drawing every frame.
+ * This file decides nothing. Every position, rotation and relationship comes
+ * from `levels/skyline/scene.ts` and is resolved by `skyline-resolve.ts`; the
+ * job here is to turn resolved transforms into instanced meshes once, and
+ * then move one group per frame.
  *
  * ---- the frame -----------------------------------------------------------
  *
  * The scene draws in a PLAYER-RELATIVE frame: the hero sits at render z=0 and
- * the world appears at `playerZ - worldZ`. So children here are placed at
- * local `-worldZ`, and `update` sets the group's z to `playerZ`. Ahead of the
+ * the world appears at `playerZ - worldZ`. Children are therefore placed at
+ * local `-worldZ` and `update` sets the group's z to `playerZ`. Ahead of the
  * player is negative z; the camera sits behind at positive z.
  *
  * ---- the ground datum ----------------------------------------------------
  *
  * y=0 is the carriageway, and road tiles are base-seated so their LOWEST
- * surface lands on it. This was got wrong twice in opposite directions — a
- * KayKit road was a solid slab whose TOP was the walking surface, a Kenney
- * tile is a thin plate with raised kerbs whose carriageway is at the bottom.
- * The datum cannot be inferred from a bounding box; `tests/skyline-datum.ts`
- * pins it instead.
- *
- * ---- one tile is the whole street ----------------------------------------
- *
- * A Kenney road tile is a complete two-way street WITH ITS OWN KERBS AND
- * PAVEMENT, not one lane. Tiling six across at one-per-lane drew a six-lane
- * expanse for a three-lane game, and adding separate pavement tiles beside it
- * buried the road under slabs of the pavement it already had. One tile,
- * centred, with the facades at its edge.
+ * surface lands on it. A Kenney tile is a thin plate with raised kerbs, not a
+ * slab — its carriageway is at the bottom. This was got wrong in both
+ * directions before `tests/skyline-datum.test.ts` pinned it.
  */
 import {
+  BufferGeometry,
+  Float32BufferAttribute,
   Group,
+  Line,
+  LineBasicMaterial,
+  LineSegments,
   Mesh,
   MeshStandardMaterial,
   Object3D,
   PlaneGeometry,
+  Vector3,
   type InstancedMesh,
 } from 'three';
 import type { StreetAssets } from './skyline-assets';
 import type { StreetPropId } from './skyline-props';
-import { GAME_ZONE_HALF } from './skyline-view';
+import { SCENE, BAY, FACADE_X, KERB_X, MARGIN } from '../levels/skyline/scene';
+import type { SceneDefinition } from '../levels/skyline/scene';
+import { SKYLINE } from '../levels/skyline/course';
+import { resolveAnchor, resolvePlacement, resolveWire, type ResolvedWire } from './skyline-resolve';
 
-/**
- * Where the canyon's inner FACES stand.
- *
- * Not where the buildings are centred: these towers scale to 15-30 units
- * wide and are asymmetric, so a fixed centre line put one shape's face
- * inside the road while another left a gap.
- */
-export const FACADE_X = 6.9;
+export { FACADE_X, KERB_X, MARGIN };
 
-/** How far dressing sits in from the facade, on the pavement. */
-export const DRESSING_INSET = 1.5;
-
-/** How far the environment extends past each end of the route. */
-export const MARGIN = 60;
-
-/** A pedestrian crossing every N tiles, to break up the repeat. */
-const CROSSING_EVERY = 5;
-
-const TOWERS: StreetPropId[] = ['towerA', 'towerC', 'towerE', 'towerG'];
-
-/**
- * Quarter turn that points a building's facade at the street.
- *
- * Exported with `facadeTurn` below so the test asserts the rotation THIS
- * file applies, rather than a copy of it — a test that restates the value it
- * is checking passes however wrong production is.
- *
- * Measured, not guessed. These models are symmetric in X (centre 0.000) and
- * asymmetric in Z — reaching 0.80 one way against 0.65 the other — and that
- * overhang is the shopfront and awning visible in the pack's own contents
- * sheet. The facade is authored facing +Z.
- *
- * The street runs along Z, so rotating by 0 or PI (as the first version did)
- * points the facade ALONG the street and never AT it: both canyon walls were
- * showing their side elevations. A quarter turn puts +Z onto +/-X instead.
- */
-export const FACADE_TURN = Math.PI / 2;
-
-/** The rotation applied to a canyon wall on `side`. The one source of it. */
-export const facadeTurn = (side: -1 | 1): number => (side > 0 ? -FACADE_TURN : FACADE_TURN);
-
-/**
- * Deterministic per-tile pseudo-random in [0, 1).
- *
- * An integer hash rather than Math.random: the street must be identical on
- * every replay, or a review screenshot cannot be compared with the one taken
- * before the change it is meant to verify. Now used only at BUILD time — the
- * frame loop no longer makes placement decisions at all.
- */
-function hash(n: number, salt: number): number {
-  let h = (n * 374761393 + salt * 668265263) | 0;
-  h = (h ^ (h >>> 13)) * 1274126177;
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-interface Batch {
-  mesh: InstancedMesh;
-  written: number;
-}
+/** Segments per wire. Enough for the sag to read as a curve, not a kink. */
+const WIRE_SEGMENTS = 10;
 
 export class SkylineStreet {
+  /** @deprecated superseded by the scene definition; see the shims below. */
+  static readonly nearestDressingX = KERB_X;
+  /** @deprecated superseded by the scene definition. */
+  static readonly clearsGameZone = KERB_X > SKYLINE.laneWidth + 0.91;
+
   readonly object = new Group();
 
-  private batches = new Map<StreetPropId, Batch>();
+  private owned: (BufferGeometry | MeshStandardMaterial | LineBasicMaterial)[] = [];
+  private meshes: (InstancedMesh | Mesh | Line | LineSegments)[] = [];
   private dummy = new Object3D();
-  private ground: Mesh;
-  private tile = 17;
-  private towerPitch = 34;
 
+  /** Resolved wires, exposed so anchors and the overlay read the same curve. */
+  readonly wires: ResolvedWire[] = [];
+  /** Resolved anchor positions, in world coordinates. */
+  readonly anchors = new Map<string, Vector3>();
+
+  /**
+   * `layout` defaults to the real scene. `?inspect` passes the contact
+   * sheet instead, so the same build path renders both — a review mode that
+   * went down a different code path would be reviewing something else.
+   */
   constructor(
     private assets: StreetAssets,
-    private routeLength: number,
+    private layout: SceneDefinition = SCENE,
   ) {
-    const road = assets.half('road');
-    if (road) this.tile = road.z * 2;
-    this.towerPitch = this.tile * 2;
+    this.buildGround();
+    this.buildObjects();
+    this.buildWires();
+  }
 
-    const span = routeLength + MARGIN * 2;
-    const roadTiles = Math.ceil(span / this.tile) + 2;
-    const towerRows = Math.ceil(span / this.towerPitch) + 2;
+  // --------------------------------------------------------------- build ---
 
+  private buildGround(): void {
     /**
-     * Ground beyond the road.
+     * One dark plane under everything, as level 1 does it.
      *
-     * The road tile is 17 units wide; the canyon towers scale to 15-30 and
-     * are placed by their inner face, so up to 28 units of each building
-     * stands past the tarmac. Without this they end in mid-air — the same
-     * problem level 1 solved the same way, with one dark plane.
-     *
-     * Dropped a clear half unit, not a hair: at 0.05 it z-fought the road
-     * across the whole near field and the painted lane markings dissolved
-     * into a grey wash.
+     * The road tile is 17 units wide; the canyon reaches past +/-30, so
+     * without this the buildings end in mid-air. Dropped a clear half unit,
+     * not a hair: at 0.05 it z-fought the road and the painted lane markings
+     * dissolved into a grey wash.
      */
-    this.ground = new Mesh(
-      new PlaneGeometry(200, span + 80),
-      new MeshStandardMaterial({ color: 0x131d30, roughness: 1 }),
-    );
-    this.ground.rotation.x = -Math.PI / 2;
-    this.ground.position.set(0, -0.5, -routeLength / 2);
-    this.object.add(this.ground);
-
-    this.allocate('road', roadTiles);
-    this.allocate('roadCrossing', Math.ceil(roadTiles / CROSSING_EVERY) + 2);
-    for (const id of TOWERS) this.allocate(id, towerRows * 2);
-    this.allocate('streetlight', towerRows * 2);
-    this.allocate('trafficLight', towerRows);
-    this.allocate('streetSign', towerRows);
-    this.allocate('dumpster', towerRows);
-
-    this.build();
+    const route = SKYLINE.duration * SKYLINE.speed;
+    const geometry = new PlaneGeometry(220, route + MARGIN * 2 + 120);
+    const material = new MeshStandardMaterial({ color: 0x131d30, roughness: 1 });
+    const ground = new Mesh(geometry, material);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(0, -0.5, -route / 2);
+    this.owned.push(geometry, material);
+    this.meshes.push(ground);
+    this.object.add(ground);
   }
 
-  private allocate(id: StreetPropId, count: number): void {
-    const mesh = this.assets.batch(id, count);
-    if (!mesh) return;
-    this.batches.set(id, { mesh, written: 0 });
-    this.object.add(mesh);
-  }
+  /** Everything the scene definition places, one instanced mesh per prop. */
+  private buildObjects(): void {
+    const byProp = new Map<StreetPropId, typeof SCENE.objects[number][]>();
+    for (const placement of this.layout.objects) {
+      const prop = placement.prop as StreetPropId;
+      const list = byProp.get(prop);
+      if (list) list.push(placement);
+      else byProp.set(prop, [placement]);
+    }
 
-  /** Place one instance at a WORLD position; the group handles the frame. */
-  private place(id: StreetPropId, x: number, y: number, worldZ: number, rotY = 0): void {
-    const batch = this.batches.get(id);
-    if (!batch || batch.written >= batch.mesh.count) return;
-    this.dummy.position.set(x, y, -worldZ);
-    this.dummy.rotation.set(0, rotY, 0);
-    this.dummy.scale.setScalar(1);
-    this.dummy.updateMatrix();
-    batch.mesh.setMatrixAt(batch.written++, this.dummy.matrix);
+    for (const [prop, placements] of byProp) {
+      const mesh = this.assets.batch(prop, placements.length);
+      if (!mesh) continue;
+      let written = 0;
+      for (const placement of placements) {
+        const resolved = resolvePlacement(placement, this.assets);
+        if (!resolved) continue;
+        this.dummy.position.set(resolved.position.x, resolved.position.y, -resolved.position.z);
+        this.dummy.rotation.set(0, resolved.rotationY, 0);
+        this.dummy.scale.setScalar(1);
+        this.dummy.updateMatrix();
+        mesh.setMatrixAt(written++, this.dummy.matrix);
+      }
+      mesh.count = written;
+      mesh.instanceMatrix.needsUpdate = true;
+      this.meshes.push(mesh);
+      this.object.add(mesh);
+    }
   }
 
   /**
-   * Lay out the whole route, once.
+   * Streetcar overhead, strung facade to facade.
    *
-   * Everything from -MARGIN to routeLength + MARGIN, so neither end of the
-   * street is ever in frame.
+   * Drawn as one `LineSegments` for every wire on the route — 21 spans of
+   * ten segments is one draw call. The anchors read their height off the
+   * same resolved curve, so the rope can never end somewhere the cable is
+   * not.
    */
-  private build(): void {
-    const firstRow = Math.floor(-MARGIN / this.tile) - 1;
-    const lastRow = Math.ceil((this.routeLength + MARGIN) / this.tile) + 1;
-    for (let i = firstRow; i <= lastRow; i++) {
-      const crossing = ((i % CROSSING_EVERY) + CROSSING_EVERY) % CROSSING_EVERY === 0;
-      this.place(crossing ? 'roadCrossing' : 'road', 0, 0, i * this.tile);
-    }
+  private buildWires(): void {
+    const points: number[] = [];
+    for (const wire of this.layout.wires) {
+      const resolved = resolveWire(wire, this.assets, this.layout.objects);
+      if (!resolved) continue;
+      this.wires.push(resolved);
 
-    const firstTower = Math.floor(-MARGIN / this.towerPitch) - 1;
-    const lastTower = Math.ceil((this.routeLength + MARGIN) / this.towerPitch) + 1;
-    for (let i = firstTower; i <= lastTower; i++) {
-      const worldZ = i * this.towerPitch;
-
-      for (const side of [-1, 1] as const) {
-        const salt = side > 0 ? 17 : 91;
-        const pick = TOWERS[Math.floor(hash(i, salt) * TOWERS.length)] as StreetPropId;
-        const jitter = (hash(i, salt + 3) - 0.5) * this.towerPitch * 0.3;
-
-        /**
-         * Place by the FACADE, using the real face rather than a half-extent.
-         *
-         * After the quarter turn the model's +Z reaches along +/-X, so the
-         * distance from its origin to the facade is `box.max.z` — not
-         * `half.x`, and not `half.z` either, because half-extents average
-         * the 0.80/0.65 asymmetry away and would stand the building 0.075
-         * units off the kerb.
-         */
-        const box = this.assets.box(pick);
-        const toFacade = box ? box.max.z : 0;
-        this.place(
-          pick,
-          side * (FACADE_X + toFacade),
-          0,
-          worldZ + jitter,
-          facadeTurn(side),
-        );
-
-        /**
-         * Streetlights alternate sides: a pair at every pitch reads as a
-         * corridor of gates, one per side reads as a street.
-         *
-         * Same quarter turn as the facades, for the same measured reason.
-         * `light-curved` is 0.05 wide against 0.225 deep with its mass
-         * offset +0.088 on Z — the lamp arm reaches along +Z. On a street
-         * that also runs along Z that pointed every arm UP OR DOWN the road
-         * instead of out over it.
-         */
-        if ((i + (side > 0 ? 1 : 0)) % 2 === 0) {
-          this.place(
-            'streetlight',
-            side * (FACADE_X - 0.7),
-            0,
-            worldZ + this.tile * 0.3,
-            facadeTurn(side),
-          );
-        }
+      let previous: Vector3 | null = null;
+      for (let i = 0; i <= WIRE_SEGMENTS; i++) {
+        const t = i / WIRE_SEGMENTS;
+        const x = resolved.a.x + (resolved.b.x - resolved.a.x) * t;
+        const z = resolved.a.z + (resolved.b.z - resolved.a.z) * t;
+        const straight = resolved.a.y + (resolved.b.y - resolved.a.y) * t;
+        const span = Math.abs(resolved.b.x - resolved.a.x);
+        const y = straight - resolved.sag * span * 4 * t * (1 - t);
+        const here = new Vector3(x, y, -z);
+        if (previous) points.push(previous.x, previous.y, previous.z, here.x, here.y, here.z);
+        previous = here;
       }
-
-      // Pavement dressing, biased close to the kerb where it passes near the
-      // camera — distance alone reads flat however good the assets are.
-      const r = hash(i, 5);
-      const side = r < 0.5 ? -1 : 1;
-      const x = side * (FACADE_X - DRESSING_INSET);
-      // Mirroring by side is right for a pole, wrong for anything that has
-      // to be READ: a signal head is wider in X than deep, so it already
-      // faces the oncoming player, and flipping it by PI on one kerb turned
-      // it to face away. A dumpster's long axis is Z, which is correct
-      // against a kerb that also runs along Z.
-      const mirrored = side > 0 ? Math.PI : 0;
-      if (r < 0.2) this.place('trafficLight', x, 0, worldZ + this.tile * 0.6, 0);
-      else if (r < 0.42) this.place('streetSign', x, 0, worldZ + this.tile * 0.6, mirrored);
-      else if (r < 0.58) this.place('dumpster', x, 0, worldZ + this.tile * 0.6, mirrored);
     }
 
-    // Draw exactly what was written. Set ONCE — the frame loop never touches
-    // these again, which is the whole point.
-    for (const batch of this.batches.values()) {
-      batch.mesh.count = batch.written;
-      batch.mesh.instanceMatrix.needsUpdate = true;
+    for (const anchor of this.layout.anchors) {
+      const wire = this.wires.find((w) => w.id === anchor.wire);
+      if (wire) this.anchors.set(anchor.id, resolveAnchor(anchor.lane, wire));
     }
+
+    if (points.length === 0) return;
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(points, 3));
+    const material = new LineBasicMaterial({ color: 0x2a3550 });
+    const lines = new LineSegments(geometry, material);
+    lines.frustumCulled = false;
+    this.owned.push(geometry, material);
+    this.meshes.push(lines);
+    this.object.add(lines);
   }
+
+  // -------------------------------------------------------------- update ---
 
   /**
    * The entire frame cost of this layer.
    *
-   * One transform on one group. No instance matrices are rewritten, no
-   * counts change, nothing is created or destroyed — which is what makes
-   * popping unexpressible rather than merely tuned away.
+   * One transform on one group. Nothing is created, destroyed or rewritten,
+   * which is what makes popping unexpressible rather than merely tuned away.
    */
   update(playerZ: number): void {
     this.object.position.z = playerZ;
   }
 
-  /** How many instances this layer holds, for the no-churn test. */
+  /** Instance counts, for the no-churn test. */
   get census(): Record<string, number> {
     const out: Record<string, number> = {};
-    for (const [id, batch] of this.batches) out[id] = batch.mesh.count;
+    for (const mesh of this.meshes) {
+      const instanced = mesh as InstancedMesh;
+      if (instanced.isInstancedMesh) out[mesh.uuid] = instanced.count;
+    }
+    out['(wires)'] = this.wires.length;
+    out['(anchors)'] = this.anchors.size;
     return out;
   }
 
-  /**
-   * Lateral reach of the nearest thing this layer places to the route.
-   *
-   * The dressing, not the facade — it is the dressing that would reach the
-   * lanes first if anyone widened the street furniture.
-   */
-  static readonly nearestDressingX = FACADE_X - DRESSING_INSET;
-
-  /** Whether the layer keeps clear of the interactive zone. */
-  static readonly clearsGameZone = FACADE_X - DRESSING_INSET > GAME_ZONE_HALF;
-
-  get loaded(): number {
-    return this.batches.size;
-  }
-
   dispose(): void {
-    this.ground.geometry.dispose();
-    (this.ground.material as MeshStandardMaterial).dispose();
-    this.ground.removeFromParent();
-    for (const { mesh } of this.batches.values()) mesh.dispose();
-    this.batches.clear();
+    for (const mesh of this.meshes) {
+      const instanced = mesh as InstancedMesh;
+      if (instanced.isInstancedMesh) instanced.dispose();
+      mesh.removeFromParent();
+    }
+    this.meshes.length = 0;
+    for (const item of this.owned) item.dispose();
+    this.owned.length = 0;
     this.object.removeFromParent();
   }
 }
+
+/** Nearest dressing to the route, for the zone contract. */
+export const NEAREST_DRESSING_X = KERB_X;
+export const BAY_PITCH = BAY;
+
+/**
+ * Compatibility shims for tests written against the previous street.
+ *
+ * The rotation itself now lives in `skyline-resolve.ts`, where it is derived
+ * from each prop's measured `front` rather than assumed to be a facade's.
+ * These keep the existing tests compiling through the visual pass; they are
+ * removed when the tests are rewritten against the scene definition.
+ */
+export const facadeTurn = (side: -1 | 1): number => (side > 0 ? -Math.PI / 2 : Math.PI / 2);
