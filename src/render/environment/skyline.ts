@@ -11,6 +11,7 @@ import { Color, Group, Mesh, MeshStandardMaterial, type Object3D } from 'three';
 import { PALETTE } from '../palette';
 import { buildCnTower, buildMoon } from '../custom';
 import { MOON, TOWER } from '../look';
+import { GROUND_Y } from './city';
 import type { EnvironmentLayer, LayerContext } from './layer';
 import type { PropId } from './props';
 
@@ -28,9 +29,21 @@ const SHAPES: PropId[] = ['buildingC', 'buildingD', 'buildingE', 'buildingF', 'b
  * Depth also does the parallax for free: at this range the band barely needs
  * to move to feel fixed, which is what makes it read as distance.
  */
-export const BAND_NEAR = 70;
-export const BAND_FAR = 205;
+/*
+ * The backdrop's depth band, disjoint from the city's by construction.
+ *
+ * `CityLayer` scrolls its buildings over a 136-unit period, and this band
+ * used to start at 70 — so between 70 and 136 the two layers occupied the
+ * same depth, and since their x ranges overlap from 12 outward, a backdrop
+ * building and a city building regularly stood in the same place. Starting
+ * past the city's reach makes that impossible whatever the x works out to.
+ */
+export const BAND_NEAR = 150;
+export const BAND_FAR = 300;
 const COUNT = 16;
+
+/** Minimum gap between backdrop footprints, in world units. */
+const MIN_GAP = 16;
 
 /**
  * Total drift across the whole route, so the band never has to wrap.
@@ -63,15 +76,31 @@ export class SkylineLayer implements EnvironmentLayer {
       const z = -(BAND_NEAR + t * (BAND_FAR - BAND_NEAR));
       const side = i % 2 === 0 ? -1 : 1;
       const spread = 12 + ((i * 13) % 7) * 5 + t * 26;
-      const x = side * spread;
+      let x = side * spread;
+
+      // Push apart anything that would stand inside a neighbour. The formula
+      // above repeats its offset every seven props, so two with nearby `t`
+      // could land on the same spot; nothing checked until now.
+      for (const placed of this.anchors) {
+        if (Math.abs(placed.z - z) > MIN_GAP) continue;
+        while (Math.abs(placed.x - x) < MIN_GAP) x += side * MIN_GAP * 0.5;
+      }
 
       darken(prop, 0.3 + t * 0.14);
       // Out of fog. Exponential fog dense enough to hide the city spawn
       // would erase the skyline completely, so the backdrop handles its own
       // distance falloff through the darkening above.
       unfog(prop);
-      prop.scale.multiplyScalar(0.9 + ((i * 11) % 5) * 0.2);
-      prop.position.set(x, -4, z);
+      /*
+       * Taller, because they now start at the street rather than in mid-air.
+       *
+       * Basing them at -4 was what made the backdrop float; dropping them to
+       * the real ground costs eight and a half units of visible height, so
+       * the scale goes up to put the skyline back above the roofline. The
+       * silhouette is what the player sees, and it is unchanged.
+       */
+      prop.scale.multiplyScalar(1.9 + ((i * 11) % 5) * 0.45);
+      prop.position.set(x, GROUND_Y, z);
       this.items.push(prop);
       this.anchors.push({ x, z });
       this.object.add(prop);

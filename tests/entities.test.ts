@@ -33,7 +33,13 @@ describe('gameplay visuals are batched', () => {
     const lasers = LEVEL_1.entities.filter((e) => e.style === 'laser');
 
     expect(lasers.length, 'the level should contain lasers to batch').toBeGreaterThan(1);
-    expect(instanced, 'all lasers share one InstancedMesh').toHaveLength(1);
+    // The rule is that mesh count does not scale with hazard count, not that
+    // there is exactly one mesh: a laser gate is now two shared batches, the
+    // neon beams and the matte emitter housings they fire from.
+    expect(instanced.length, 'lasers must not add a mesh each')
+      .toBeLessThan(lasers.length);
+    expect(instanced.length, 'beams and emitters, and nothing else')
+      .toBeLessThanOrEqual(2);
     visuals.dispose();
   });
 
@@ -54,12 +60,12 @@ describe('gameplay visuals are batched', () => {
     expect(batched, 'the level should contain batched hazards').toBeGreaterThan(2);
     expect(spotlights, 'the level should contain spotlights').toBeGreaterThan(2);
 
-    // One child per gift, plus the shared bar batch, the sparkle field, and
-    // a fixed pool of cones. Crucially: nothing scales with the number of
-    // lasers, fences or spotlights.
+    // One child per gift, plus the shared beam and emitter batches, the
+    // sparkle field, and a fixed pool of cones. Crucially: nothing scales
+    // with the number of lasers, fences or spotlights.
     const perEntity = visuals.group.children.length - gifts;
     expect(perEntity, 'batched hazards must not add children').toBeLessThanOrEqual(
-      2 + SPOTLIGHT_POOL,
+      3 + SPOTLIGHT_POOL,
     );
   });
 

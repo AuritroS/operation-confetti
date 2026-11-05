@@ -47,6 +47,15 @@ export const SPAWN_DISTANCE = 130;
 /** Street level, well below the roof. */
 const STREET_Y = -12;
 
+/**
+ * The one ground everything below the roof stands on.
+ *
+ * Exported because the skyline backdrop has to use it too: it used to base
+ * its buildings at y -4 while the street sat at -12, so the whole backdrop
+ * floated eight units above the ground it was meant to be standing on.
+ */
+export const GROUND_Y = STREET_Y - 0.5;
+
 export class CityLayer implements EnvironmentLayer {
   readonly id = 'city' as const;
   readonly object = new Group();
@@ -65,7 +74,7 @@ export class CityLayer implements EnvironmentLayer {
         // Set well back and based below street level, so only upper floors
         // clear the parapet and the facades meet the ground instead of
         // ending in mid-air. Close buildings read as a street, not a roof.
-        prop.position.set(sign * (ctx.corridor.edge + 11 + (i % 2) * 4), STREET_Y - 0.5, 0);
+        prop.position.set(sign * (ctx.corridor.edge + 11 + (i % 2) * 4), GROUND_Y, 0);
         items.push(prop);
         this.object.add(prop);
         this.owned.push(prop);

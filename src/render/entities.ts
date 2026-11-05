@@ -50,17 +50,19 @@ export const DRAW_DISTANCE = 44;
 const LASER_BARS = 2;
 const BAR_HEIGHTS = [0.42, 0.78];
 /**
- * Uprights at the lane edges, so a laser gate is mounted on something.
+ * Emitter housings at the lane edges.
  *
- * Two bars hanging in the air with nothing under them read as props that
- * failed to land rather than as a barrier — which is exactly how they looked
- * on a phone. The posts are part of the same instanced batch, so grounding
- * the hazard costs no extra draw.
+ * Two beams hanging in the air with nothing under them read as props that
+ * failed to land. The first attempt stood them on uprights drawn in the
+ * beams' own magenta additive material, which only turned the hazard into a
+ * magenta fence.
+ *
+ * These are matte steel instead, in their own batch: hardware, not a signal.
+ * It keeps the rule the palette sets — if it glows, it matters — so the
+ * housing is a prop the player can ignore and the beam is the threat.
  */
 const LASER_POSTS = 2;
 const POST_TOP = 0.92;
-/** Total instances a laser hazard writes: its beams and its uprights. */
-const LASER_PARTS = LASER_BARS + LASER_POSTS;
 
 export type PropProvider = (id: PropId) => Object3D | null;
 
@@ -94,6 +96,9 @@ export class EntityVisuals {
   private readonly objects = new Map<string, Object3D>();
   private readonly barIndex = new Map<string, { base: number; count: number }>();
   private readonly lasers: InstancedMesh;
+  /** Matte housings the beams emit from. Hardware, never a signal. */
+  private readonly emitters: InstancedMesh;
+  private emitterCount = 0;
   private readonly lights: { light: Searchlight; id: string | null }[] = [];
   /** Seconds since each gift was taken, driving its pop. */
   private readonly collected = new Map<string, number>();
@@ -114,7 +119,7 @@ export class EntityVisuals {
     const barTotal = tracked.reduce(
       (n, t) =>
         n +
-        (t.entity.style === 'laser' ? LASER_PARTS : t.entity.style === 'fence' ? FENCE_PILLARS : 0),
+        (t.entity.style === 'laser' ? LASER_BARS : t.entity.style === 'fence' ? FENCE_PILLARS : 0),
       0,
     );
 
@@ -134,6 +139,15 @@ export class EntityVisuals {
     this.lasers.count = 0;
     this.group.add(this.lasers);
 
+    this.emitters = new InstancedMesh(
+      new BoxGeometry(0.1, POST_TOP, 0.1),
+      new MeshStandardMaterial({ color: PALETTE.steel, roughness: 0.6 }),
+      Math.max(1, barTotal),
+    );
+    this.emitters.frustumCulled = false;
+    this.emitters.count = 0;
+    this.group.add(this.emitters);
+
     // One collectible glow aura batch for all gifts.
     this.giftGlow = new GiftGlowField(tracked.length, {
       size: 1.6,
@@ -144,7 +158,7 @@ export class EntityVisuals {
     let nextBar = 0;
     for (const t of tracked) {
       const bars =
-        t.entity.style === 'laser' ? LASER_PARTS : t.entity.style === 'fence' ? FENCE_PILLARS : 0;
+        t.entity.style === 'laser' ? LASER_BARS : t.entity.style === 'fence' ? FENCE_PILLARS : 0;
       if (bars > 0) {
         this.barIndex.set(t.entity.id, { base: nextBar, count: bars });
         nextBar += bars;
@@ -204,6 +218,7 @@ export class EntityVisuals {
     this.anchors.length = 0;
 
     let bars = 0;
+    this.emitterCount = 0;
     const spotlights: TrackedEntity[] = [];
 
     for (const t of tracked) {
@@ -276,6 +291,8 @@ export class EntityVisuals {
 
     this.lasers.count = bars;
     this.lasers.instanceMatrix.needsUpdate = true;
+    this.emitters.count = this.emitterCount;
+    this.emitters.instanceMatrix.needsUpdate = true;
     this.driveSpotlights(spotlights, step);
     this.giftGlow.setAnchors(this.anchors);
     this.giftGlow.update(step);
@@ -304,18 +321,15 @@ export class EntityVisuals {
       this.lasers.setMatrixAt(offset + i, this.matrix);
     }
 
-    // The batch's geometry is one horizontal beam, so an upright is the same
-    // box rescaled: thin on the lane axis, tall on Y.
+    // Housings are a separate matte batch, written against their own cursor.
     const beamWidth = this.level.laneWidth * 0.94;
-    const sx = 0.07 / beamWidth;
-    const sy = POST_TOP / 0.055;
     for (let i = 0; i < LASER_POSTS; i++) {
       const side = i === 0 ? -1 : 1;
-      this.matrix.makeScale(sx, sy, 1.2);
+      this.matrix.identity();
       this.matrix.setPosition(x + side * beamWidth * 0.5, POST_TOP / 2, z);
-      this.lasers.setMatrixAt(offset + LASER_BARS + i, this.matrix);
+      this.emitters.setMatrixAt(this.emitterCount++, this.matrix);
     }
-    return LASER_PARTS;
+    return LASER_BARS;
   }
 
   /**
@@ -381,6 +395,9 @@ export class EntityVisuals {
     this.lights.length = 0;
     this.collected.clear();
     this.baseScale.clear();
+    this.emitters.geometry.dispose();
+    (this.emitters.material as MeshStandardMaterial).dispose();
+    this.emitters.removeFromParent();
     this.lasers.geometry.dispose();
     (this.lasers.material as MeshBasicMaterial).dispose();
     this.lasers.removeFromParent();

@@ -51,7 +51,17 @@ export class Stage {
      */
     this.scene.fog = new FogExp2(PALETTE.ink, FOG_DENSITY);
 
-    this.camera = new PerspectiveCamera(58, 1, 0.1, 160);
+    /*
+     * Near raised off 0.1 and far pushed well out.
+     *
+     * The old far plane of 160 silently clipped anything further — which is
+     * how level 1's CN Tower and half its skyline backdrop came to be built
+     * but never drawn. The backdrop now sits past the city, beyond 150, so
+     * the plane has to clear it. Raising near at the same time buys back the
+     * depth precision the longer range costs; nothing is ever within 0.3 of
+     * this camera.
+     */
+    this.camera = new PerspectiveCamera(58, 1, 0.3, 340);
 
     const hemi = new HemisphereLight(PALETTE.cyan, PALETTE.navyDeep, 0.85);
     this.scene.add(hemi);

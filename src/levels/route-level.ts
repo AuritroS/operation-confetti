@@ -47,7 +47,15 @@ export class RouteLevel implements LevelController {
   private readonly enabledLayers = requestedLayers();
   private readonly hasRooftop: boolean;
   private readonly markers = new RouteMarkers(LEVEL_1);
-  private readonly vault = buildVaultDoor(LEVEL_1.laneWidth * LEVEL_1.laneCount, 3.6);
+  /**
+   * The route's end, built to the same proportions level 2 finishes on.
+   *
+   * It used to span only the lanes at 4.8 by 3.6, which left the disc and
+   * its mask too small to read and the rooftop visible either side of it.
+   * Wider than the parapets and tall enough to block the route end, so the
+   * emblem dominates the frame the way level 2's does.
+   */
+  private readonly vault = buildVaultDoor(12, 9);
 
   private runner = new LevelRunner(LEVEL_1);
   private entityVisuals: EntityVisuals;
