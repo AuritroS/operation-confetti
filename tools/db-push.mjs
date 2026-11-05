@@ -61,7 +61,7 @@ if (conn.status !== 0) {
   const unreachable = /translate host name|Name or service not known|nodename nor servname/i.test(stderr)
     || (/No route to host|Network is unreachable|Connection timed out/i.test(stderr) && /\(([0-9a-f]*:){2,}/i.test(stderr));
 
-  if (unreachable) {
+  if (unreachable && !env.SUPABASE_DB_HOST) {
     console.error('\n  That is the direct connection, which this project publishes over IPv6');
     console.error('  only — nothing is wrong with the password. Use the session pooler,');
     console.error('  which answers on IPv4. Dashboard > Connect > Session pooler, then');
@@ -71,6 +71,18 @@ if (conn.status !== 0) {
     console.error('    SUPABASE_DB_PORT=5432\n');
     console.error('  Session mode (5432), not transaction mode (6543): the schema has');
     console.error('  DDL that transaction pooling will not run.\n');
+  } else if (unreachable) {
+    /*
+     * Already on an override, so the pooler advice would be a loop.
+     *
+     * At this point the host is whatever .env names, and the useful
+     * questions are about that host and this machine's route to it — not
+     * about a switch that has already been made.
+     */
+    console.error(`\n  ${env.SUPABASE_DB_HOST} could not be reached from this machine.`);
+    console.error('  SUPABASE_DB_HOST is set, so this is the host .env names, not the');
+    console.error('  default. Check the spelling against Dashboard > Connect, and that');
+    console.error('  nothing here blocks outbound 5432.\n');
   } else {
     console.error('\n  Check SUPABASE_DB_PASSWORD, and that the project is not paused.\n');
   }
