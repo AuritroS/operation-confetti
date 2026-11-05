@@ -283,16 +283,25 @@ export function buildMoon(size = 18): Mesh {
   const moon = new Mesh(new PlaneGeometry(size, size), mat);
   moon.userData.isNeon = true;
   /*
-   * Drawn as sky, not as geometry.
+   * It tests depth, like anything else in the world.
    *
-   * It was an ordinary transparent plane competing on depth, so as level 1's
-   * drifted twenty-four units closer over the route it walked into the band
-   * the city buildings occupy and started appearing in front of them and
-   * intersecting. Disabling the depth test and drawing early puts it behind
-   * everything by construction, which is what a moon is: there is no distance
-   * at which a building should be behind it.
+   * An earlier attempt turned the depth test off and set a low render order,
+   * reasoning that a moon should be behind everything by construction. That
+   * is wrong for this material: `transparent` puts it in three's transparent
+   * queue, which runs after the *whole* opaque pass, so the render order only
+   * sorted it early among other transparent objects. With no depth test it
+   * then painted straight over every building in the scene — the moon ended
+   * up in the foreground, which is the opposite of what was intended.
+   *
+   * Depth sorting does the job honestly. The problem it was meant to solve —
+   * level 1's moon wandering into the city's depth band — is fixed at the
+   * cause instead: the drift is gone, and `look.ts` places the moon above the
+   * skyline rather than across it.
+   *
+   * `depthWrite` stays off so the moon never occludes anything behind it, and
+   * the render order keeps it first among transparent objects, where a thing
+   * this distant belongs.
    */
-  mat.depthTest = false;
   moon.renderOrder = -9;
   return moon;
 }
