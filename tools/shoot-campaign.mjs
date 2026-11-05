@@ -71,15 +71,15 @@ for (const viewport of VIEWPORTS) {
 
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
   await page.waitForFunction(() => window.__campaign && !window.__campaign.switching, null, { timeout: 60_000 });
-  await page.waitForTimeout(3500);
-  await page.screenshot({ path: join(SHOTS, `tutorial-${viewport.name}.png`) });
-  await startLevel(page);
   // Hide the debug panel: this is a review of what a player sees.
   await page.evaluate(() => { const d = document.getElementById('debug'); if (d) d.hidden = true; });
 
   for (const stage of [1, 2, 3]) {
     // Let the level settle: props and the character stream in after mount.
     await page.waitForTimeout(stage === 1 ? 4000 : 3000);
+    await page.screenshot({ path: join(SHOTS, `tutorial${stage}-${viewport.name}.png`) });
+    await startLevel(page);
+    await page.waitForTimeout(1200);
     await page.screenshot({ path: join(SHOTS, `level${stage}-${viewport.name}.png`) });
     const overflow = await page.evaluate(() => document.body.scrollWidth);
     if (overflow > viewport.width) {
@@ -89,7 +89,6 @@ for (const viewport of VIEWPORTS) {
       await page.evaluate(() => window.__campaign.skip());
       await page.waitForFunction((w) => window.__campaign.stage === w && !window.__campaign.switching,
         stage + 1, { timeout: 60_000 });
-      await startLevel(page);
     }
   }
   process.stdout.write(`${errors.length ? 'FAIL' : 'ok  '} ${viewport.name}\n`);

@@ -4,8 +4,8 @@
  * The tutorial sheet.
  *
  * Bottom third, over the live scene, so the player can see the level they are
- * about to play while they read how to play it. Every level uses this same
- * shell, so the verbs change and nothing else does.
+ * about to play while they learn to play it. Gestures are drawn rather than
+ * described: an arrow reads faster than a sentence about an arrow.
  */
 .tutorial {
   position: absolute;
@@ -13,37 +13,52 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 20px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+  padding: 22px 20px calc(22px + env(safe-area-inset-bottom, 0px));
   display: grid;
-  gap: 12px;
+  gap: 16px;
   justify-items: center;
-  text-align: center;
-  background: linear-gradient(180deg, #0b112000 0%, #0b1120e6 26%, #0b1120f5 100%);
+  background: linear-gradient(180deg, #0b112000 0%, #0b1120e0 24%, #0b1120f5 100%);
   pointer-events: auto;
 }
 .tutorial__chapter {
+  margin: 0;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .18em;
   color: var(--gold-text);
 }
-.tutorial__verbs {
-  display: grid;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  line-height: 1.45;
-  color: #dbe4f7;
+
+.tutorial__controls { display: flex; gap: 22px; align-items: flex-start; }
+.tutorial__control { display: grid; gap: 6px; justify-items: center; }
+.tutorial__icons { display: flex; gap: 2px; }
+
+.tutorial__icon {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: #dbe4f7;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-/* The practice note is a different kind of line: a promise, not an instruction. */
-.tutorial__free {
-  font-size: 11px;
+.tutorial__icon--right { transform: rotate(180deg); }
+.tutorial__icon--up { transform: rotate(90deg); }
+.tutorial__icon--down { transform: rotate(-90deg); }
+
+/* The tap glyph is filled and ringed, so it cannot be read as an arrow. */
+.tutorial__icon--tap { stroke: none; }
+.tutorial__tap-dot { fill: #dbe4f7; }
+.tutorial__tap-ring { fill: none; stroke: #dbe4f7; stroke-width: 1.5; opacity: .45; }
+
+.tutorial__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
   color: #93a3c4;
 }
+
 .tutorial__start {
-  margin-top: 2px;
   border: 1px solid #ffdf9a;
   border-radius: 999px;
   background: #6b2c70;

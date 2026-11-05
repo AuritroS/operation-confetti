@@ -73,7 +73,7 @@ const STAGES: readonly StageSpec[] = [
     make: () => new RouteLevel(host),
     copy: {
       chapter: '1 · THE GIFT HEIST',
-      verbs: ['Swipe left or right to change lanes.', 'Collect gifts. Dodge the hazards.'],
+      controls: [{ icons: ['left', 'right'], label: 'Change lane' }],
     },
   },
   {
@@ -82,7 +82,11 @@ const STAGES: readonly StageSpec[] = [
     make: () => new SkylineLevel(host),
     copy: {
       chapter: '2 · THE SKYLINE CHASE',
-      verbs: ['Swipe up to grapple the next anchor.', 'Swipe left or right to steer, down to drop.'],
+      controls: [
+        { icons: ['up'], label: 'Grapple' },
+        { icons: ['left', 'right'], label: 'Steer' },
+        { icons: ['down'], label: 'Drop' },
+      ],
     },
   },
   {
@@ -91,7 +95,10 @@ const STAGES: readonly StageSpec[] = [
     make: () => new BossLevel(),
     copy: {
       chapter: '3 · CAKE SHOWDOWN',
-      verbs: ['Swipe to dodge the marked lanes.', 'Tap to fire confetti when her shield drops.'],
+      controls: [
+        { icons: ['left', 'right'], label: 'Dodge' },
+        { icons: ['tap'], label: 'Fire' },
+      ],
     },
   },
 ];
