@@ -43,7 +43,14 @@ function cloudTexture(): CanvasTexture {
   return texture;
 }
 
-/** Cloud bands add rooftop altitude but stay behind the boss and the lanes. */
+/**
+ * Sky and cloud bands.
+ *
+ * The low band sits *below* the deck plane and out past the terrace sides,
+ * where the pod occludes nothing. Cloud seen underfoot is the cheapest and
+ * most legible altitude cue there is; cloud at deck level, which is where
+ * this band started, is simply hidden behind the stage.
+ */
 export class BossSky {
   readonly root = new Group();
   private readonly texture = gradient();
@@ -55,10 +62,10 @@ export class BossSky {
 
   constructor() {
     const backdrop = new Mesh(
-      new PlaneGeometry(80, 38),
+      new PlaneGeometry(130, 72),
       new MeshBasicMaterial({ map: this.texture, depthWrite: false, fog: false }),
     );
-    backdrop.position.set(0, 7.5, -29);
+    backdrop.position.set(0, 2.0, -34);
     backdrop.renderOrder = -10;
     this.root.add(backdrop);
 
@@ -66,16 +73,27 @@ export class BossSky {
       map: this.cloudMap, color: 0x8b98bd, transparent: true,
       opacity: 0.25, depthWrite: false, fog: false,
     });
+    // Brighter and more opaque than the high band. It is read against the lit
+    // city rather than against empty sky, so the contrast it needs is against
+    // window light, not against the backdrop.
     const low = new MeshBasicMaterial({
-      map: this.cloudMap, color: 0x7e85af, transparent: true,
-      opacity: 0.33, depthWrite: false, fog: false,
+      map: this.cloudMap, color: 0xb9c3e8, transparent: true,
+      opacity: 0.72, depthWrite: false, fog: false,
     });
     const placements = [
       [-7.3, 8.2, -20, 7.0, 2.7, 0.11, high],
       [0.8, 9.0, -22, 6.8, 2.4, -0.08, high],
       [8.0, 7.7, -19, 6.1, 2.5, 0.09, high],
-      [-6.6, 1.3, -11.8, 5.6, 2.0, 0.16, low],
-      [6.8, 1.5, -11.5, 5.3, 1.8, -0.13, low],
+      // A layer lying over the city rather than under it: at this height the
+      // weather is below us, so cloud should cross the skyline, not sit
+      // beneath it. Placed in front of the city band at z -50 and inside the
+      // wedge the pod leaves visible.
+      [-11.5, -1.9, -42, 19.0, 5.4, 0.16, low],
+      [10.8, -2.6, -44, 18.0, 5.0, -0.13, low],
+      [-16.5, -3.1, -40, 16.0, 4.6, -0.1, low],
+      [15.4, -1.6, -46, 17.0, 4.8, 0.12, low],
+      [-4.0, -3.6, -47, 16.0, 4.4, 0.08, low],
+      [5.2, -4.2, -45, 15.0, 4.2, -0.09, low],
     ] as const;
     for (const [x, y, z, width, height, speed, material] of placements) {
       const mesh = new Mesh(new PlaneGeometry(width, height), material);

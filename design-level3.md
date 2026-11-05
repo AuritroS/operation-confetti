@@ -1,16 +1,19 @@
 # Level 3 — Aurora's Christmas birthday showdown
 
-Status: a dramatic birthday gala environment preview is implemented on
-`codex/level3`. The user removed snow and asked for birthday details to lead
-the visual design. The environment now uses a low perspective camera that
-makes Aurora about 1.6–1.7 times Matthew's screen height, a stepped theatrical
-dais, velvet and gold proscenium, floating red velvet cake, candle stands,
-muted balloons, rooftop side banners, a clouded night sky, a prominent CN
-Tower and layered Toronto skyline. Idle magic surrounds Aurora and holds the
-cake. Boss combat remains a later stage. The branch started at `0081761`;
-the original control/asset slice was committed by the user as `6d024f1`.
-The parent project typecheck has existing Level 2 errors, recorded in the
-collaboration document.
+Status: the arena is the CN Tower's SkyPod. Levels 1 and 2 run toward the
+tower; level 3 stands on it. A low confrontation camera sits below Aurora's
+eyeline, she takes her height from a raised dais and hovers clear of it, and
+the backdrop is open night with the tower shaft rising behind her and Toronto
+far below under a cloud layer. Boss combat is still a later stage.
+
+Owner: Claude, from 6 November 2026 (see `docs/COLLABORATION.md`). The branch
+started at `0081761`; `6d024f1` and `fccb2f0` were Codex's control and first
+environment slices.
+
+Measured at 390x844: 98 draw calls, 60,360 triangles, Aurora 1.64x Matthew's
+screen height. Software-rasterised in CI, so these are geometry counts and
+framing, never a performance result.
+
 Read `docs/COLLABORATION.md` for isolation and ownership before implementation.
 This plan follows the user's build order. Current user decisions override older
 design text; existing runtime manifests and code establish what actually exists.
@@ -172,45 +175,44 @@ substitutions have been verified to exist in the generated libraries.
 
 ### Implemented environment review
 
-`/level3.html` renders a 3D birthday gala behind the working swipe/tap
-practice. `src/levels/boss/layout.ts` owns the three lane centres and
-player/boss/cake positions. `src/render/boss/camera.ts` holds a fixed
-perspective camera at (0, 5.5, 13), angled toward Aurora; Matthew starts one
-unit closer to the lens than in the first scene. `environment.ts` builds a
-dry inlaid roof, stepped oval stage, gold arch, velvet panels, rooftop side
-banners, candle stands, muted balloon clusters, layered city skyline, enlarged
-floating cake and a prominent CN Tower. `sky.ts` provides a gradient sky and
-high/low cloud bands; `magic.ts` animates Aurora's halo, glyphs, motes and
-cake tether. Three City Builder GLBs add detailed skyline flanks.
-`actors.ts` loads the unhooded Matthew export and right-hand cannon used in
-Level 2, plus Aurora and her crown. `scene.ts` adds stronger gold and purple
-lighting and still draws practice shots and hit confetti.
+`/level3.html` renders the SkyPod arena behind the working swipe/tap practice.
+`src/levels/boss/layout.ts` owns lane centres and the player, boss and cake
+anchors. `camera.ts` holds the fixed low camera. `tower.ts` builds the pod
+deck, parapet, shaft, upper pod and spire. `environment.ts` builds the terrace,
+dais, gala arch, candle stands, balloons, cake display and the distant city.
+`sky.ts` provides the gradient, the high cloud band and the low band that lies
+over the city. `magic.ts` animates Aurora's halo, glyphs, motes and cake
+tether. `actors.ts` loads both characters, the right-hand cannon and her
+floating crown.
 
-Christmas trees remain in the catalog but are **not placed** in the arena.
-Birthday props lead the theme; there is no snow. The full hero silhouette in
-all three lanes, Aurora, cake and stage arch project inside 360×800, 375×667,
-390×844 and 430×932 portrait views in an automated framing check. Review the
-actual render at `http://127.0.0.1:5303/level3.html`; use `?debug` for
-draw/triangle counts. The sandbox cannot launch Chromium because of a denied
-macOS Mach port, so visual quality and real-phone performance still need the
-user's browser review. The isolated typecheck, 36 focused tests, asset builder
-and standalone build passed. Current shots count hits against a practice
-target; Aurora has no HP, shield cycle or attacks yet.
+Findings that constrain any further work on this frame:
 
-The procedural environment batches repeated static materials after construction
-while keeping the cake as a movable group. A Node scene-construction check
-counted 43 regular meshes, five instanced meshes and about 31k procedural
-triangles with the moon canvas skipped; runtime actor/prop draw counts should
-be read from `?debug` in a browser. This is not a phone performance result.
+- **You cannot see "down" from this camera.** The deck occludes everything
+  steeper than about 10 degrees below horizontal at the frame edge, so the
+  only visible air is between screen y 437 and y 549 in the outer slivers —
+  13% of frame height. Narrowing the terrace to a half-width of 3.8 buys 38
+  pixels. Altitude is therefore carried by what sits *in* that band: the city
+  near the horizon, the cloud layer over it, and the tower itself.
+- **Camera eye height is the lever for the gap between the two actors.**
+  Matthew reads below the eye line and Aurora's feet above it, so raising the
+  lens pushes them apart. Pitching up moves both down together and changes
+  the gap by about 1%.
+- **Perspective eats height ratios.** The lens is roughly twice as far from
+  Aurora as from Matthew, so her 3x world-height advantage reads as 1.64x on
+  screen. Moving either actor trades directly against that ratio.
+- **The backdrop is painter-ordered, not depth-sorted.** The sky plane sits
+  nearer than the skyline yet must appear behind it, and nothing in it writes
+  depth. Anything added to that stack has to be reasoned about in draw order.
 
-Make the setting feel like a **birthday party Aurora has taken over**: a dry
-Toronto rooftop gala with warm candlelight, a visible cake display, and her
-purple magic concentrated around the raised boss stage. Keep the centre deck
-spacious. Richness should come from several readable depth layers and a few
-large landmarks, not small props scattered across the attack lanes.
-There is **no snow, snowfall, frost or white roof trim**. The birthday is
-conveyed by the cake, candles, balloons, gifts and warm lights. That keeps the
-weather and surfaces consistent with Levels 1 and 2.
+Review the render at `http://127.0.0.1:5303/level3.html`; `?debug` prints draw
+and triangle counts, and exposes the scene graph on `window.level3` so capture
+tooling can measure real bounds instead of assumed coordinates. Shoot the
+viewport matrix with `node tools/boss-capture.mjs --query debug`.
+
+Still open for the next stage: colour discipline (magenta and blue are
+reserved for attacks and gifts but still appear in the lane dividers, the 64
+floor flecks and the red/green scenery presents), the cake tether, foreground
+birthday dressing under Aurora, and the winter trim still on the lantern prop.
 
 ### Spatial contract
 

@@ -3,6 +3,7 @@ import {
   Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { AssetBundle, type Actor } from '../../assets/characters';
 import { BOSS_ACTORS, BOSS_ANIMATION_LIBRARIES, BOSS_CANNON_MOUNT, BOSS_PROPS } from '../../assets/boss/catalog';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
@@ -91,7 +92,57 @@ function floatCrown(actor: Actor, head: Object3D): Group | null {
   crown.position.copy(head.worldToLocal(
     new Vector3(centre.x, bounds.max.y + size.y * 0.025, centre.z),
   ));
-  return crown;
+  crown.updateMatrixWorld(true);
+  return mergeByLook(crown);
+}
+
+/**
+ * Collapse a prop into one mesh per distinct look.
+ *
+ * `buildCrown` is thirteen separate meshes — a band, eight points and four
+ * jewels — and it builds a fresh material per jewel, so the crown and its
+ * aura together cost about 26 draw calls for an object a centimetre tall on
+ * screen. That was a fifth of the whole scene's budget. Grouping by appearance
+ * rather than by material identity also folds the per-jewel materials into one.
+ */
+function mergeByLook(group: Group): Group {
+  const buckets = new Map<string, Mesh[]>();
+  group.traverse((object) => {
+    if (!(object instanceof Mesh) || Array.isArray(object.material)) return;
+    const material = object.material as MeshBasicMaterial;
+    const key = [
+      material.type, material.color?.getHexString() ?? '', material.opacity,
+      material.transparent, material.blending, material.side, material.depthWrite,
+    ].join('|');
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(object);
+    buckets.set(key, bucket);
+  });
+  const merged = new Group();
+  merged.position.copy(group.position);
+  merged.rotation.copy(group.rotation);
+  merged.scale.copy(group.scale);
+  for (const meshes of buckets.values()) {
+    const parts = meshes.map((mesh) => {
+      const geometry = mesh.geometry.clone();
+      mesh.updateMatrix();
+      // Local to the prop's own root, so the merged mesh can replace it.
+      geometry.applyMatrix4(mesh.matrixWorld.clone().premultiply(group.matrixWorld.clone().invert()));
+      return geometry;
+    });
+    const combined = mergeGeometries(parts, false);
+    for (const part of parts) part.dispose();
+    if (!combined) continue;
+    merged.add(new Mesh(combined, meshes[0]!.material));
+  }
+  for (const mesh of meshes(group)) mesh.geometry.dispose();
+  return merged;
+}
+
+function meshes(group: Group): Mesh[] {
+  const found: Mesh[] = [];
+  group.traverse((object) => { if (object instanceof Mesh) found.push(object); });
+  return found;
 }
 
 function shadow(): Mesh {

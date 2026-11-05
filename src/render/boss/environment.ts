@@ -6,34 +6,12 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
-import { buildCake, buildCnTower } from '../custom';
+import { buildCake } from '../custom';
+import { gold, luminous, midnight, paleGold, satin, velvet, wine } from './materials';
+import { makeTower } from './tower';
 import type { BossProp } from '../../assets/boss/catalog';
 
-const satinCache = new Map<string, MeshStandardMaterial>();
-const luminousCache = new Map<string, MeshBasicMaterial>();
-function satin(color: number, metalness = 0.03, roughness = 0.67): MeshStandardMaterial {
-  const key = `${color}:${metalness}:${roughness}`;
-  let material = satinCache.get(key);
-  if (!material) {
-    material = new MeshStandardMaterial({ color, metalness, roughness });
-    satinCache.set(key, material);
-  }
-  return material;
-}
-function luminous(color: number, opacity = 1): MeshBasicMaterial {
-  const key = `${color}:${opacity}`;
-  let material = luminousCache.get(key);
-  if (!material) {
-    material = new MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: opacity === 1 });
-    luminousCache.set(key, material);
-  }
-  return material;
-}
-const gold = satin(0xe7ae61, 0.72, 0.24);
-const paleGold = satin(0xffd890, 0.65, 0.3);
-const velvet = satin(0x40194e, 0.02, 0.92);
-const wine = satin(0x72264f, 0.03, 0.8);
-const midnight = satin(0x141d3a);
+// Materials come from the shared cache so tower and terrace geometry batch together.
 
 function block(parent: Group, size: [number, number, number], at: [number, number, number], mat: MeshStandardMaterial | MeshBasicMaterial): Mesh {
   const mesh = new Mesh(new BoxGeometry(...size), mat);
@@ -68,14 +46,27 @@ function ribbon(parent: Group, points: Vector3[], radius: number, mat: MeshStand
  * z 11, so a deck ending at the old 7.35 left a band of void across the bottom
  * of the frame. The floor has to run past the lens, not stop behind it.
  */
+/**
+ * Toronto, seen from the pod.
+ *
+ * Far enough away to sit just under the horizon and low enough that we look
+ * down on every roofline — the camera eye is at y 2.9, so nothing may rise
+ * above that or the city reads as standing beside us again. The first attempt
+ * dropped the band straight down at its old distance, which put it behind the
+ * deck's far edge and showed nothing at all.
+ */
+const CITY_BASE_Y = -11.0;
+const CITY_Z = -50;
+const CITY_SPREAD = 2.6;
+const CITY_SCALE = 1.78;
 const DECK_NEAR_Z = 12.2;
 const DECK_FAR_Z = -9.15;
 const DECK_LENGTH = DECK_NEAR_Z - DECK_FAR_Z;
 const DECK_CENTRE_Z = (DECK_NEAR_Z + DECK_FAR_Z) / 2;
 
 function makeDeck(parent: Group): void {
-  block(parent, [10.2, 0.38, DECK_LENGTH], [0, -0.25, DECK_CENTRE_Z], satin(0x19223b));
-  block(parent, [9.8, 0.07, DECK_LENGTH - 0.7], [0, -0.025, DECK_CENTRE_Z], satin(0x27314b));
+  block(parent, [9.2, 0.38, DECK_LENGTH], [0, -0.25, DECK_CENTRE_Z], satin(0x19223b));
+  block(parent, [8.8, 0.07, DECK_LENGTH - 0.7], [0, -0.025, DECK_CENTRE_Z], satin(0x27314b));
   const laneMats = [satin(0x202b47), satin(0x263454), satin(0x202b47)];
   const laneLength = DECK_NEAR_Z - (-5.1);
   const laneCentreZ = (DECK_NEAR_Z + -5.1) / 2;
@@ -87,7 +78,7 @@ function makeDeck(parent: Group): void {
   for (const x of [-3.32, -1.1, 1.1, 3.32]) {
     block(parent, [0.025, 0.014, laneLength], [x, 0.048, laneCentreZ], satin(0x916b79, 0.23));
   }
-  for (const x of [-4.95, 4.95]) {
+  for (const x of [-4.45, 4.45]) {
     block(parent, [0.27, 0.22, DECK_LENGTH - 0.7], [x, 0.1, DECK_CENTRE_Z], midnight);
     block(parent, [0.16, 0.06, DECK_LENGTH - 0.7], [x, 0.23, DECK_CENTRE_Z], gold);
     for (const z of [-4.6, -2.3, 0, 2.3, 4.6, 7.4, 10.2]) {
@@ -100,7 +91,7 @@ function makeDeck(parent: Group): void {
   for (const side of [-1, 1]) {
     for (let i = 0; i < 9; i++) {
       const z = -4.4 + i * 1.16;
-      block(parent, [1.18, 0.009, 0.025], [side * 4.2, 0.039, z], joint);
+      block(parent, [1.18, 0.009, 0.025], [side * 3.9, 0.039, z], joint);
     }
   }
 }
@@ -143,8 +134,10 @@ function makeDais(parent: Group): void {
 /** Velvet folds and golden architrave form a tall birthday gala proscenium. */
 function makeArchitecture(parent: Group): void {
   const z = -8.7;
-  block(parent, [10.4, 0.7, 0.5], [0, 0.4, z], satin(0x17213d));
-  block(parent, [10.5, 0.13, 0.64], [0, 0.81, z], gold);
+  // No backdrop wall. What stands behind Aurora is the tower shaft, and the
+  // open night either side of it is the only thing that can say "350 m up".
+  // The arch, its columns and the velvet stay; they now read as her dressing
+  // hung on the tower rather than as a stage flat.
   for (const side of [-1, 1]) {
     const x = side * 3.75;
     cylinder(parent, 0.32, 0.4, 4.25, [x, 2.95, z + 0.12], satin(0x3f2455), 20);
@@ -152,7 +145,7 @@ function makeArchitecture(parent: Group): void {
       cylinder(parent, 0.43, 0.43, 0.12, [x, y, z + 0.12], gold, 20);
     }
     // Tall velvet panels with alternating lit and shadowed folds.
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 4; i++) {
       const foldX = x + side * (0.18 + i * 0.17);
       const top = 5.45 - i * 0.075;
       const bottom = 1.05 + i * 0.13;
@@ -188,30 +181,16 @@ function makeArchitecture(parent: Group): void {
   parent.add(lamps);
 }
 
-/** Rooftop side wings carry the party toward the foreground without entering play. */
-function makeSideWings(parent: Group): void {
-  const stone = satin(0x26304a);
-  const recess = satin(0x392743);
-  const fabric = satin(0x55334f, 0.02, 0.89);
-  for (const side of [-1, 1]) {
-    for (const [z, height] of [[-3.4, 3.25], [0.6, 2.5]] as const) {
-      const x = side * 4.42;
-      block(parent, [0.58, height, 0.66], [x, height / 2 + 0.12, z], stone);
-      block(parent, [0.69, 0.13, 0.76], [x, height + 0.15, z], gold);
-      block(parent, [0.32, height * 0.58, 0.025], [x - side * 0.01, height * 0.57, z + 0.35], recess);
-      orb(parent, 0.11, [x, height + 0.32, z], luminous(0xe8bd83), 9);
-      const bannerX = side * 4.04;
-      block(parent, [0.54, height * 0.67, 0.05], [bannerX, height * 0.62, z + 0.38], fabric);
-      block(parent, [0.035, height * 0.67, 0.07], [bannerX - 0.29, height * 0.62, z + 0.42], gold);
-      block(parent, [0.035, height * 0.67, 0.07], [bannerX + 0.29, height * 0.62, z + 0.42], gold);
-      const jewel = block(parent, [0.18, 0.18, 0.06], [bannerX, height * 0.64, z + 0.43], satin(0x8b5b9c, 0.4));
-      jewel.rotation.z = Math.PI / 4;
-    }
-    // The shoulder beyond the parapet reads as a real roof edge, not empty space.
-    block(parent, [0.45, 0.8, 20.0], [side * 5.38, 0.3, 1.6], stone);
-    block(parent, [0.53, 0.08, 20.0], [side * 5.38, 0.75, 1.6], satin(0x7b7290, 0.2));
-  }
-}
+/*
+ * The rooftop side wings are gone.
+ *
+ * They were banner pylons 3.25 units tall standing at x +/-4.4, designed to
+ * frame a flat roof. On the pod they stood exactly in the one strip of sky
+ * the geometry lets us see: the deck occludes everything steeper than ~10
+ * degrees below horizontal at the frame edge, so the air between the horizon
+ * and that line is the entire altitude cue, and the wings filled it. The
+ * parapet in tower.ts does the edge-framing job now.
+ */
 
 function makeMoonAndSkyline(parent: Group): void {
   // A soft, painted moon sets the same city-at-night silhouette as the references.
@@ -242,22 +221,28 @@ function makeMoonAndSkyline(parent: Group): void {
     [-4.8, 5.5, 1.9], [-2.4, 4.2, 2.4], [0, 5.0, 2.1], [2.7, 4.7, 2.5],
     [5.1, 6.9, 2.3], [7.9, 5.6, 2.8], [10.6, 7.2, 2.2], [13.1, 4.9, 2.5],
   ] as const;
-  const cityMaterials = [satin(0x182445), satin(0x202d51), satin(0x242548)];
+  const cityMaterials = [satin(0x121b36), satin(0x16203d), satin(0x191a38)];
   const windows: number[] = [];
   for (let i = 0; i < buildings.length; i++) {
-    const [x, height, width] = buildings[i]!;
-    const z = -17 - (i % 3) * 0.7;
-    block(parent, [width, height, 1.4], [x, height / 2 - 0.6, z], cityMaterials[i % 3]!);
-    block(parent, [width + 0.16, 0.14, 1.55], [x, height - 0.55, z], satin(0x344267));
-    if (i % 3 === 0) block(parent, [0.08, 0.65, 0.08], [x, height + 0.02, z], satin(0x596b9a));
+    const [rawX, rawHeight, rawWidth] = buildings[i]!;
+    const x = rawX * CITY_SPREAD;
+    const height = rawHeight * CITY_SCALE;
+    const width = rawWidth * CITY_SCALE;
+    const z = CITY_Z - (i % 3) * 2.2;
+    // Toronto is below us now. Dropping the band under the deck plane is what
+    // turns "a plaza with buildings behind it" into "a platform in the air".
+    const base = CITY_BASE_Y;
+    block(parent, [width, height, 3.5], [x, base + height / 2, z], cityMaterials[i % 3]!);
+    block(parent, [width + 0.3, 0.3, 3.7], [x, base + height - 0.05, z], satin(0x253150));
+    if (i % 3 === 0) block(parent, [0.08, 0.65, 0.08], [x, base + height + 0.52, z], satin(0x596b9a));
     for (let row = 0; row < Math.floor(height / 0.48) - 1; row++) {
       for (let col = 0; col < Math.floor(width / 0.34) - 1; col++) {
         if ((row * 7 + col * 11 + i * 3) % 5 === 0) continue;
-        windows.push(x - width / 2 + 0.28 + col * 0.34, row * 0.47 + 0.25, z + 0.72);
+        windows.push(x - width / 2 + 0.46 + col * 0.56, CITY_BASE_Y + row * 0.78 + 1.2, z + 1.8);
       }
     }
   }
-  const windowMesh = new InstancedMesh(new PlaneGeometry(0.115, 0.19), luminous(0xf0b872, 0.85), windows.length / 3);
+  const windowMesh = new InstancedMesh(new PlaneGeometry(0.2, 0.32), luminous(0xcf9a62, 0.62), windows.length / 3);
   const dummy = new Object3D();
   for (let i = 0; i < windows.length / 3; i++) {
     dummy.position.set(windows[i * 3]!, windows[i * 3 + 1]!, windows[i * 3 + 2]!);
@@ -265,19 +250,13 @@ function makeMoonAndSkyline(parent: Group): void {
     windowMesh.setMatrixAt(i, dummy.matrix);
   }
   parent.add(windowMesh);
-  const tower = buildCnTower(11.8);
-  tower.position.set(-3.15, -0.8, -15.4);
-  parent.add(tower);
-  const towerRing = new Mesh(new TorusGeometry(0.77, 0.075, 7, 24), luminous(0xb354e2, 0.85));
-  towerRing.rotation.x = Math.PI / 2;
-  towerRing.position.set(-3.15, 6.9, -15.4);
-  parent.add(towerRing);
+  // No distant CN Tower: this scene is on top of it.
   // Sparse high stars, behind the moon and architecture.
   const stars = new InstancedMesh(new SphereGeometry(0.05, 5, 4), luminous(0x8fb7fb, 0.7), 32);
   const matrix = new Matrix4();
   for (let i = 0; i < 32; i++) {
     const x = -13 + (i * 17 % 31) / 31 * 26;
-    const y = 7.2 + (i * 23 % 29) / 29 * 7;
+    const y = 4.6 + (i * 23 % 29) / 29 * 12;
     matrix.makeTranslation(x, y, -22);
     stars.setMatrixAt(i, matrix);
   }
@@ -294,7 +273,7 @@ function makeBalloons(parent: Group): void {
     for (let i = 0; i < 12; i++) {
       const col = i % 3;
       const row = Math.floor(i / 3);
-      const x = side * (4.31 + col * 0.25 + (row % 2) * 0.08);
+      const x = side * (3.92 + col * 0.25 + (row % 2) * 0.08);
       const y = 2.2 + STAGE_LIFT + row * 0.58 + (col % 2) * 0.18;
       const z = -7.1 + (col - 1) * 0.29;
       dummy.position.set(x, y, z);
@@ -314,7 +293,7 @@ function makeBalloons(parent: Group): void {
   for (const side of [-1, 1]) {
     ribbon(parent, Array.from({ length: 12 }, (_, i) => {
       const t = i / 11;
-      return new Vector3(side * (4.4 + Math.sin(t * Math.PI * 3) * 0.15), 1.3 + STAGE_LIFT * 0.4 + t * (3.9 + STAGE_LIFT), -6.75 + Math.sin(t * Math.PI * 4) * 0.12);
+      return new Vector3(side * (4.02 + Math.sin(t * Math.PI * 3) * 0.15), 1.3 + STAGE_LIFT * 0.4 + t * (3.9 + STAGE_LIFT), -6.75 + Math.sin(t * Math.PI * 4) * 0.12);
     }), 0.018, paleGold);
   }
 }
@@ -437,7 +416,7 @@ export class BossEnvironment {
     makeArchitecture(architecture);
     architecture.scale.y = (6.38 + STAGE_LIFT * 1.95) / 6.38;
     this.root.add(architecture);
-    makeSideWings(this.root);
+    makeTower(this.root, DECK_NEAR_Z, DECK_FAR_Z);
     makeBalloons(this.root);
     makeCandelabra(this.root, -3.55, -5.5);
     makeCandelabra(this.root, 3.55, -5.5);
@@ -467,37 +446,17 @@ export class BossEnvironment {
     };
     const stage = BOSS_LAYOUT.bossStageY;
     // Cluster real pack gifts at the wings; the playable deck remains empty.
-    place('decorGiftRed', -4.12, stage, -6.1, 0.78, 0.2);
-    place('decorGiftGreen', -4.5, stage, -7.2, 1.05, -0.2);
-    place('decorGiftRed', -4.85, stage, -7.8, 0.55);
-    place('decorGiftGreen', 4.18, stage, -6.55, 0.96, 0.2);
-    place('decorGiftRed', 4.63, stage, -7.4, 0.7, -0.1);
-    place('lantern', -4.65, 0.15, -4.65, 2.15);
-    place('lantern', 4.65, 0.15, -4.65, 2.15);
-    const placeCity = (id: string, x: number, z: number, height: number) => {
-      const model = models.get(id);
-      const spec = byId.get(id);
-      if (!model || !spec) return;
-      const clone = model.clone(true);
-      clone.scale.setScalar(height / spec.nativeHeight);
-      clone.traverse((object) => {
-        if (!(object instanceof Mesh)) return;
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-        const toned = materials.map((original) => {
-          const material = original.clone();
-          if (material instanceof MeshStandardMaterial) material.color.lerp(new Color(0x1a294c), 0.68);
-          return material;
-        });
-        object.material = Array.isArray(object.material) ? toned : toned[0]!;
-      });
-      const bounds = new Box3().setFromObject(clone);
-      clone.position.set(x, -0.7 - bounds.min.y, z);
-      this.root.add(clone);
-    };
-    placeCity('cityA', -8.1, -12.8, 7.2);
-    placeCity('cityG', -6.2, -13.8, 9.2);
-    placeCity('cityC', 5.5, -13.6, 8.6);
-    placeCity('cityA', 7.5, -12.7, 6.8);
+    place('decorGiftRed', -3.78, stage, -6.1, 0.78, 0.2);
+    place('decorGiftGreen', -4.12, stage, -7.2, 1.05, -0.2);
+    place('decorGiftRed', -4.4, stage, -7.8, 0.55);
+    place('decorGiftGreen', 3.84, stage, -6.55, 0.96, 0.2);
+    place('decorGiftRed', 4.22, stage, -7.4, 0.7, -0.1);
+    place('lantern', -4.22, 0.15, -4.65, 2.15);
+    place('lantern', 4.22, 0.15, -4.65, 2.15);
+    // The City Builder flanks are gone. They are Level 2's street-canyon
+    // assets, and standing them beside the gala made the arena read as more
+    // of the chase rather than somewhere we had arrived. The skyline band far
+    // below does the city's job now.
     // The wreath and bell are intentionally omitted: their winter motifs would
     // displace the stronger birthday cake, balloons, and candle silhouette.
   }
