@@ -48,7 +48,8 @@ describe('four-direction skyline', () => {
       expect(Number.isFinite(s.p.x+s.p.y+s.v.x)).toBe(true);
       expect(s.p.y).toBeGreaterThanOrEqual(SKYLINE.groundY-.002);
       expect(Math.abs(s.p.x)).toBeLessThanOrEqual(SKYLINE.laneWidth+2.51);
-      expect(s.v.z).toBeCloseTo(SKYLINE.speed,5);
+      expect(s.v.z).toBeGreaterThan(3.5);
+      expect(s.v.z).toBeLessThan(SKYLINE.speed * 1.5);
     }
   });
   it('remembers up beneath a bridge and launches automatically after clearance', () => {

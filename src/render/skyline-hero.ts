@@ -86,7 +86,7 @@ const FACING_Y = Math.PI;
 const MUZZLE_LOCAL = new Vector3(0.08, 0.11, 0.78);
 
 /** How fast the arms settle toward the pose, as an exponential time constant. */
-const ARM_SETTLE = 0.1;
+const ARM_SETTLE = 0.055;
 
 /**
  * How far above the player an anchor must be before the arms reach for it.
@@ -98,10 +98,48 @@ const ARM_SETTLE = 0.1;
  * hang from something above you, so that is now the test.
  */
 const ANCHOR_MIN_RISE = 0.5;
-/** How far the hands sit apart on the cable, as a fraction of the reach. */
-const GRIP_SPREAD = 0.22;
-/** Lateral axis the two hands are offset along, so they don't overlap. */
-const SIDEWAYS = new Vector3(1, 0, 0);
+const DEG = Math.PI / 180;
+
+/**
+ * How far outboard the grappling arm swings, away from the anchor direction.
+ *
+ * Not a style choice — a clearance. His shoulder sits at x -0.212 with a
+ * total reach of 0.576, while the curl shell is 0.697 wide. The arm is
+ * shorter than his head, so pointing it at an anchor that is now 88 degrees
+ * overhead drives the hand straight into the hair. Clearing it needs 0.485
+ * of lateral travel on a 0.576 reach, which is this angle.
+ *
+ * This is allowed to be a pose rather than a solve because the line is drawn
+ * from the blaster muzzle to the anchor, and the muzzle rides in his hand —
+ * so the rope connects wherever the hand ends up. The arm only has to look
+ * like it is holding on.
+ */
+const OUTWARD_TILT = 18 * DEG;
+
+/**
+ * Direction the blaster barrel points in wrist.r local space in the bind pose.
+ * Derived from the bone chain (wrist.r -> hand.r -> handslot.r -> blaster).
+ */
+const BARREL_LOCAL_IN_WRIST = new Vector3(-1, 0, 0);
+
+/**
+ * How much of the aim the forearm takes.
+ *
+ * Both bones used to aim at the same target, which makes the arm a dead
+ * straight rod from shoulder to hand. Letting the forearm only partly follow
+ * leaves some of the clip's bend in the elbow, and the bend is most of what
+ * reads as an arm rather than a pose.
+ */
+const FOREARM_FOLLOW = 0.6;
+
+/** The free arm: down, outboard and trailing, as a counterweight. */
+const COUNTER_DOWN = 0.62;
+const COUNTER_OUT = 0.55;
+const COUNTER_BACK = 0.56;
+/** Blend weight, so the clip still reads through it. */
+const COUNTER_WEIGHT = 0.35;
+/** Radians of extra sway per unit of lateral speed; |v.x| peaks near 9. */
+const COUNTER_SWAY = 0.03;
 
 export interface SkylineHero {
   readonly object: Object3D;
@@ -176,14 +214,29 @@ class RiggedHero implements SkylineHero {
    * shoulder pointed correctly at the anchor. The cable then started from a
    * grip that was nowhere near the cable. The forearm has to follow.
    */
-  private arms: { bone: Object3D; rest: Vector3 }[] = [];
+  private rightArm: { bone: Object3D; rest: Vector3 }[] = [];
+  private leftArm: { bone: Object3D; rest: Vector3 }[] = [];
+  private rightWrist: Object3D | null = null;
   private readonly reach = new Vector3();
   private readonly scratch = new Vector3();
-  /** `aim` must not write to `scratch`: callers pass it in as the target. */
+  private readonly shoulder = new Vector3();
+  private readonly counter = new Vector3();
+  private readonly perp = new Vector3();
+  private readonly muzzleWorld = new Vector3();
+  private readonly anchorWorld = new Vector3();
+  private readonly toAnchor = new Vector3();
+  private readonly targetInLowerarm = new Vector3();
+  private readonly wristDiff = new Quaternion();
+  private readonly parentQuat = new Quaternion();
+  /** The character's own right, up and facing axes, in world space. */
+  private readonly axisX = new Vector3();
+  private readonly axisY = new Vector3();
+  private readonly axisZ = new Vector3();
+  /** `aim`'s own scratch: it must not write to the vector it was handed. */
   private readonly aimed = new Vector3();
   private readonly turn = new Quaternion();
   private readonly posed = new Quaternion();
-  /** 0 = arms at rest under the clip, 1 = fully aimed at the anchor. */
+  /** 0 = arms at rest under the clip, 1 = fully posed on the line. */
   private grip = 0;
   private chest: Object3D | null;
   private hands: Object3D[] = [];
@@ -220,24 +273,27 @@ class RiggedHero implements SkylineHero {
      * at rest, whatever convention the pack used. Aiming is then a single
      * `setFromUnitVectors` and the code is correct for any rig.
      */
-    for (const [joint, child] of [
-      ['upperarm.l', 'lowerarm.l'],
-      ['lowerarm.l', 'wrist.l'],
-      ['upperarm.r', 'lowerarm.r'],
-      ['lowerarm.r', 'wrist.r'],
-    ]) {
-      const bone = actor.node(joint as string);
-      const next = actor.node(child as string);
+    for (const [side, joint, child] of [
+      ['r', 'upperarm.r', 'lowerarm.r'],
+      ['r', 'lowerarm.r', 'wrist.r'],
+      ['l', 'upperarm.l', 'lowerarm.l'],
+      ['l', 'lowerarm.l', 'wrist.l'],
+    ] as const) {
+      const bone = actor.node(joint);
+      const next = actor.node(child);
       if (!bone || !next) continue;
-      this.arms.push({ bone, rest: next.position.clone().normalize() });
+      const entry = { bone, rest: next.position.clone().normalize() };
+      (side === 'r' ? this.rightArm : this.leftArm).push(entry);
     }
     this.chest = actor.node('chest');
+    this.rightWrist = actor.node('wrist.r');
     for (const name of ['hand.l', 'hand.r']) {
       const hand = actor.node(name);
       if (hand) this.hands.push(hand);
     }
-    if (this.arms.length < 4) {
-      console.warn(`[skyline] only ${this.arms.length}/4 arm bones found; swing pose degraded`);
+    const found = this.rightArm.length + this.leftArm.length;
+    if (found < 4) {
+      console.warn(`[skyline] only ${found}/4 arm bones found; swing pose degraded`);
     }
   }
 
@@ -256,31 +312,101 @@ class RiggedHero implements SkylineHero {
     // ---- procedural arms, applied AFTER the mixer ------------------------
     // Blended rather than switched, so letting go of a cable releases the
     // arms into the clip instead of snapping them.
-    const holding = !!s.anchor && s.anchor.y > s.p.y + ANCHOR_MIN_RISE;
+    const holding = !!s.anchor && (s.anchor.kind === 'lower' || s.anchor.y > s.p.y + ANCHOR_MIN_RISE);
     this.grip += ((holding ? 1 : 0) - this.grip) * (1 - Math.exp(-dt / ARM_SETTLE));
-    if (holding && s.anchor && this.grip > 0.01) {
-      // The anchor in the same player-relative frame the scene draws in.
-      this.reach.set(s.anchor.x - s.p.x, s.anchor.y - s.p.y, -(s.anchor.z - s.p.z));
-      const spread = GRIP_SPREAD * this.reach.length();
-      for (let i = 0; i < this.arms.length; i++) {
-        const arm = this.arms[i];
-        if (!arm) continue;
-        // Entries are [upper.l, lower.l, upper.r, lower.r], so the two left
-        // bones share a side and the two right bones share the other.
-        const side = i < 2 ? -1 : 1;
-        this.aim(
-          arm.bone,
-          arm.rest,
-          this.scratch.copy(this.reach).addScaledVector(SIDEWAYS, side * spread),
-          this.grip,
+
+    if (this.grip > 0.01) {
+      this.readBasis();
+
+      // ---- the grappling arm, right only ---------------------------------
+      // Only the right arm is on the line: the blaster lives in handslot.r
+      // and the rope leaves its muzzle. Mirroring the pose onto the left read
+      // as a mistake, which it was.
+      const upper = this.rightArm[0], lower = this.rightArm[1];
+      if (holding && s.anchor && upper && lower) {
+        // From the SHOULDER, not the player origin. Worth about two degrees
+        // on a twelve-unit rope, but it is the honest vector.
+        upper.bone.getWorldPosition(this.shoulder);
+        this.reach
+          .set(s.anchor.x, s.anchor.y, s.p.z - s.anchor.z)
+          .sub(this.shoulder);
+        if (this.reach.lengthSq() > 1e-6) {
+          this.reach.normalize();
+          // Chest clearance envelope: ensure the right arm never cuts inward across Matthew's chest/face
+          const lateral = this.reach.dot(this.axisX);
+          if (lateral < 0.18) {
+            this.reach.addScaledVector(this.axisX, 0.18 - lateral).normalize();
+          }
+          this.tiltToward(this.reach, this.axisX, OUTWARD_TILT);
+          this.aim(upper.bone, upper.rest, this.reach, this.grip);
+          this.aim(lower.bone, lower.rest, this.reach, this.grip * FOREARM_FOLLOW);
+
+          // Align the wrist so the blaster barrel points directly along the line to the anchor.
+          // Directly slerp to the computed target orientation so rotation never accumulates or spins.
+          if (this.rightWrist) {
+            this.rightWrist.getWorldPosition(this.muzzleWorld);
+            this.anchorWorld.set(s.anchor.x, s.anchor.y, s.p.z - s.anchor.z);
+            this.toAnchor.copy(this.anchorWorld).sub(this.muzzleWorld);
+            if (this.toAnchor.lengthSq() > 1e-6) {
+              this.toAnchor.normalize();
+              this.targetInLowerarm.copy(this.toAnchor)
+                .applyQuaternion(lower.bone.getWorldQuaternion(this.parentQuat).invert())
+                .normalize();
+              this.wristDiff.setFromUnitVectors(BARREL_LOCAL_IN_WRIST, this.targetInLowerarm);
+              this.rightWrist.quaternion.slerp(this.wristDiff, this.grip);
+            }
+          }
+        }
+      }
+
+      // ---- the free arm ---------------------------------------------------
+      // Down, outboard and trailing, swaying against the direction of travel
+      // so a lane change reads as a counterweight rather than a dead limb.
+      // During descent, sweeps back and up in an aerodynamic superhero dive.
+      const freeUpper = this.leftArm[0], freeLower = this.leftArm[1];
+      if (freeUpper && freeLower) {
+        const isDescend = s.phase === 'descend';
+        const downWeight = isDescend ? 0.35 : -COUNTER_DOWN;
+        const backWeight = isDescend ? -0.85 : -COUNTER_BACK;
+        const outWeight = isDescend ? -COUNTER_OUT * 1.3 : -COUNTER_OUT;
+        this.counter
+          .copy(this.axisY).multiplyScalar(downWeight)
+          .addScaledVector(this.axisX, outWeight)
+          .addScaledVector(this.axisZ, backWeight)
+          .normalize();
+        this.tiltToward(
+          this.counter,
+          this.axisX,
+          MathUtils.clamp(-s.v.x * COUNTER_SWAY, -0.5, 0.5),
         );
+        const weight = this.grip * (isDescend ? 0.85 : COUNTER_WEIGHT);
+        this.aim(freeUpper.bone, freeUpper.rest, this.counter, weight);
+        this.aim(freeLower.bone, freeLower.rest, this.counter, weight * FOREARM_FOLLOW);
+      }
+    }
+
+    // Athletic flight soar pose: trailing arms during free-flight soar or unattached descent
+    if (!holding && (s.phase === 'flight' || s.phase === 'descend')) {
+      this.readBasis();
+      const upperR = this.rightArm[0], lowerR = this.rightArm[1];
+      const upperL = this.leftArm[0], lowerL = this.leftArm[1];
+      for (const [side, up, low] of [[1, upperR, lowerR], [-1, upperL, lowerL]] as const) {
+        if (up && low) {
+          this.counter
+            .copy(this.axisY).multiplyScalar(-0.35)
+            .addScaledVector(this.axisZ, -0.65)
+            .addScaledVector(this.axisX, side * 0.45)
+            .normalize();
+          this.aim(up.bone, up.rest, this.counter, 0.75);
+          this.aim(low.bone, low.rest, this.counter, 0.75 * FOREARM_FOLLOW);
+        }
       }
     }
 
     // Lean the chest into the arc. Small, because the clip is already
     // animating the spine and a large override reads as a broken rig.
     if (this.chest && !reduced) {
-      const lean = MathUtils.clamp(-s.v.y * 0.012, -0.22, 0.22);
+      const lean = MathUtils.clamp(s.v.y * 0.015, -0.22, 0.22);
       this.chest.rotation.x += lean;
     }
   }
@@ -303,6 +429,31 @@ class RiggedHero implements SkylineHero {
     }
     out.multiplyScalar(1 / this.hands.length);
     return true;
+  }
+
+  /**
+   * The character's right, up and facing axes in world space.
+   *
+   * Read from the rig rather than assumed, because the body banks up to 24
+   * degrees into a lane change and the arm has to clear the head it is
+   * actually attached to, not a head standing upright. Model -X is his
+   * right: `handslot.r` sits at x -0.883.
+   */
+  private readBasis(): void {
+    this.actor.root.updateWorldMatrix(true, false);
+    const e = this.actor.root.matrixWorld.elements;
+    this.axisX.set(-(e[0] as number), -(e[1] as number), -(e[2] as number)).normalize();
+    this.axisY.set(e[4] as number, e[5] as number, e[6] as number).normalize();
+    this.axisZ.set(e[8] as number, e[9] as number, e[10] as number).normalize();
+  }
+
+  /** Rotate a unit `dir` by `angle` radians toward a unit `target`. */
+  private tiltToward(dir: Vector3, target: Vector3, angle: number): void {
+    if (angle === 0) return;
+    this.perp.copy(target).addScaledVector(dir, -target.dot(dir));
+    if (this.perp.lengthSq() < 1e-8) return;
+    this.perp.normalize();
+    dir.multiplyScalar(Math.cos(angle)).addScaledVector(this.perp, Math.sin(angle)).normalize();
   }
 
   /**

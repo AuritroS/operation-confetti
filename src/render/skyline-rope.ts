@@ -26,33 +26,29 @@
 import {
   BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial, Vector3,
 } from 'three';
-import { PALETTE } from './palette';
 
 // ---- tuning --------------------------------------------------------------
 // One block, module scope, so a change is a hot reload rather than a build.
 
 /** Tube radius at the muzzle, in world units. */
-const ROPE_RADIUS = 0.045;
+const ROPE_RADIUS = 0.038;
 /** Radius multiplier at the hook end, so it reads as a line and not a rod. */
-const ROPE_TAPER = 0.6;
-/** Radial segments. Five is round enough at 1-2 px of apparent width. */
-const ROPE_SIDES = 5;
-/** Segments along the length. Only matters once the rope is allowed to bend. */
+const ROPE_TAPER = 0.75;
+/** Radial segments. Eight gives a smooth round silhouette. */
+const ROPE_SIDES = 8;
+/** Segments along the length. */
 const ROPE_SEGMENTS = 14;
 
 /** How long the hook takes to reach the anchor, in seconds. */
-const FIRE_TIME = 0.1;
+const FIRE_TIME = 0.04;
 /** How long the line takes to snap back once the anchor is released. */
-const RELEASE_TIME = 0.18;
+const RELEASE_TIME = 0.06;
 
 /**
- * Gravity droop, as a fraction of the span.
- *
- * Deliberately small. With the anchor left flat the span runs out to 27
- * units, where even five percent is over a unit of sag on something that is
- * meant to read as a taut sling rather than a slack rope.
+ * Gravity droop: near-zero under high-tensile 12 m/s pull tension.
+ * Reads as a taut, vibrating cable rather than a slack cord.
  */
-const SAG = 0.03;
+const SAG = 0.002;
 
 /**
  * There is deliberately no hook model on the far end.
@@ -122,7 +118,7 @@ export class SkylineRope {
      * that dims with the lighting or fades at 27 units has stopped being a
      * cue.
      */
-    this.material = new MeshBasicMaterial({ color: PALETTE.gold, fog: false });
+    this.material = new MeshBasicMaterial({ color: 0xffea88, fog: false });
     this.mesh = new Mesh(this.geometry, this.material);
     // The tube is rebuilt in world space each frame, so a bounding sphere
     // computed once would cull it the moment the player moved.
@@ -171,8 +167,9 @@ export class SkylineRope {
   private advance(to: Vector3 | null, step: number): void {
     this.elapsed += step;
     if (to) {
+      const moved = this.phase === 'attached' && this.held.distanceToSquared(to) > 0.5;
       this.held.copy(to);
-      if (this.phase === 'idle' || this.phase === 'release') {
+      if (this.phase === 'idle' || this.phase === 'release' || moved) {
         this.phase = 'fire';
         this.elapsed = 0;
       } else if (this.phase === 'fire' && this.elapsed >= FIRE_TIME) {

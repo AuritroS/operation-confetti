@@ -81,6 +81,7 @@ export class SkylineScene {
   private grip = new Vector3();
   private anchorAt = new Vector3();
   private latest: Snapshot | null = null;
+  private latestScrollZ = 0;
   private visibleEntities = new Set<string>();
   /** Null until the street assets land; the primitives stand in until then. */
   private street: SkylineStreet | null = null;
@@ -319,8 +320,27 @@ export class SkylineScene {
     const hit = Math.max(0, 1 - s.hitAge / 0.4);
     const crouch = landing ? 0.14 * Math.sin(Math.PI * Math.min(1, s.landingAge / LAND_TIME)) : 0;
     this.hero.position.set(s.p.x, s.p.y - crouch, 0);
-    this.hero.rotation.set(running ? -0.12 : -Math.atan2(s.v.y, s.v.z) * 0.65,
-      -Math.atan2(s.v.x, s.v.z) * 0.55, -Math.atan2(s.v.x, s.v.z) * 0.5 + (reduced ? 0 : Math.sin(s.hitAge * 35) * hit * 0.2));
+
+    // Target pitch:
+    // Diving forward into the ground when descending (v.y < 0): negative rotation around X (nose-down dive)
+    // Soaring into the air when ascending (v.y > 0): positive rotation around X (nose-up climb)
+    // Running: -0.12 (athletic forward lean)
+    // Landing: -0.28 (impact crouch)
+    const rawPitch = running ? -0.12 : landing ? -0.28 : Math.atan2(s.v.y, s.v.z) * 0.95;
+    const targetPitch = Math.max(-0.65, Math.min(0.35, rawPitch));
+
+    // Target yaw & roll: clamp lateral banking to avoid sudden 60-degree snap
+    const rawYaw = -Math.atan2(s.v.x, s.v.z);
+    const rawRoll = -Math.atan2(s.v.x, s.v.z);
+    const targetYaw = Math.max(-0.28, Math.min(0.28, rawYaw * 0.45));
+    const targetRoll = Math.max(-0.46, Math.min(0.46, rawRoll * 0.65))
+      + (reduced ? 0 : Math.sin(s.hitAge * 35) * hit * 0.2);
+
+    // Smooth rotational changes across frames to eliminate twitch
+    const rotSmooth = 1 - Math.exp(-dt / 0.08);
+    this.hero.rotation.x += (targetPitch - this.hero.rotation.x) * rotSmooth;
+    this.hero.rotation.y += (targetYaw - this.hero.rotation.y) * rotSmooth;
+    this.hero.rotation.z += (targetRoll - this.hero.rotation.z) * rotSmooth;
     this.hero.visible = this.gameplayVisible && !this.rigged;
     if (this.rigged) {
       this.rigged.object.visible = this.gameplayVisible;
@@ -353,28 +373,36 @@ export class SkylineScene {
     } else {
       this.ropeOriginSource = source;
     }
+    const surgeZ = s.mode === 'swing'
+      ? 1.35 * Math.sin((2 * Math.PI / this.course.cycle) * s.elapsed)
+      : s.phase === 'land'
+      ? -0.15 * (1 - Math.min(1, s.landingAge / LAND_TIME))
+      : 0;
+    const scrollZ = s.p.z + surgeZ;
+    this.latestScrollZ = scrollZ;
+
     const live = s.anchor && !s.complete;
-    if (live) this.anchorAt.set(s.anchor!.x, s.anchor!.y, s.p.z - s.anchor!.z);
+    if (live) this.anchorAt.set(s.anchor!.x, s.anchor!.y, scrollZ - s.anchor!.z);
     this.rope.update(this.grip, live ? this.anchorAt : null, dt);
     if (!this.gameplayVisible) this.rope.object.visible = false;
     let b = 0, w = 0;
     if (this.street) {
-      this.street.update(s.p.z);
-      this.boxes?.update(s.p.z);
+      this.street.update(scrollZ);
+      this.boxes?.update(scrollZ);
     } else {
       // Primitive stand-in, used only until the GLBs resolve.
-      const base = Math.floor(s.p.z / 20) * 20;
+      const base = Math.floor(scrollZ / 20) * 20;
       for (let i = -2; i < 10; i++) {
         const z = base + i * 20;
         for (const side of [-1, 1]) {
           const h = 26 + Math.sin(z * 0.12 + side) * 7;
-          this.instance(this.blocks, b++, side * 17, h / 2, s.p.z - z, 6, h, 17);
+          this.instance(this.blocks, b++, side * 17, h / 2, scrollZ - z, 6, h, 17);
           for (let y = 4; y < h - 1; y += 4) {
-            this.instance(this.trims, w++, side * 13.96, y, s.p.z - z, 0.06, 0.16, 13);
-            this.instance(this.trims, w++, side * 17, y, s.p.z - z + 8.55, 4.5, 0.16, 0.06);
+            this.instance(this.trims, w++, side * 13.96, y, scrollZ - z, 0.06, 0.16, 13);
+            this.instance(this.trims, w++, side * 17, y, scrollZ - z + 8.55, 4.5, 0.16, 0.06);
           }
         }
-        for (const x of [-3, 3]) this.instance(this.trims, w++, x, 0.03, s.p.z - z, 0.08, 0.05, 10);
+        for (const x of [-3, 3]) this.instance(this.trims, w++, x, 0.03, scrollZ - z, 0.08, 0.05, 10);
       }
     }
     /**
@@ -387,7 +415,7 @@ export class SkylineScene {
      * painted markings, so there is nothing left for them to do.
      */
     const BAY = this.course.cycle * this.course.speed;
-    const playerBay = Math.floor(s.p.z / BAY);
+    const playerBay = Math.floor(scrollZ / BAY);
     const targetBay = playerBay + 1;
     const activeId = s.anchor?.id;
 
@@ -406,7 +434,7 @@ export class SkylineScene {
         const pool = this.anchorPools[slot];
         const n = anchorCounts[slot] ?? 0;
         if (pool && n < ANCHOR_POOL) {
-          this.dummy.position.set(pos.x, pos.y, s.p.z - pos.z);
+          this.dummy.position.set(pos.x, pos.y, scrollZ - pos.z);
           this.dummy.rotation.set(0, 0, 0);
           this.dummy.scale.setScalar(active ? 1.1 : 0.75);
           this.dummy.updateMatrix();
@@ -415,11 +443,23 @@ export class SkylineScene {
         }
       }
     }
+    if (s.anchor && s.anchor.kind === 'lower') {
+      const pool = this.anchorPools[0];
+      const n = anchorCounts[0] ?? 0;
+      if (pool && n < ANCHOR_POOL) {
+        this.dummy.position.set(s.anchor.x, s.anchor.y, scrollZ - s.anchor.z);
+        this.dummy.rotation.set(0, 0, 0);
+        this.dummy.scale.setScalar(1.2);
+        this.dummy.updateMatrix();
+        pool.setMatrixAt(n, this.dummy.matrix);
+        anchorCounts[0] = n + 1;
+      }
+    }
     this.anchorPools.forEach((pool, i) => {
       pool.count = anchorCounts[i] ?? 0;
       pool.instanceMatrix.needsUpdate = true;
     });
-    const finish = s.p.z - this.course.duration * this.course.speed;
+    const finish = scrollZ - this.course.duration * this.course.speed;
     this.instance(this.trims, w++, 0, 17, finish, 24, 0.5, 0.5);
     for (const side of [-1, 1]) this.instance(this.trims, w++, side * 12, 8.5, finish, 0.5, 17, 0.5);
     for (const [mesh, count] of [[this.blocks, b], [this.trims, w]] as const) {
@@ -430,15 +470,15 @@ export class SkylineScene {
     const hazardAt: Vector3[] = [];
     for (const e of this.course.entities) {
       const mesh = this.contents.get(e.id)!;
-      mesh.visible = !states.has(e.id) && e.z > s.p.z - 3 && e.z < s.p.z + ENTITY_DRAW_AHEAD;
-      mesh.position.set(e.x, e.y, s.p.z - e.z);
+      mesh.visible = !states.has(e.id) && e.z > scrollZ - 3 && e.z < scrollZ + ENTITY_DRAW_AHEAD;
+      mesh.position.set(e.x, e.y, scrollZ - e.z);
       if (mesh.visible) {
         this.visibleEntities.add(e.id);
         // Marker at the top of a ground obstacle and the underside of an
         // overhead one: in both cases the edge the player has to clear.
         const marker = this.markBuffer[giftAt.length + hazardAt.length] ??= new Vector3();
         const lift = e.kind === 'gift' ? 0 : e.y - this.course.groundY > 3 ? -e.halfY : e.halfY;
-        marker.set(e.x, e.y + lift, s.p.z - e.z);
+        marker.set(e.x, e.y + lift, scrollZ - e.z);
         (e.kind === 'gift' ? giftAt : hazardAt).push(marker);
       }
       // Gift bounds stay aligned with the visible box; no rotating collider mismatch.
@@ -454,12 +494,12 @@ export class SkylineScene {
       for (const mesh of this.contents.values()) mesh.visible = false;
       this.rope.object.visible = false;
     }
-    for (const layer of this.backdrop) layer.update(s.p.z, dt);
+    for (const layer of this.backdrop) layer.update(scrollZ, dt);
     this.camera.update(s, dt, reduced);
   }
   framing() {
     const s = this.latest;
-    const project = (p: Point3) => this.probe.set(p.x, p.y, (s?.p.z ?? 0) - p.z).project(this.stage.camera).toArray();
+    const project = (p: Point3) => this.probe.set(p.x, p.y, (s ? this.latestScrollZ : 0) - p.z).project(this.stage.camera).toArray();
     return { player: s ? project(s.p) : [], anchor: s?.anchor ? project(s.anchor) : null,
       entities: this.course.entities.filter((e) => this.visibleEntities.has(e.id)).map((e) => ({ id: e.id, point: project(e) })),
       draws: this.stage.drawCalls, triangles: this.stage.triangles };

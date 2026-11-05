@@ -139,8 +139,9 @@ describe('generated review route', () => {
     const c = empty(); c.entities = [gift(c, 'gift', 3, -1)];
     const inputs: Swipe[] = [{ time: 0, direction: 'up' }, { time: 2.6, direction: 'left' }];
     const timing = probeTiming(inputs, c);
-    expect(timing.late).toBeCloseTo(0.1);
+    expect(timing.late).toBeCloseTo(0.2);
     expect(timing.stoppedBy.late).toBe('replay');
-    expect(timing.firstFailure).toMatchObject({ swipe: 1, offset: 0.2, outcome: { missed: ['gift'] } });
+    expect(timing.firstFailure?.offset).toBeCloseTo(0.3);
+    expect(timing.firstFailure).toMatchObject({ swipe: 1, outcome: { missed: ['gift'] } });
   });
 });
