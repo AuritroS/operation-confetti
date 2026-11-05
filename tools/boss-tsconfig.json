@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "../src/level3.ts",
+    "../src/assets/boss/**/*.ts",
+    "../src/levels/boss/**/*.ts",
+    "../src/render/boss/**/*.ts",
+    "../tests/boss-*.test.ts"
+  ]
+}

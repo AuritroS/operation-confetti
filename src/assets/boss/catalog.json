@@ -1,0 +1,11 @@
+[
+  { "id": "treeHero", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/christmas_tree_decorated.gltf", "url": "/models/level3/christmas_tree_decorated.glb", "nativeHeight": 4.231, "targetHeight": 3.1, "role": "One lit tree outside the left arena edge" },
+  { "id": "treeRepeat", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/christmas_tree_withoutLights.gltf", "url": "/models/level3/christmas_tree_withoutLights.glb", "nativeHeight": 4.031, "targetHeight": 2.6, "role": "Unlit tree outside the right arena edge" },
+  { "id": "collectibleGift", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_A_blue.gltf", "url": "/models/level3/present_A_blue.glb", "nativeHeight": 0.662, "targetHeight": 0.66, "role": "Only scored gift silhouette; add blue sparkle" },
+  { "id": "decorGiftRed", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_C_red.gltf", "url": "/models/level3/present_C_red.glb", "nativeHeight": 0.462, "targetHeight": 0.46, "role": "Scenery outside lanes" },
+  { "id": "decorGiftGreen", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/present_D_green.gltf", "url": "/models/level3/present_D_green.glb", "nativeHeight": 1.062, "targetHeight": 0.8, "role": "Scenery outside lanes" },
+  { "id": "lantern", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/lantern_decorated.gltf", "url": "/models/level3/lantern_decorated.glb", "nativeHeight": 3.991, "targetHeight": 2.5, "role": "Two warm side lights, clear of the playfield" },
+  { "id": "wreath", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/wreath.gltf", "url": "/models/level3/wreath.glb", "nativeHeight": 1.344, "targetHeight": 0.9, "role": "Backdrop wall behind Aurora" },
+  { "id": "bell", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/bell_decorated.gltf", "url": "/models/level3/bell_decorated.glb", "nativeHeight": 1.095, "targetHeight": 0.65, "role": "One celebration accent near the stage" },
+  { "id": "cannon", "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/snowball_cannon.gltf", "url": "/models/level3/snowball_cannon.glb", "nativeHeight": 0.714, "targetHeight": 0.357, "role": "Level 2's handheld cannon; reuse its right-hand mount and muzzle" }
+]
