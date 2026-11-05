@@ -352,15 +352,16 @@ function makeCakeDisplay(parent: Group, cake: Group, cakeRings: Mesh[]): void {
     orb(cake, 0.075, [Math.cos(a) * 0.47, 1.2, Math.sin(a) * 0.47], berry, 8);
   }
   /*
-   * Three rings it rests in, smallest at the top.
+   * Three rings it rests in, widest at the top and tapering to a point below.
    *
-   * A single hairline circle read as a dinner plate. Stacking them into an
-   * inverted cone makes the cake look held up by something, and giving each
-   * ring its own rotation in `update` makes that something look alive. They
+   * A single hairline circle read as a dinner plate. Tapering them downward
+   * makes the cake look carried on a focused column of her magic rather than
+   * sat in a funnel, and giving each ring its own rotation makes that column
+   * look alive. They
    * live in the cake group so they bob with it; nothing else needs to know
    * where the cake is.
    */
-  for (const [radius, drop, tube] of [[0.5, -0.26, 0.055], [0.94, -0.5, 0.048], [1.4, -0.76, 0.04]] as const) {
+  for (const [radius, drop, tube] of [[1.4, -0.26, 0.04], [0.94, -0.5, 0.048], [0.5, -0.76, 0.055]] as const) {
     // Bake the lie-flat rotation into the geometry rather than the mesh. With
     // it on the transform, animating rotation.z tipped each ring out of its
     // own plane instead of spinning it, and they read as loose crossing
