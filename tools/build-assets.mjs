@@ -45,6 +45,11 @@ const CONVERT = [
   `${HOLIDAY}/present_A_yellow.gltf`,
   `${HOLIDAY}/present_C_red.gltf`,
   `${HOLIDAY}/candycane_small.gltf`,
+  // The confetti blaster, and in level 2 the thing the grapple line
+  // leaves from. `manifest.ts` has pointed at this path since the asset
+  // plan was written; it was simply never added here, so the probe has
+  // been reporting "blaster unavailable" against a 404.
+  `${HOLIDAY}/snowball_cannon.gltf`,
   `${HOLIDAY}/bell_decorated.gltf`,
   `${CITY}/watertower.gltf`,
   `${CITY}/streetlight.gltf`,
@@ -128,12 +133,25 @@ const KENNEY_PROPS = [
   // has, and it already spans all three lanes.
   'electricity-pole-wide', 'electricity-wires-wide', 'electricity-side-wide',
   'light-curved-double', 'light-curved',
-  'road-sign-empty-hanging', 'sign-highway-wide', 'traffic-light-hanging',
+  'road-sign-empty-hanging', 'traffic-light-hanging',
+  // All three gantry signs. `skyline-props.ts` names every one of them,
+  // but only the wide variant was ever copied — the other two passed
+  // their existence test on stale files left in public/models from an
+  // older build list, so a clean rebuild was the thing that broke them.
+  'sign-highway-wide', 'sign-highway', 'sign-highway-detailed',
   // Obstacles
   'construction-barrier', 'construction-cone', 'construction-fence',
   'construction-light', 'dumpster',
   // Dressing
   'traffic-light', 'road-sign-street',
+  // Signs and lights `skyline-props.ts` names but the list never
+  // carried. Every one of them existed in public/models as a leftover
+  // from an older list, so the test that checks each prop resolves to a
+  // real file passed on stale output and only failed once the directory
+  // was rebuilt clean.
+  'traffic-light-object-horizontal', 'traffic-light-object-vertical',
+  'road-sign-object-warning', 'road-sign-object-stop',
+  'road-sign-warning', 'road-sign-stop',
 ];
 
 /** Animation libraries: copied, then stripped of their mannequin mesh. */

@@ -26,10 +26,12 @@
  * anything applied before `update()` is discarded. The override has to come
  * after, every frame.
  */
-import { Box3, MathUtils, Object3D, Quaternion, Vector3 } from 'three';
+import { Box3, MathUtils, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AssetBundle, type Actor } from '../assets/characters';
-import { CLIPS, HIDDEN_MESHES, SOURCES } from '../assets/manifest';
+import { ATTACH_NODES, ATTACH_OFFSETS, CLIPS, HIDDEN_MESHES, SOURCES } from '../assets/manifest';
 import type { Snapshot } from '../levels/skyline/types';
+import { LAND_TIME } from '../levels/skyline/config';
 
 /**
  * Gameplay height for level 2, in world units.
@@ -51,11 +53,51 @@ export const HERO_HEIGHT = 2.385;
  */
 const FOOT_DROP = 1.24;
 
+/**
+ * Height of the BODY — everything but the head — at gameplay scale.
+ *
+ * Fitting on the whole bounding box was correct while the head was a hood,
+ * and wrong the moment it became hair: the curl shell reaches y 2.347 in
+ * bind space where the hood stopped at 2.17, so the same `HERO_HEIGHT`
+ * target produced a scale of 1.015 instead of 1.094 and quietly shrank
+ * Matthew by 7%. Hair is not height the street cares about. Measuring the
+ * body instead means any future change to hair, or a hat, moves nothing.
+ *
+ * The number is the body at the scale it had before the shell landed:
+ * 1.2545 bind units x (2.385 / 2.180).
+ */
+const HERO_BODY_HEIGHT = 1.3724;
+
+/** Excluded from the fit measurement: this is the mesh carrying the hair. */
+const HEAD_MESH = 'Rogue_Head';
+
 /** The Rogue faces +Z in source; the route runs toward -Z, so turn it round. */
 const FACING_Y = Math.PI;
 
+/**
+ * Where the line leaves the blaster, in the blaster's own local space.
+ *
+ * The barrel runs along +Z and ends at z 0.78, so this is the centre of the
+ * muzzle face. Having the rope start here rather than at the hands is what
+ * gives the near end of it something solid to come out of — and the near
+ * end is the one actually on camera, since the anchor sits 7 to 27 units
+ * down the street.
+ */
+const MUZZLE_LOCAL = new Vector3(0.08, 0.11, 0.78);
+
 /** How fast the arms settle toward the pose, as an exponential time constant. */
 const ARM_SETTLE = 0.1;
+
+/**
+ * How far above the player an anchor must be before the arms reach for it.
+ *
+ * A descent transfer targets a `lowerAnchor` sitting at y 0.6, on the road.
+ * The arm pose had no notion of direction, so for the whole 0.73s of a
+ * descent both arms aimed at a point up to 4.4 units BELOW him while the
+ * body played a hang — he fell to the street reaching at it. You can only
+ * hang from something above you, so that is now the test.
+ */
+const ANCHOR_MIN_RISE = 0.5;
 /** How far the hands sit apart on the cable, as a fraction of the reach. */
 const GRIP_SPREAD = 0.22;
 /** Lateral axis the two hands are offset along, so they don't overlap. */
@@ -71,6 +113,14 @@ export interface SkylineHero {
    * its own fallback rather than drawing a cable from the origin.
    */
   gripPoint(out: Vector3): boolean;
+  /**
+   * World position of the blaster muzzle, for the grapple line to start at.
+   *
+   * Falls back to `gripPoint` and reports which it used, so "where does the
+   * rope actually begin" is answerable from the debug panel instead of
+   * guessable from a screenshot.
+   */
+  ropeOrigin(out: Vector3): 'muzzle' | 'hands' | 'none';
   dispose(): void;
 }
 
@@ -82,12 +132,32 @@ export async function loadSkylineHero(): Promise<SkylineHero | null> {
     const actor = bundle.actor(SOURCES.characters.matthew);
     actor.root.rotation.y = FACING_Y;
     actor.hideMeshes(HIDDEN_MESHES['matthew'] ?? []);
-    fitToHeight(actor.root, HERO_HEIGHT);
+    fitToBody(actor.root, HERO_BODY_HEIGHT);
     // Re-seat so the ORIGIN sits where the stand-in's origin sat, rather than
     // at the soles, which is what `fitToHeight` leaves behind.
     actor.root.position.y -= FOOT_DROP;
 
     actor.play(CLIPS.matthew.run);
+
+    // The blaster is the grapple launcher here, not a weapon: both hands go
+    // on the cable during a swing, so a gun held alongside the rope would
+    // read as a mistake. Treating it as the thing the line comes out of is
+    // what the reference shows, and it costs one draw and one asset we
+    // already ship. A failed load leaves the rope starting at the hands.
+    try {
+      const gltf = await new GLTFLoader().loadAsync(SOURCES.props.blaster);
+      const blaster = gltf.scene;
+      const o = ATTACH_OFFSETS.blaster;
+      blaster.position.set(...o.position);
+      blaster.rotation.set(...o.rotationEuler);
+      blaster.scale.setScalar(o.scale);
+      if (!actor.attach(ATTACH_NODES.handRight, blaster)) {
+        console.warn('[skyline] no handslot.r; blaster not attached');
+      }
+      return new RiggedHero(bundle, actor, blaster);
+    } catch (e) {
+      console.warn('[skyline] blaster failed to load; rope starts at the hands', e);
+    }
     return new RiggedHero(bundle, actor);
   } catch (e) {
     console.warn('[skyline] Matthew failed to load; keeping the stand-in', e);
@@ -118,10 +188,21 @@ class RiggedHero implements SkylineHero {
   private chest: Object3D | null;
   private hands: Object3D[] = [];
   private lastPhase = '';
+  /** Seconds since this hero started updating; the clock the hand-off uses. */
+  private clock = 0;
+  /**
+   * A one-shot clip has a natural end, and the phase that triggered it
+   * usually outlives it. `Jump_Start` runs 0.60s inside a launch that lasts
+   * about 1.3s, so with `clampWhenFinished` it used to hold a frozen pose
+   * for the remaining 0.7s. These record what to fall into, and when.
+   */
+  private settleTo: string | null = null;
+  private settleAt = 0;
 
   constructor(
     private bundle: AssetBundle,
     private actor: Actor,
+    private blaster: Object3D | null = null,
   ) {
     // A wrapper, so the runner can position the hero without fighting the
     // scale and foot offset baked into the model's own transform.
@@ -162,13 +243,22 @@ class RiggedHero implements SkylineHero {
 
   update(s: Snapshot, dt: number, reduced: boolean): void {
     this.actor.update(dt);
+    this.clock += dt;
     this.playFor(s);
+
+    // Hand a finished one-shot over to the clip that should follow it,
+    // rather than letting `clampWhenFinished` freeze the last frame.
+    if (this.settleTo && this.clock >= this.settleAt) {
+      this.actor.play(this.settleTo, { fade: 0.16 });
+      this.settleTo = null;
+    }
 
     // ---- procedural arms, applied AFTER the mixer ------------------------
     // Blended rather than switched, so letting go of a cable releases the
     // arms into the clip instead of snapping them.
-    this.grip += ((s.anchor ? 1 : 0) - this.grip) * (1 - Math.exp(-dt / ARM_SETTLE));
-    if (s.anchor && this.grip > 0.01) {
+    const holding = !!s.anchor && s.anchor.y > s.p.y + ANCHOR_MIN_RISE;
+    this.grip += ((holding ? 1 : 0) - this.grip) * (1 - Math.exp(-dt / ARM_SETTLE));
+    if (holding && s.anchor && this.grip > 0.01) {
       // The anchor in the same player-relative frame the scene draws in.
       this.reach.set(s.anchor.x - s.p.x, s.anchor.y - s.p.y, -(s.anchor.z - s.p.z));
       const spread = GRIP_SPREAD * this.reach.length();
@@ -193,6 +283,15 @@ class RiggedHero implements SkylineHero {
       const lean = MathUtils.clamp(-s.v.y * 0.012, -0.22, 0.22);
       this.chest.rotation.x += lean;
     }
+  }
+
+  ropeOrigin(out: Vector3): 'muzzle' | 'hands' | 'none' {
+    if (this.blaster) {
+      this.blaster.updateWorldMatrix(true, false);
+      out.copy(MUZZLE_LOCAL).applyMatrix4(this.blaster.matrixWorld);
+      return 'muzzle';
+    }
+    return this.gripPoint(out) ? 'hands' : 'none';
   }
 
   gripPoint(out: Vector3): boolean {
@@ -239,12 +338,22 @@ class RiggedHero implements SkylineHero {
     const phase = s.phase;
     if (phase === this.lastPhase) return;
     this.lastPhase = phase;
+    this.settleTo = null;
 
     if (phase === 'run') this.actor.play(CLIPS.matthew.run);
     else if (phase === 'land') {
-      this.actor.play('Jump_Land', { loop: false, clampWhenFinished: true, fade: 0.08 });
+      // Fit the clip to the window instead of being cut off by it. At the
+      // old 0.28s you saw 42% of a 0.67s landing before the run took over.
+      const clip = this.actor.duration('Jump_Land');
+      this.actor.play('Jump_Land', {
+        loop: false, clampWhenFinished: true, fade: 0.08,
+        timeScale: clip > 0 ? clip / LAND_TIME : 1,
+      });
     } else if (phase === 'launch') {
       this.actor.play('Jump_Start', { loop: false, clampWhenFinished: true, fade: 0.08 });
+      // Then into the hang, because a launch outlasts the push-off.
+      this.settleTo = CLIPS.matthew.hang;
+      this.settleAt = this.clock + this.actor.duration('Jump_Start');
     } else {
       // Everything airborne — swing, flight, descend, transfer — shares the
       // hang. The arms are what distinguish them, and they are procedural.
@@ -260,17 +369,28 @@ class RiggedHero implements SkylineHero {
 }
 
 /**
- * Scale a model so its bind-pose height matches the gameplay height, and sit
- * its feet at the origin. Measured rather than assumed: the packs author
- * characters at inconsistent heights, and a hard-coded factor silently
- * breaks the moment an asset is re-exported.
+ * Scale a model so its BODY matches the gameplay height, and sit its feet at
+ * the origin.
+ *
+ * Still measured rather than assumed — the packs author characters at
+ * inconsistent heights and a hard-coded factor breaks silently on a
+ * re-export — but measured over everything except the head. Hair is the
+ * part of a character that changes, and with the whole box as the ruler
+ * every change to it rescales the body underneath. The feet still come from
+ * the full bounds, because that is what has to touch the road.
  */
-function fitToHeight(root: Object3D, target: number): number {
-  const box = new Box3().setFromObject(root);
-  const height = box.getSize(new Vector3()).y;
+function fitToBody(root: Object3D, target: number): number {
+  const body = new Box3();
+  root.updateWorldMatrix(true, true);
+  root.traverse((o) => {
+    if (o.name === HEAD_MESH || !(o as Mesh).isMesh) return;
+    body.expandByObject(o);
+  });
+  const height = body.isEmpty() ? 0 : body.getSize(new Vector3()).y;
   if (height <= 0) return 1;
-  root.scale.setScalar(target / height);
+  const scale = target / height;
+  root.scale.setScalar(scale);
   const scaled = new Box3().setFromObject(root);
   root.position.y -= scaled.min.y;
-  return target / height;
+  return scale;
 }

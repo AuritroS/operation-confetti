@@ -64,24 +64,55 @@ const SKIN = {
 /**
  * Recipes: cell -> target colour.
  *
- * Cells deliberately NOT listed are left untouched. Skin (A1, H3, G4, H4),
- * eye black (C1) and hair (B1 on the Mage) must survive unchanged — the doc
- * rules out likeness work, and recolouring skin alongside clothing is the
- * specific failure it warns about.
+ * Cells deliberately NOT listed are left untouched. Eye black (C1) must
+ * survive unchanged, and skin (A1) is only ever given a skin ramp —
+ * recolouring skin with a clothing colour is the specific failure design.md
+ * section 10 warns about, and a test asserts against it.
+ *
+ * B1 is hair. It was on the untouched list while every character wore
+ * something over it; Matthew no longer does, so his is now recoloured to the
+ * reference's near-black. Aurora's and the guard's stay as the pack authored
+ * them.
  */
+/**
+ * Hair ramps.
+ *
+ * Needs explicit ends for the same reason skin does: a single hex lightens
+ * toward white, and black hair whose highlight desaturates reads as grey.
+ * Matthew's reference is near-black with a warm brown sheen, so the ramp
+ * runs from an almost-black base to a dark warm brown rather than to grey.
+ */
+const HAIR = {
+  matthew: { light: '#3b2a22', dark: '#0f0a09' },
+};
+
 const RECIPES = [
   {
     id: 'matthew',
-    source: 'Rogue_Hooded',
+    source: 'Rogue',
     texture: 'rogue_texture.png',
+    /** Runs `graftHair`: drops cells B1 and D1 from the head, adds the curls. */
+    hair: true,
     note:
-      'Navy and gold. B2 is the green cloth shared by hood, cape and tunic. ' +
-      'Deliberately the saturated navy rather than navyDeep, which is the ' +
-      'ground colour — a character the same value as the floor has no ' +
-      'silhouette, which a screenshot of the real game made obvious.',
+      'Navy and gold on the UNHOODED Rogue. The hood is geometry inside ' +
+      '`RogueHooded_Head`, not a separate mesh, so it cannot be hidden at ' +
+      'runtime — losing it means sourcing the body that never had one. ' +
+      'Both bodies share the identical 23-joint Rig_Medium skeleton, so ' +
+      'every clip and every bone lookup in skyline-hero.ts is unaffected. ' +
+      'The cell map had to be rebalanced, because the hood was carrying ' +
+      'the navy: mapping each mesh’s UVs to the 8x4 grid shows B2 falling ' +
+      'from 446 verts on the hooded body to 186 on the bare one, and ' +
+      'disappearing from the head entirely. A2 — 396 verts, the largest ' +
+      'surface on the torso and the cloth on the arms — was the tunic worn ' +
+      'UNDER the hood and was therefore ink. Left alone, taking the hood ' +
+      'off would have turned Matthew near-black and moved the navy onto ' +
+      'nothing but a cape. So A2 becomes the navy and B2 keeps it, which ' +
+      'puts the colour on the suit rather than on a garment he no longer ' +
+      'wears.',
     cells: {
-      B2: P.navy,       // hood + cape + tunic
-      A2: P.ink,        // bandit mask and dark accents
+      A2: P.navy,       // tunic and arm cloth — the suit, and most of him
+      B2: P.navy,       // cape and shoulder collar, the last of the hood cloth
+      B1: HAIR.matthew, // hair, bare for the first time now the hood is gone
       D3: P.navyDeep,   // legs and boots, a step darker than the body
       G1: P.gold,       // body trim
       F1: P.gold,       // arm bracers
@@ -209,11 +240,11 @@ async function recolourAtlas(texturePath, cells) {
   }
 
   const png = await sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
-  return { png, changed, width, height };
+  return { png, changed, width, height, raw: data };
 }
 
 /** Replace the embedded texture inside a GLB and write the runtime copy. */
-async function bakeGlb(sourceGlb, png, outPath) {
+async function bakeGlb(sourceGlb, png, outPath, surgery) {
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
   const doc = await io.read(sourceGlb);
   const textures = doc.getRoot().listTextures();
@@ -221,7 +252,249 @@ async function bakeGlb(sourceGlb, png, outPath) {
     throw new Error(`expected exactly one texture in ${sourceGlb}, found ${textures.length}`);
   }
   textures[0].setImage(png).setMimeType('image/png');
+  const report = surgery ? surgery(doc) : null;
   await io.write(outPath, doc);
+  return report;
+}
+
+// ---- head surgery: drop the pack hair, graft the curl shell ------------
+
+/**
+ * The curl shell, tuned in the designer and pasted here verbatim.
+ *
+ * Bind-space units, matching the GLB's own coordinates. Every number came
+ * out of the live preview, and the generator below is a line-for-line port
+ * of the one that drew it — same Fibonacci lattice, same `rnd`, same salt
+ * indices, same per-curl scale and rotation. That equivalence is the whole
+ * point: what was approved on screen is what gets baked, with no second
+ * round of eyeballing.
+ */
+const CURL = {
+  LATTICE: 80,
+  SHELL_R: 0.460,
+  SQUASH: 1.14,
+  CENTER_Y: 1.640,
+  CENTER_Z: 0.135,
+  CURL_R: 0.204,
+  BROW_Y: 1.885,
+  NAPE_Y: 1.220,
+  JITTER: 0.0,
+  SEED: 1,
+  DETAIL: 0,
+};
+
+const HEAD_MESH = 'Rogue_Head';
+/** Cells deleted from the head: B1 is the pack hair, D1 the earring. */
+const HEAD_DROP = ['B1', 'D1'];
+/** Cell the curls are mapped into, so they take the hair colour. */
+const HAIR_CELL = 'B1';
+/** Index of `head` within skins[0].joints. The curls weight entirely to it. */
+const HEAD_JOINT = 17;
+
+/** Same hash the preview used; the shell is reproducible from SEED alone. */
+function rnd(seed, i, salt) {
+  const x = Math.sin(seed * 374.761 + i * 127.1 + salt * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function cellOf(u, v) {
+  return String.fromCharCode(65 + Math.min(7, Math.floor(u * GRID_X))) +
+    (Math.min(GRID_Y - 1, Math.floor(v * GRID_Y)) + 1);
+}
+
+/**
+ * Curl centres on a squashed shell, culled by a hairline that sweeps from
+ * the brow at the front round to the nape at the back.
+ */
+function curlCentres(c) {
+  const out = [];
+  for (let i = 0; i < c.LATTICE; i++) {
+    // Fibonacci lattice: even coverage with no clustering at the poles.
+    const y = 1 - (i + 0.5) * 2 / c.LATTICE;
+    const rad = Math.sqrt(Math.max(0, 1 - y * y));
+    const th = Math.PI * (1 + Math.sqrt(5)) * i;
+    const d = [Math.cos(th) * rad, y, Math.sin(th) * rad];
+
+    const jr = c.SHELL_R + (rnd(c.SEED, i, 1) - 0.5) * 2 * c.JITTER;
+    const px = d[0] * jr;
+    let py = c.CENTER_Y + d[1] * jr * c.SQUASH;
+    const pz = c.CENTER_Z + d[2] * jr;
+    py += (rnd(c.SEED, i, 2) - 0.5) * 2 * c.JITTER * 0.6;
+
+    // Front is +Z, which is where the Rogue faces.
+    const frontness = (d[2] + 1) / 2;
+    if (py < c.NAPE_Y + (c.BROW_Y - c.NAPE_Y) * frontness) continue;
+    out.push([px, py, pz]);
+  }
+  return out;
+}
+
+/**
+ * One unit icosphere, flat shaded, non-indexed — byte-identical in shape to
+ * `THREE.IcosahedronGeometry(1, 0)`, which is what the preview drew.
+ */
+function icosphere() {
+  const t = (1 + Math.sqrt(5)) / 2;
+  const base = [
+    [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
+    [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+    [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1],
+  ].map((v) => {
+    const n = Math.hypot(v[0], v[1], v[2]);
+    return [v[0] / n, v[1] / n, v[2] / n];
+  });
+  const faces = [
+    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+    [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+    [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+  ];
+  const tris = [];
+  for (const f of faces) tris.push([base[f[0]], base[f[1]], base[f[2]]]);
+  return tris;
+}
+
+/** Rotate by Euler XYZ with z=0, the order three.js composes in. */
+function rotXY(v, rx, ry) {
+  const a = Math.cos(rx), b = Math.sin(rx), c = Math.cos(ry), d = Math.sin(ry);
+  return [
+    c * v[0] + d * v[2],
+    b * d * v[0] + a * v[1] - b * c * v[2],
+    -a * d * v[0] + b * v[1] + a * c * v[2],
+  ];
+}
+
+/**
+ * Find where inside a cell the ramp is light and where it is dark.
+ *
+ * Read rather than assumed: which end of a cell carries the highlight is a
+ * property of the source atlas, and guessing it wrong puts the shine under
+ * the curls instead of on top.
+ */
+function rampAxis(raw, width, height, cell) {
+  const { x0, y0, x1, y1 } = cellBounds(cell, width, height);
+  const mid = Math.floor((x0 + x1) / 2);
+  const sample = (y) => {
+    const i = (y * width + mid) * 4;
+    return luma(raw[i], raw[i + 1], raw[i + 2]);
+  };
+  const top = sample(y0 + 2), bottom = sample(y1 - 3);
+  const u = (mid + 0.5) / width;
+  const vLight = ((top >= bottom ? y0 + 2 : y1 - 3) + 0.5) / height;
+  const vDark = ((top >= bottom ? y1 - 3 : y0 + 2) + 0.5) / height;
+  return { u, vLight, vDark };
+}
+
+/**
+ * Replace the head's hair with the curl shell, in place on the document.
+ *
+ * Done as geometry rather than at runtime because `matthew.glb` has four
+ * consumers — both levels, the probe and the gallery — and a runtime graft
+ * would have to be wired into each of them and would cost its own draw
+ * call. Merged into the existing primitive it costs neither.
+ */
+function graftHair(doc, atlas) {
+  const mesh = doc.getRoot().listMeshes().find((m) => m.getName() === HEAD_MESH);
+  if (!mesh) throw new Error(`mesh ${HEAD_MESH} not found`);
+  const prim = mesh.listPrimitives()[0];
+
+  const src = {};
+  for (const name of prim.listSemantics()) src[name] = prim.getAttribute(name);
+  const indices = prim.getIndices();
+  const count = indices.getCount();
+
+  // ---- 1. keep only the triangles outside the dropped cells ------------
+  const uv = src['TEXCOORD_0'];
+  const kept = [];
+  const uvTmp = [0, 0];
+  for (let t = 0; t < count; t += 3) {
+    const a = indices.getScalar(t);
+    uv.getElement(a, uvTmp);
+    if (HEAD_DROP.includes(cellOf(uvTmp[0], uvTmp[1]))) continue;
+    kept.push(a, indices.getScalar(t + 1), indices.getScalar(t + 2));
+  }
+
+  // Remap to a compact vertex range, so the dropped verts go too.
+  const remap = new Map();
+  const out = { POSITION: [], NORMAL: [], TEXCOORD_0: [], JOINTS_0: [], WEIGHTS_0: [] };
+  const take = (v) => {
+    if (remap.has(v)) return remap.get(v);
+    const id = remap.size;
+    remap.set(v, id);
+    for (const [name, size] of [['POSITION', 3], ['NORMAL', 3], ['TEXCOORD_0', 2], ['JOINTS_0', 4], ['WEIGHTS_0', 4]]) {
+      const el = new Array(size);
+      src[name].getElement(v, el);
+      out[name].push(...el);
+    }
+    return id;
+  };
+  const idx = kept.map(take);
+  const keptTris = idx.length / 3;
+  const keptVerts = remap.size;
+
+  // ---- 2. graft the curls ----------------------------------------------
+  const centres = curlCentres(CURL);
+  const unit = icosphere();
+  const ramp = rampAxis(atlas.raw, atlas.width, atlas.height, HAIR_CELL);
+
+  for (let k = 0; k < centres.length; k++) {
+    const c = centres[k];
+    // Per-curl variation, reproduced exactly from the preview.
+    const s = CURL.CURL_R * (0.86 + rnd(CURL.SEED, k, 3) * 0.3);
+    const scale = [s, s * 0.94, s];
+    const rx = rnd(CURL.SEED, k, 4) * 6.28;
+    const ry = rnd(CURL.SEED, k, 5) * 6.28;
+
+    for (const tri of unit) {
+      const world = tri.map((v) => {
+        const r = rotXY([v[0] * scale[0], v[1] * scale[1], v[2] * scale[2]], rx, ry);
+        return [r[0] + c[0], r[1] + c[1], r[2] + c[2]];
+      });
+      // Flat shading: one face normal for all three corners, which is what
+      // IcosahedronGeometry at detail 0 produces.
+      const e1 = [world[1][0] - world[0][0], world[1][1] - world[0][1], world[1][2] - world[0][2]];
+      const e2 = [world[2][0] - world[0][0], world[2][1] - world[0][1], world[2][2] - world[0][2]];
+      let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      const len = Math.hypot(n[0], n[1], n[2]) || 1;
+      n = [n[0] / len, n[1] / len, n[2] / len];
+
+      for (const w of world) {
+        idx.push(out.POSITION.length / 3);
+        out.POSITION.push(w[0], w[1], w[2]);
+        out.NORMAL.push(n[0], n[1], n[2]);
+        // Light end of the ramp on upward-facing curls, dark underneath.
+        const up = Math.max(0, Math.min(1, 0.5 + 0.5 * n[1]));
+        out.TEXCOORD_0.push(ramp.u, ramp.vDark + (ramp.vLight - ramp.vDark) * up);
+        out.JOINTS_0.push(HEAD_JOINT, 0, 0, 0);
+        out.WEIGHTS_0.push(1, 0, 0, 0);
+      }
+    }
+  }
+
+  // ---- 3. write the new attributes --------------------------------------
+  const buffer = doc.getRoot().listBuffers()[0];
+  const set = (name, array, type) => {
+    const old = prim.getAttribute(name);
+    prim.setAttribute(name, doc.createAccessor().setArray(array).setType(type).setBuffer(buffer));
+    old.dispose();
+  };
+  set('POSITION', new Float32Array(out.POSITION), 'VEC3');
+  set('NORMAL', new Float32Array(out.NORMAL), 'VEC3');
+  set('TEXCOORD_0', new Float32Array(out.TEXCOORD_0), 'VEC2');
+  set('JOINTS_0', new Uint8Array(out.JOINTS_0), 'VEC4');
+  set('WEIGHTS_0', new Float32Array(out.WEIGHTS_0), 'VEC4');
+
+  const verts = out.POSITION.length / 3;
+  const oldIndices = prim.getIndices();
+  prim.setIndices(
+    doc.createAccessor()
+      .setArray(verts > 65535 ? new Uint32Array(idx) : new Uint16Array(idx))
+      .setType('SCALAR').setBuffer(buffer),
+  );
+  oldIndices.dispose();
+
+  return { keptTris, keptVerts, curls: centres.length, curlTris: centres.length * unit.length,
+    tris: idx.length / 3, verts };
 }
 
 // ---- run ---------------------------------------------------------------
@@ -243,13 +516,19 @@ for (const recipe of RECIPES) {
     continue;
   }
 
-  const { png, changed } = await recolourAtlas(texturePath, recipe.cells);
+  const atlas = await recolourAtlas(texturePath, recipe.cells);
+  const { png, changed } = atlas;
 
   // Write the atlas alongside the GLB so it can be inspected on its own.
   writeFileSync(`${OUT_TEX}/${recipe.id}_atlas.png`, png);
 
   const outGlb = `${OUT_MODELS}/${recipe.id}.glb`;
-  await bakeGlb(glbPath, png, outGlb);
+  const surgery = recipe.hair ? (doc) => graftHair(doc, atlas) : null;
+  const grafted = await bakeGlb(glbPath, png, outGlb, surgery);
+  if (grafted) {
+    console.log(`  ${''.padEnd(8)} head: kept ${grafted.keptTris} tris, grafted ` +
+      `${grafted.curls} curls / ${grafted.curlTris} tris -> ${grafted.tris} tris, ${grafted.verts} verts`);
+  }
 
   report.push({
     id: recipe.id,

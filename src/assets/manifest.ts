@@ -95,12 +95,24 @@ export const CHARACTER_HEIGHT = 1.45;
  * Meshes hidden at load, per character.
  *
  * Each body part is its own mesh, so removing one is a visibility toggle
- * rather than an export. The guard loses its cape because that silhouette
- * belongs to Matthew, and Aurora loses the Mage hat because the reference
- * gives her a crown, which `buildCrown` supplies instead.
+ * rather than an export — and reversible without an asset rebuild, which is
+ * why it is preferred over surgery for anything still under review.
+ *
+ * Matthew loses the cape. It was fine under the hood, which draped over it,
+ * but the curl shell is a cluster of spheres reaching down to y 1.169 while
+ * the cape's top edge is at 1.236, so the two intersect even standing still
+ * — and the chest lean then shears them, because the head is weighted 100%
+ * to `head` while the cape is 50% spine / 27% hips / 23% chest. The
+ * reference has no cape either: what sits behind his shoulders there reads
+ * as a lowered hood. Checked first that the torso is closed underneath —
+ * `Rogue_Body`'s only open edges are at the front waist, under the belt.
+ *
+ * Aurora loses the Mage hat because the reference gives her a crown, which
+ * `buildCrown` supplies instead. The guard loses its cape to keep that
+ * silhouette distinct from Matthew's.
  */
 export const HIDDEN_MESHES: Record<string, readonly string[]> = {
-  matthew: [],
+  matthew: ['Rogue_Cape'],
   aurora: ['Mage_Hat'],
   guard: ['Knight_Cape'],
 };
@@ -112,12 +124,26 @@ export const ATTACH_NODES = {
   head: 'head',
 } as const;
 
-/** Local transform for the blaster inside `handslot.r`. Tune in the probe. */
+/**
+ * Local transform for the blaster inside `handslot.r`.
+ *
+ * Solved from the rig rather than nudged into place. In bind pose the slot's
+ * own axes land as localX -> world -X, localY -> world +Z, localZ -> world
+ * +Y, while the blaster's barrel runs along its own +Z. At zero rotation
+ * those compose to a barrel pointing along world +Y, which is to say
+ * straight up at the sky — which is exactly how it first appeared.
+ *
+ * Wanting the barrel along world +Z (the way the Rogue faces) and the
+ * blaster's +Y still up gives a single 180-degree rotation about the axis
+ * bisecting Y and Z, which in three's default XYZ Euler order is
+ * (-PI/2, 0, PI).
+ */
 export const ATTACH_OFFSETS = {
   blaster: {
     position: [0, 0, 0] as [number, number, number],
-    rotationEuler: [0, 0, 0] as [number, number, number],
-    scale: 1,
+    rotationEuler: [-Math.PI / 2, 0, Math.PI] as [number, number, number],
+    /** The model is 0.95 long against a 2.18-tall character; 1.0 is a cannon. */
+    scale: 0.5,
   },
 } as const;
 

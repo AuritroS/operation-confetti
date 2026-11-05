@@ -1,5 +1,5 @@
 import type { Anchor, Course, Kinematic, Lane, Phase, Point3, RouteSample, TravelMode } from './types';
-import { MOTION_LIMIT_X } from './config';
+import { LAND_TIME, MOTION_LIMIT_X } from './config';
 
 interface Axis { p: number; v: number; a: number }
 /** Quintic boundary interpolation preserves position, velocity AND acceleration. */
@@ -117,7 +117,7 @@ export class Motion {
     const tr = this.transfer;
     if (!tr) {
       const s = route(this.c, this.lane, t, this.mode);
-      if (this.mode === 'run' && t - this.landedAt < 0.28) s.phase = 'land';
+      if (this.mode === 'run' && t - this.landedAt < LAND_TIME) s.phase = 'land';
       return s;
     }
     if (t >= tr.start + tr.duration) {

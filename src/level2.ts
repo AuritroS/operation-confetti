@@ -6,7 +6,7 @@ import { POINTS, scoreRun } from './core/scoring';
 import { SKYLINE } from './levels/skyline/course';
 import { SkylineRunner } from './levels/skyline/runner';
 import { laneName, LANES } from './levels/skyline/types';
-import type { Direction } from './levels/skyline/types';
+import type { Course, Direction } from './levels/skyline/types';
 import { SkylineScene } from './render/skyline-scene';
 import { loadStreetAssets } from './render/skyline-assets';
 import { loadSkylineHero } from './render/skyline-hero';
@@ -53,9 +53,14 @@ const hud = new Hud(), debug = new DebugPanel();
 const params = new URLSearchParams(location.search);
 let debugVisible = params.has('debug') && !params.has('clean'); debug.setVisible(debugVisible);
 
-const courseForPlay = {
+/**
+ * The course as played, with the obstacles switched off for the movement
+ * pass. Typed from the course rather than left as a bare `[]`, which infers
+ * `never[]` and makes every read of an entity below a type error.
+ */
+const courseForPlay: Course = {
   ...SKYLINE,
-  entities: [], // No obstacles or collisions for movement pass
+  entities: [],
 };
 
 const view = new SkylineScene(document.getElementById('stage') as HTMLCanvasElement, courseForPlay);
@@ -107,6 +112,7 @@ function render(): void {
     mode: `${s.mode} → ${s.requestedMode}`, clearance: s.pendingLaunch ? 'waiting' : 'clear',
     time: `${s.elapsed.toFixed(1)} / ${SKYLINE.duration}`, position: `${s.p.x.toFixed(1)} / ${s.p.y.toFixed(1)} / ${s.p.z.toFixed(1)}`,
     transfer: s.transitioning ? 'yes' : 'no', anchor: s.anchor?.id ?? 'released',
+    rope: view.ropeOriginSource,
     gifts: `${runner.events.filter((e) => e.t === 'gift').length}/${courseForPlay.entities.filter(e => e.kind === 'gift' && e.scored).length}`,
     incidents: runner.events.filter((e) => e.t === 'incident').length,
     fps: loop.stats.fps, draws: view.stage.drawCalls, tris: view.stage.triangles });
@@ -151,6 +157,13 @@ if (import.meta.env.DEV) Object.assign(window, { __skylineReview: {
   // The offline solver stays outside the player bundle. The browser check
   // compares this course with the one it solved before sending real swipes.
   course: SKYLINE,
+  /**
+   * How many entities the RUNNER was given, which is not always how many the
+   * course has — the level can be run with them disabled for a movement
+   * pass. The browser check branches on this so the scoring and collection
+   * assertions skip rather than fail, and come back on their own.
+   */
+  get entitiesInPlay() { return courseForPlay.entities.length; },
   get entityStates() { return [...runner.entityStates]; },
   /** Hazards with the time each is reached, so warning checks cannot drift. */
   hazards: SKYLINE.entities

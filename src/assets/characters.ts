@@ -130,11 +130,22 @@ export class Actor {
     });
   }
 
+  /** Authored length of a clip in seconds, or 0 if it is not in the library. */
+  duration(clipName: string): number {
+    return this.library.get(clipName)?.duration ?? 0;
+  }
+
   /**
    * Cross-fade to a clip by name. Returns false if the clip is missing, so a
    * bad manifest entry surfaces as a visible no-op rather than a crash.
+   *
+   * `timeScale` plays a clip faster or slower than authored, which is how a
+   * fixed-length clip is made to fit a window the simulation decides.
    */
-  play(clipName: string, { fade = 0.18, loop = true, clampWhenFinished = false } = {}): boolean {
+  play(
+    clipName: string,
+    { fade = 0.18, loop = true, clampWhenFinished = false, timeScale = 1 } = {},
+  ): boolean {
     if (this.current === clipName) return true;
     const clip = this.library.get(clipName);
     if (!clip) {
@@ -146,6 +157,10 @@ export class Actor {
     next.reset();
     next.setLoop(loop ? LoopRepeat : LoopOnce, loop ? Infinity : 1);
     next.clampWhenFinished = clampWhenFinished;
+    // Always set it, never only when it differs: actions are cached by
+    // `clipAction`, so a scale left over from a previous play would persist
+    // into a later one that wanted the authored speed.
+    next.setEffectiveTimeScale(timeScale);
 
     const prevName = this.current;
     const prev = prevName ? this.library.get(prevName) : undefined;

@@ -22,8 +22,14 @@
  * was. The lanes had to narrow first; see `LANE_WIDTH` in the course.
  */
 
-/** Stand-off from the hero along +Z, before the portrait correction. */
-export const CAMERA_DISTANCE = 18;
+/**
+ * Stand-off from the hero along +Z, before the portrait correction.
+ *
+ * 18 put Matthew at 10.6% of frame height. 16 puts him at roughly 12.7%,
+ * which is the size asked for once the curl shell landed. Level 1 still
+ * frames him far larger, at 22.3%, so this remains the wider of the two.
+ */
+export const CAMERA_DISTANCE = 16;
 
 /**
  * Extra distance on narrow screens.

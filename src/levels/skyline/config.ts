@@ -53,6 +53,21 @@ export const GAME_ZONE_HALF = 4.6;
 export const PLAYER_HALF = { x: 0.35, y: 0.9, z: 0.35 } as const;
 
 /**
+ * How long the `land` phase lasts, in seconds.
+ *
+ * Presentation only — nothing in collision, scoring or the solver reads the
+ * phase, and the landing clip and the crouch are its only consumers. It
+ * lived as a bare 0.28 in both `motion.ts` and `skyline-scene.ts`, which is
+ * how it came to disagree with the clip: `Jump_Land` runs 0.67s, so at 0.28
+ * the landing was cut off 42% in and replaced by the run.
+ *
+ * The clip is now time-scaled to whatever this says, so this is the one
+ * dial. Raise it for a heavier landing, lower it for a snappier one; the
+ * animation fits either way.
+ */
+export const LAND_TIME = 0.42;
+
+/**
  * The furthest the player's CENTRE may travel from the middle lane.
  *
  * Derived, not chosen: the body adds `PLAYER_HALF.x`, so a centre at this

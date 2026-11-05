@@ -1,14 +1,14 @@
 import {
-  BoxGeometry, BufferGeometry, Color, Float32BufferAttribute, FogExp2, Group,
+  BoxGeometry, Color, FogExp2, Group,
   DirectionalLight,
-  InstancedMesh, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, MeshStandardMaterial,
+  InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial,
   Object3D, OctahedronGeometry, Vector2, Vector3,
 } from 'three';
 import { Stage } from './stage';
 import { SkylineCamera } from './skyline-camera';
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
-import { INSPECT, INSPECTING, InspectLabels, travelArrows } from './skyline-inspect';
+import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower } from './custom';
 import { SparkleField } from './effects';
@@ -19,8 +19,9 @@ import type { StreetAssets } from './skyline-assets';
 import { CAMERA_FAR, CAMERA_NEAR, ENTITY_DRAW_AHEAD, FOG_DENSITY } from './skyline-view';
 import { ObstacleKit } from './skyline-obstacles';
 import type { SkylineHero } from './skyline-hero';
-import { upperAnchor } from '../levels/skyline/motion';
+import { SkylineRope } from './skyline-rope';
 import { LANES } from '../levels/skyline/types';
+import { LAND_TIME } from '../levels/skyline/config';
 import type { Course, Point3, Snapshot } from '../levels/skyline/types';
 
 /** Anchor markers drawn at once, across all three state pools. */
@@ -66,10 +67,19 @@ export class SkylineScene {
    */
   private anchorPools: InstancedMesh[] = [];
   private contents = new Map<string, Group>();
-  private cable: Line;
+  private rope = new SkylineRope();
+  /**
+   * Where the rope was last drawn from, for the debug panel.
+   *
+   * Exposed because a screenshot cannot tell a line leaving the muzzle from
+   * one leaving the top of his head — with an anchor overhead both land in
+   * roughly the same pixels, which is how the fallback went unnoticed.
+   */
+  ropeOriginSource: 'muzzle' | 'hands' | 'fallback' = 'fallback';
   private dummy = new Object3D();
   private probe = new Vector3();
   private grip = new Vector3();
+  private anchorAt = new Vector3();
   private latest: Snapshot | null = null;
   private visibleEntities = new Set<string>();
   /** Null until the street assets land; the primitives stand in until then. */
@@ -118,7 +128,7 @@ export class SkylineScene {
     this.gameplayVisible = visible;
     this.hero.visible = visible && !this.rigged;
     if (this.rigged) this.rigged.object.visible = visible;
-    this.cable.visible = visible;
+    this.rope.object.visible = visible && this.rope.currentPhase !== 'idle';
     this.giftMarks.points.visible = visible;
     this.hazardMarks.points.visible = visible;
     for (const pool of this.anchorPools) pool.visible = visible;
@@ -196,10 +206,7 @@ export class SkylineScene {
       this.cube(leg, this.blue, 0, -0.8, -0.1, 0.29, 0.18, 0.45);
       this.hero.add(leg); this.legs.push(leg);
     }
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(6), 3));
-    this.cable = new Line(geometry, new LineBasicMaterial({ color: 0xffefc3, fog: false }));
-    this.cable.frustumCulled = false; this.root.add(this.cable);
+    this.root.add(this.rope.object);
     for (const material of [this.gold, this.cyan, this.idle]) {
       const pool = new InstancedMesh(this.diamond, material, ANCHOR_POOL);
       pool.frustumCulled = false;
@@ -310,7 +317,7 @@ export class SkylineScene {
     const landing = s.phase === 'land';
     const stride = running ? Math.sin(s.elapsed * 18) : 0;
     const hit = Math.max(0, 1 - s.hitAge / 0.4);
-    const crouch = landing ? 0.14 * Math.sin(Math.PI * Math.min(1, s.landingAge / 0.28)) : 0;
+    const crouch = landing ? 0.14 * Math.sin(Math.PI * Math.min(1, s.landingAge / LAND_TIME)) : 0;
     this.hero.position.set(s.p.x, s.p.y - crouch, 0);
     this.hero.rotation.set(running ? -0.12 : -Math.atan2(s.v.y, s.v.z) * 0.65,
       -Math.atan2(s.v.x, s.v.z) * 0.55, -Math.atan2(s.v.x, s.v.z) * 0.5 + (reduced ? 0 : Math.sin(s.hitAge * 35) * hit * 0.2));
@@ -334,20 +341,22 @@ export class SkylineScene {
       leg.rotation.set(running ? stride * (i === 0 ? 1 : -1) * 0.8 : landing ? 0.55 : 0.25 + i * 0.18,
         0, running ? 0 : (i === 0 ? -0.12 : 0.12));
     });
-    this.cable.visible = !!s.anchor && !s.complete;
-    if (s.anchor) {
-      const attr = this.cable.geometry.getAttribute('position');
-      // Start at the HANDS when the rigged model is in, not at a point above
-      // the head. The stand-in had no hands to speak of, so a fixed offset
-      // was fine; with a real rig the cable visibly missed his grip, which
-      // is the one detail that says whether he is holding on or falling.
-      if (this.rigged?.gripPoint(this.grip)) {
-        attr.setXYZ(0, this.grip.x, this.grip.y, this.grip.z);
-      } else {
-        attr.setXYZ(0, s.p.x, s.p.y + (s.anchor.kind === 'lower' ? 0.4 : 1), 0);
-      }
-      attr.setXYZ(1, s.anchor.x, s.anchor.y, s.p.z - s.anchor.z); attr.needsUpdate = true;
+    // ---- grapple line ----------------------------------------------------
+    // The line starts at the blaster muzzle when Matthew is in, at his hands
+    // if the blaster failed to load, and at a point above the stand-in's
+    // shoulders if neither resolved. Which one was used is recorded rather
+    // than assumed; see `ropeOriginSource`.
+    const source = this.rigged?.ropeOrigin(this.grip) ?? 'none';
+    if (source === 'none') {
+      this.grip.set(s.p.x, s.p.y + (s.anchor?.kind === 'lower' ? 0.4 : 1), 0);
+      this.ropeOriginSource = 'fallback';
+    } else {
+      this.ropeOriginSource = source;
     }
+    const live = s.anchor && !s.complete;
+    if (live) this.anchorAt.set(s.anchor!.x, s.anchor!.y, s.p.z - s.anchor!.z);
+    this.rope.update(this.grip, live ? this.anchorAt : null, dt);
+    if (!this.gameplayVisible) this.rope.object.visible = false;
     let b = 0, w = 0;
     if (this.street) {
       this.street.update(s.p.z);
@@ -443,9 +452,7 @@ export class SkylineScene {
       this.hazardMarks.points.visible = false;
       for (const pool of this.anchorPools) pool.visible = false;
       for (const mesh of this.contents.values()) mesh.visible = false;
-      if (this.gantries) this.gantries.visible = false;
-      if (this.lowMarks) this.lowMarks.visible = false;
-      this.cable.visible = false;
+      this.rope.object.visible = false;
     }
     for (const layer of this.backdrop) layer.update(s.p.z, dt);
     this.camera.update(s, dt, reduced);
@@ -464,10 +471,10 @@ export class SkylineScene {
     }
     this.stage.render();
   }
-  reset(): void { this.camera.reset(); }
+  reset(): void { this.camera.reset(); this.rope.reset(); }
   dispose(): void {
     this.root.removeFromParent(); this.box.dispose(); this.diamond.dispose();
-    this.cable.geometry.dispose(); (this.cable.material as LineBasicMaterial).dispose();
+    this.rope.dispose();
     for (const m of [this.city, this.windowMat, this.groundMat, this.blue, this.gold, this.pale, this.cyan, this.idle, this.pink, this.darkPink]) m.dispose();
     for (const m of [this.blocks, this.trims, ...this.anchorPools]) m.dispose();
     this.fill.removeFromParent();
