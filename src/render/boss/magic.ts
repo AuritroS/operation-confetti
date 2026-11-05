@@ -1,0 +1,163 @@
+import {
+  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CatmullRomCurve3,
+  Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D,
+  Points, PointsMaterial, TextureLoader, TorusGeometry, TubeGeometry, Vector3,
+} from 'three';
+import { BOSS_PARTICLES } from '../../assets/boss/catalog';
+import { BOSS_LAYOUT } from '../../levels/boss/layout';
+
+/** Ambient spellcraft stays behind Aurora; attack warnings will own the floor. */
+export class BossMagic {
+  readonly root = new Group();
+  private readonly halo = new Group();
+  private readonly rings: Mesh[] = [];
+  private readonly glyphs: InstancedMesh;
+  private readonly cakeRing: Mesh;
+  private readonly wingSeals: Mesh[] = [];
+  private readonly tether: Mesh[] = [];
+  private readonly motes: Points;
+  private readonly points = new Float32Array(18 * 3);
+  private readonly dummy = new Object3D();
+  private readonly reducedMotion = typeof window !== 'undefined'
+    && (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false);
+  private time = 0;
+
+  constructor() {
+    const outer = new MeshBasicMaterial({
+      color: 0x8f3bc1, transparent: true, opacity: 0.42,
+      depthWrite: false, blending: AdditiveBlending,
+    });
+    const inner = new MeshBasicMaterial({
+      color: 0xdf7cf5, transparent: true, opacity: 0.55,
+      depthWrite: false, blending: AdditiveBlending,
+    });
+    for (const [radius, thickness, angle, material] of [
+      [2.18, 0.028, 0.1, outer], [1.86, 0.019, -0.15, inner],
+    ] as const) {
+      const ring = new Mesh(new TorusGeometry(radius, thickness, 6, 64), material);
+      ring.rotation.z = angle;
+      this.halo.add(ring);
+      this.rings.push(ring);
+    }
+    this.halo.position.set(0, 3.1, BOSS_LAYOUT.bossZ - 1.05);
+    this.root.add(this.halo);
+    for (const side of [-1, 1]) {
+      const seal = new Mesh(
+        new TorusGeometry(0.5, 0.018, 5, 28),
+        new MeshBasicMaterial({
+          color: 0x9b54c4, transparent: true, opacity: 0.34,
+          depthWrite: false, blending: AdditiveBlending,
+        }),
+      );
+      seal.position.set(side * 3.5, 3.45, BOSS_LAYOUT.bossZ - 1.65);
+      seal.scale.y = 1.3;
+      this.wingSeals.push(seal);
+      this.root.add(seal);
+    }
+
+    this.glyphs = new InstancedMesh(
+      new BoxGeometry(0.085, 0.22, 0.025),
+      new MeshBasicMaterial({
+        color: 0xb765df, transparent: true, opacity: 0.62,
+        depthWrite: false, blending: AdditiveBlending,
+      }),
+      22,
+    );
+    for (let i = 0; i < 22; i++) {
+      this.glyphs.setColorAt(i, new Color(i % 5 === 0 ? 0xf4b9ff : 0xa858db));
+    }
+    this.root.add(this.glyphs);
+
+    this.cakeRing = new Mesh(
+      new TorusGeometry(1.17, 0.032, 6, 48),
+      new MeshBasicMaterial({
+        color: 0xca62ec, transparent: true, opacity: 0.6,
+        depthWrite: false, blending: AdditiveBlending,
+      }),
+    );
+    this.cakeRing.rotation.x = Math.PI / 2;
+    this.cakeRing.position.set(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.bossStageY + 1.42, BOSS_LAYOUT.cakeZ);
+    this.root.add(this.cakeRing);
+
+    // A fine tether makes the stolen cake visibly Aurora's captive.
+    for (const sign of [-1, 1]) {
+      const path = new CatmullRomCurve3([
+        new Vector3(0.68, 3.55, BOSS_LAYOUT.bossZ + 0.05),
+        new Vector3(1.2, 3.8 + sign * 0.11, BOSS_LAYOUT.bossZ - 0.12),
+        new Vector3(1.77, 3.48 + sign * 0.09, BOSS_LAYOUT.cakeZ - 0.1),
+        new Vector3(BOSS_LAYOUT.cakeX, 2.77, BOSS_LAYOUT.cakeZ),
+      ]);
+      const strand = new Mesh(
+        new TubeGeometry(path, 26, 0.013, 4, false),
+        new MeshBasicMaterial({
+          color: sign > 0 ? 0xe18afa : 0x8c3dce,
+          transparent: true, opacity: 0.48, depthWrite: false,
+          blending: AdditiveBlending,
+        }),
+      );
+      this.tether.push(strand);
+      this.root.add(strand);
+    }
+
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(this.points, 3));
+    const texture = new TextureLoader().load(BOSS_PARTICLES.chargedMagic);
+    this.motes = new Points(
+      geometry,
+      new PointsMaterial({
+        map: texture, color: 0xc474eb, size: 0.28,
+        transparent: true, opacity: 0.62, depthWrite: false,
+        blending: AdditiveBlending, sizeAttenuation: true,
+      }),
+    );
+    this.root.add(this.motes);
+    this.update(0, BOSS_LAYOUT.bossStageY + 1.53);
+  }
+
+  update(step: number, cakeY: number): void {
+    if (!this.reducedMotion) this.time += step;
+    const t = this.time;
+    this.rings[0]!.rotation.z = 0.1 + t * 0.09;
+    this.rings[1]!.rotation.z = -0.15 - t * 0.13;
+    this.halo.scale.setScalar(1 + Math.sin(t * 1.1) * 0.025);
+    this.wingSeals[0]!.rotation.z = t * 0.12;
+    this.wingSeals[1]!.rotation.z = -t * 0.12;
+    this.cakeRing.position.y = cakeY - 0.1;
+    this.cakeRing.rotation.z = t * 0.18;
+    for (let i = 0; i < 22; i++) {
+      const a = i / 22 * Math.PI * 2 + t * 0.13;
+      const r = 2.34 + (i % 3) * 0.05;
+      this.dummy.position.set(
+        Math.cos(a) * r,
+        3.1 + Math.sin(a) * r,
+        BOSS_LAYOUT.bossZ - 0.98,
+      );
+      this.dummy.rotation.z = a + Math.PI / 2;
+      this.dummy.updateMatrix();
+      this.glyphs.setMatrixAt(i, this.dummy.matrix);
+    }
+    this.glyphs.instanceMatrix.needsUpdate = true;
+    for (let i = 0; i < 18; i++) {
+      const a = i * 2.39996 + t * (0.13 + i % 3 * 0.035);
+      const radius = 0.6 + (i % 5) * 0.26;
+      this.points[i * 3] = Math.cos(a) * radius + (i % 4 === 0 ? BOSS_LAYOUT.cakeX : 0);
+      this.points[i * 3 + 1] = 2.45 + Math.sin(a) * 0.75 + (i % 4 === 0 ? 0.25 : 0);
+      this.points[i * 3 + 2] = BOSS_LAYOUT.bossZ - 0.15 - (i % 3) * 0.3;
+    }
+    (this.motes.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;
+    for (const strand of this.tether) {
+      (strand.material as MeshBasicMaterial).opacity = 0.36 + Math.sin(t * 1.4) * 0.1;
+    }
+  }
+
+  dispose(): void {
+    this.root.traverse((object) => {
+      if (!(object instanceof Mesh || object instanceof Points)) return;
+      object.geometry.dispose();
+      const material = object.material as MeshBasicMaterial | PointsMaterial;
+      material.map?.dispose();
+      material.dispose();
+    });
+    this.root.removeFromParent();
+  }
+}

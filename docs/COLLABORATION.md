@@ -94,8 +94,8 @@ Run these from `.worktrees/level3`. Strict binding must fail if occupied; stop
 and choose/document another free port rather than killing a process. Preview,
 when needed, uses `npm run preview -- --host 127.0.0.1 --port 5403 --strictPort`.
 
-Level 3 will use `/level3.html`, importing its own controller. **The page does
-not exist yet.** Do not edit shared entry routing merely to view the prototype.
+Level 3 uses `/level3.html`, importing its own controller. Do not edit shared
+entry routing merely to view the prototype.
 The existing production Vite input list excludes this page; adding it to the
 campaign/production build is a later integration change.
 

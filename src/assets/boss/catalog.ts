@@ -17,7 +17,7 @@ export const BOSS_ACTORS = {
   matthew: {
     url: '/models/matthew.glb',
     source: 'assets/KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue.glb',
-    targetHeight: 1.45,
+    targetHeight: 1.55,
     hideMeshes: ['Rogue_Cape'],
     note: 'Same unhooded Rogue with grafted curls as Level 2 commit 4b5d989.',
     clips: { idle: 'Idle_A', aim: 'Idle_B', shoot: 'Throw', hit: 'Hit_A', win: 'Jump_Full_Short' },
@@ -25,7 +25,7 @@ export const BOSS_ACTORS = {
   aurora: {
     url: '/models/aurora.glb',
     source: 'assets/KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb',
-    targetHeight: 1.45,
+    targetHeight: 4.15,
     hideMeshes: ['Mage_Hat'],
     clips: { idle: 'Idle_B', raise: 'Use_Item', cast: 'Throw', hit: 'Hit_A', defeat: 'Death_A' },
   },
@@ -57,13 +57,13 @@ export const BOSS_PARTICLES = {
 
 /** No pack mesh is appropriate for these gameplay/story roles. */
 export const BOSS_PROCEDURAL = {
-  cake: 'Reuse buildCake: red velvet, frosting, six candles; on Aurora stage',
+  cake: 'Reuse buildCake, then add Level 3 cream piping and berries; cake floats above the gala platter',
   crown: 'Reuse buildCrown on Aurora head; hide the Mage hat',
-  birthday: 'Small bunting and balloon meshes at the stage sides',
+  birthday: 'Velvet gala arch, candle stands, muted balloon clusters and rooftop side banners',
   shield: 'Purple magical ring/dome, driven by simulation shield state',
   laneStrike: 'Marked lane tile and vertical spell beam, driven by committed target',
   magicOrb: 'Slow magenta sphere with a trail and explicit collider',
   confetti: 'Pooled decorative paper pieces at impact, no individual damage',
-  terrace: 'Dry slate rooftop, low parapet and raised cake platform',
-  backdrop: 'Reuse Level 2 city silhouettes as distant scenery after integration review',
+  terrace: 'Dry inlaid slate rooftop, stepped oval dais and raised cake platform',
+  backdrop: 'Gradient night sky, moon, cloud bands, prominent CN Tower and City Builder flank buildings',
 } as const;

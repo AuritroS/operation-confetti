@@ -1,4 +1,5 @@
 import { LaneRunner } from '../../core/lanes';
+import { BOSS_LAYOUT } from './layout';
 
 /** Isolated control harness. Combat HP, hazards, gifts and scoring come later. */
 export interface PracticeShot {
@@ -7,7 +8,7 @@ export interface PracticeShot {
 }
 
 export class BossPractice {
-  readonly lanes = new LaneRunner(3, 2.2);
+  readonly lanes = new LaneRunner(3, BOSS_LAYOUT.laneWidth);
   readonly cooldownSeconds = 0.3;
   readonly flightSeconds = 0.38;
   private cooldown = 0;

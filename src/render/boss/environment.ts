@@ -1,0 +1,468 @@
+import {
+  Box3, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CatmullRomCurve3,
+  Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, LineSegments,
+  Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry,
+  SphereGeometry, TorusGeometry, TubeGeometry, Vector3,
+} from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { BOSS_LAYOUT } from '../../levels/boss/layout';
+import { buildCake, buildCnTower } from '../custom';
+import type { BossProp } from '../../assets/boss/catalog';
+
+const satinCache = new Map<string, MeshStandardMaterial>();
+const luminousCache = new Map<string, MeshBasicMaterial>();
+function satin(color: number, metalness = 0.03, roughness = 0.67): MeshStandardMaterial {
+  const key = `${color}:${metalness}:${roughness}`;
+  let material = satinCache.get(key);
+  if (!material) {
+    material = new MeshStandardMaterial({ color, metalness, roughness });
+    satinCache.set(key, material);
+  }
+  return material;
+}
+function luminous(color: number, opacity = 1): MeshBasicMaterial {
+  const key = `${color}:${opacity}`;
+  let material = luminousCache.get(key);
+  if (!material) {
+    material = new MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: opacity === 1 });
+    luminousCache.set(key, material);
+  }
+  return material;
+}
+const gold = satin(0xe7ae61, 0.72, 0.24);
+const paleGold = satin(0xffd890, 0.65, 0.3);
+const velvet = satin(0x40194e, 0.02, 0.92);
+const wine = satin(0x72264f, 0.03, 0.8);
+const midnight = satin(0x141d3a);
+
+function block(parent: Group, size: [number, number, number], at: [number, number, number], mat: MeshStandardMaterial | MeshBasicMaterial): Mesh {
+  const mesh = new Mesh(new BoxGeometry(...size), mat);
+  mesh.position.set(...at);
+  parent.add(mesh);
+  return mesh;
+}
+
+function cylinder(parent: Group, rTop: number, rBottom: number, height: number, at: [number, number, number], mat: MeshStandardMaterial | MeshBasicMaterial, sides = 24): Mesh {
+  const mesh = new Mesh(new CylinderGeometry(rTop, rBottom, height, sides), mat);
+  mesh.position.set(...at);
+  parent.add(mesh);
+  return mesh;
+}
+
+function orb(parent: Group, radius: number, at: [number, number, number], mat: MeshStandardMaterial | MeshBasicMaterial, segments = 16): Mesh {
+  const mesh = new Mesh(new SphereGeometry(radius, segments, Math.max(8, segments / 2)), mat);
+  mesh.position.set(...at);
+  parent.add(mesh);
+  return mesh;
+}
+
+function ribbon(parent: Group, points: Vector3[], radius: number, mat: MeshStandardMaterial | MeshBasicMaterial): void {
+  parent.add(new Mesh(new TubeGeometry(new CatmullRomCurve3(points), Math.max(12, points.length * 5), radius, 5, false), mat));
+}
+
+/** The long clear run is a dark inlaid carpet; its fine gold boundaries reveal the lane perspective. */
+function makeDeck(parent: Group): void {
+  block(parent, [10.2, 0.38, 16.5], [0, -0.25, -0.9], satin(0x19223b));
+  block(parent, [9.8, 0.07, 15.8], [0, -0.025, -0.9], satin(0x27314b));
+  const laneMats = [satin(0x202b47), satin(0x263454), satin(0x202b47)];
+  for (let lane = 0; lane < 3; lane++) {
+    const x = BOSS_LAYOUT.laneCentres[lane]!;
+    block(parent, [2.06, 0.025, 11.7], [x, 0.02, 0.75], laneMats[lane]!);
+    block(parent, [1.84, 0.009, 0.07], [x, 0.041, 5.47], gold);
+  }
+  for (const x of [-3.32, -1.1, 1.1, 3.32]) {
+    block(parent, [0.025, 0.014, 11.7], [x, 0.048, 0.75], satin(0x916b79, 0.23));
+  }
+  for (const x of [-4.95, 4.95]) {
+    block(parent, [0.27, 0.22, 15.8], [x, 0.1, -0.9], midnight);
+    block(parent, [0.16, 0.06, 15.8], [x, 0.23, -0.9], gold);
+    for (const z of [-4.6, -2.3, 0, 2.3, 4.6]) {
+      cylinder(parent, 0.08, 0.11, 0.92, [x, 0.68, z], midnight, 10);
+      orb(parent, 0.09, [x, 1.18, z], luminous(0xffc471), 8);
+    }
+  }
+  // The small paving joints are concentrated on the shoulders and never mask a warning.
+  const joint = satin(0x60708c);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 9; i++) {
+      const z = -4.4 + i * 1.16;
+      block(parent, [1.18, 0.009, 0.025], [side * 4.2, 0.039, z], joint);
+    }
+  }
+}
+
+/** A three-step oval dais reads as a theatrical boss stage rather than a bare box. */
+function makeDais(parent: Group): void {
+  const tiers = [
+    { r: 4.5, y: 0.17, h: 0.34, z: -6.25, mat: satin(0x301a42) },
+    { r: 4.18, y: 0.46, h: 0.28, z: -6.43, mat: gold },
+    { r: 3.95, y: 0.74, h: 0.3, z: -6.48, mat: velvet },
+    { r: 3.82, y: 0.96, h: 0.12, z: -6.48, mat: paleGold },
+    { r: 3.68, y: 1.035, h: 0.07, z: -6.48, mat: satin(0x4d245a) },
+  ];
+  for (const tier of tiers) {
+    const mesh = cylinder(parent, tier.r, tier.r, tier.h, [0, tier.y, tier.z], tier.mat, 48);
+    mesh.scale.z = 0.48;
+  }
+  // Inset medallion behind Aurora, thin enough to keep shots and spell cues legible.
+  const medallion = cylinder(parent, 1.4, 1.4, 0.018, [0, 1.085, BOSS_LAYOUT.bossZ], satin(0x7d4474, 0.2), 32);
+  medallion.scale.z = 0.64;
+}
+
+/** Velvet folds and golden architrave form a tall birthday gala proscenium. */
+function makeArchitecture(parent: Group): void {
+  const z = -8.7;
+  block(parent, [10.4, 0.7, 0.5], [0, 0.4, z], satin(0x17213d));
+  block(parent, [10.5, 0.13, 0.64], [0, 0.81, z], gold);
+  for (const side of [-1, 1]) {
+    const x = side * 3.75;
+    cylinder(parent, 0.32, 0.4, 4.25, [x, 2.95, z + 0.12], satin(0x3f2455), 20);
+    for (const y of [0.94, 1.08, 4.92, 5.13]) {
+      cylinder(parent, 0.43, 0.43, 0.12, [x, y, z + 0.12], gold, 20);
+    }
+    // Tall velvet panels with alternating lit and shadowed folds.
+    for (let i = 0; i < 7; i++) {
+      const foldX = x + side * (0.18 + i * 0.17);
+      const top = 5.45 - i * 0.075;
+      const bottom = 1.05 + i * 0.13;
+      block(parent, [0.21, top - bottom, 0.12], [foldX, (top + bottom) / 2, z + 0.45 + (i % 2) * 0.08], i % 2 ? wine : velvet);
+    }
+    const swag = Array.from({ length: 9 }, (_, i) => {
+      const u = i / 8;
+      return new Vector3(side * (2.7 + u * 1.8), 5.15 - Math.sin(u * Math.PI) * 1.0, z + 0.63);
+    });
+    ribbon(parent, swag, 0.055, gold);
+    orb(parent, 0.21, [side * 4.5, 5.17, z + 0.65], paleGold, 10);
+  }
+  const arch = Array.from({ length: 21 }, (_, i) => {
+    const a = Math.PI - i / 20 * Math.PI;
+    return new Vector3(Math.cos(a) * 3.75, 5.03 + Math.sin(a) * 1.35, z + 0.17);
+  });
+  ribbon(parent, arch, 0.16, gold);
+  ribbon(parent, arch.map((p) => new Vector3(p.x * 0.93, p.y - 0.16, p.z + 0.09)), 0.045, paleGold);
+  for (const side of [-1, 1]) {
+    block(parent, [1.45, 0.24, 0.85], [side * 4.38, 5.4, z + 0.25], gold);
+    block(parent, [1.1, 1.1, 0.65], [side * 4.38, 6.04, z + 0.16], midnight);
+    const crest = cylinder(parent, 0.26, 0.36, 0.68, [side * 4.38, 6.63, z + 0.2], gold, 12);
+    crest.rotation.z = side * -0.12;
+    orb(parent, 0.13, [side * 4.38, 7.1, z + 0.2], luminous(0xf0a7ff), 10);
+  }
+  const lamps = new InstancedMesh(new SphereGeometry(0.08, 8, 5), luminous(0xffd184), 25);
+  const matrix = new Matrix4();
+  for (let i = 0; i < 25; i++) {
+    const a = Math.PI - i / 24 * Math.PI;
+    matrix.makeTranslation(Math.cos(a) * 3.68, 5.02 + Math.sin(a) * 1.31, z + 0.36);
+    lamps.setMatrixAt(i, matrix);
+  }
+  parent.add(lamps);
+}
+
+/** Rooftop side wings carry the party toward the foreground without entering play. */
+function makeSideWings(parent: Group): void {
+  const stone = satin(0x26304a);
+  const recess = satin(0x392743);
+  const fabric = satin(0x55334f, 0.02, 0.89);
+  for (const side of [-1, 1]) {
+    for (const [z, height] of [[-3.4, 3.25], [0.6, 2.5]] as const) {
+      const x = side * 4.42;
+      block(parent, [0.58, height, 0.66], [x, height / 2 + 0.12, z], stone);
+      block(parent, [0.69, 0.13, 0.76], [x, height + 0.15, z], gold);
+      block(parent, [0.32, height * 0.58, 0.025], [x - side * 0.01, height * 0.57, z + 0.35], recess);
+      orb(parent, 0.11, [x, height + 0.32, z], luminous(0xe8bd83), 9);
+      const bannerX = side * 4.04;
+      block(parent, [0.54, height * 0.67, 0.05], [bannerX, height * 0.62, z + 0.38], fabric);
+      block(parent, [0.035, height * 0.67, 0.07], [bannerX - 0.29, height * 0.62, z + 0.42], gold);
+      block(parent, [0.035, height * 0.67, 0.07], [bannerX + 0.29, height * 0.62, z + 0.42], gold);
+      const jewel = block(parent, [0.18, 0.18, 0.06], [bannerX, height * 0.64, z + 0.43], satin(0x8b5b9c, 0.4));
+      jewel.rotation.z = Math.PI / 4;
+    }
+    // The shoulder beyond the parapet reads as a real roof edge, not empty space.
+    block(parent, [0.45, 0.8, 8.5], [side * 5.38, 0.3, -1.0], stone);
+    block(parent, [0.53, 0.08, 8.5], [side * 5.38, 0.75, -1.0], satin(0x7b7290, 0.2));
+  }
+}
+
+function makeMoonAndSkyline(parent: Group): void {
+  // A soft, painted moon sets the same city-at-night silhouette as the references.
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const sky = ctx.createRadialGradient(128, 128, 0, 128, 128, 126);
+    sky.addColorStop(0, '#fcf9da'); sky.addColorStop(0.72, '#d7e9ff'); sky.addColorStop(0.9, '#91b8ec'); sky.addColorStop(1, '#91b8ec00');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 28; i++) {
+      const a = i * 2.39996;
+      const r = Math.sqrt((i * 37 % 97) / 97) * 89;
+      ctx.beginPath();
+      ctx.fillStyle = i % 3 ? '#9ab9d121' : '#819fc02c';
+      ctx.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 4 + i % 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const tex = new CanvasTexture(canvas);
+    tex.colorSpace = 'srgb';
+    const moon = new Mesh(new PlaneGeometry(3.25, 3.25), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide }));
+    moon.position.set(2.35, 8.0, -22);
+    moon.lookAt(0, 7, 13);
+    parent.add(moon);
+  }
+  const buildings = [
+    [-14, 4.1, 2.4], [-12, 6.0, 2.1], [-9.8, 4.4, 2.6], [-7.3, 7.3, 2.7],
+    [-4.8, 5.5, 1.9], [-2.4, 4.2, 2.4], [0, 5.0, 2.1], [2.7, 4.7, 2.5],
+    [5.1, 6.9, 2.3], [7.9, 5.6, 2.8], [10.6, 7.2, 2.2], [13.1, 4.9, 2.5],
+  ] as const;
+  const cityMaterials = [satin(0x182445), satin(0x202d51), satin(0x242548)];
+  const windows: number[] = [];
+  for (let i = 0; i < buildings.length; i++) {
+    const [x, height, width] = buildings[i]!;
+    const z = -17 - (i % 3) * 0.7;
+    block(parent, [width, height, 1.4], [x, height / 2 - 0.6, z], cityMaterials[i % 3]!);
+    block(parent, [width + 0.16, 0.14, 1.55], [x, height - 0.55, z], satin(0x344267));
+    if (i % 3 === 0) block(parent, [0.08, 0.65, 0.08], [x, height + 0.02, z], satin(0x596b9a));
+    for (let row = 0; row < Math.floor(height / 0.48) - 1; row++) {
+      for (let col = 0; col < Math.floor(width / 0.34) - 1; col++) {
+        if ((row * 7 + col * 11 + i * 3) % 5 === 0) continue;
+        windows.push(x - width / 2 + 0.28 + col * 0.34, row * 0.47 + 0.25, z + 0.72);
+      }
+    }
+  }
+  const windowMesh = new InstancedMesh(new PlaneGeometry(0.115, 0.19), luminous(0xf0b872, 0.85), windows.length / 3);
+  const dummy = new Object3D();
+  for (let i = 0; i < windows.length / 3; i++) {
+    dummy.position.set(windows[i * 3]!, windows[i * 3 + 1]!, windows[i * 3 + 2]!);
+    dummy.updateMatrix();
+    windowMesh.setMatrixAt(i, dummy.matrix);
+  }
+  parent.add(windowMesh);
+  const tower = buildCnTower(11.8);
+  tower.position.set(-3.15, -0.8, -15.4);
+  parent.add(tower);
+  const towerRing = new Mesh(new TorusGeometry(0.77, 0.075, 7, 24), luminous(0xb354e2, 0.85));
+  towerRing.rotation.x = Math.PI / 2;
+  towerRing.position.set(-3.15, 6.9, -15.4);
+  parent.add(towerRing);
+  // Sparse high stars, behind the moon and architecture.
+  const stars = new InstancedMesh(new SphereGeometry(0.05, 5, 4), luminous(0x8fb7fb, 0.7), 32);
+  const matrix = new Matrix4();
+  for (let i = 0; i < 32; i++) {
+    const x = -13 + (i * 17 % 31) / 31 * 26;
+    const y = 7.2 + (i * 23 % 29) / 29 * 7;
+    matrix.makeTranslation(x, y, -22);
+    stars.setMatrixAt(i, matrix);
+  }
+  parent.add(stars);
+}
+
+function makeBalloons(parent: Group): void {
+  const balloon = new InstancedMesh(new SphereGeometry(0.32, 12, 9), satin(0xffffff, 0.02, 0.58), 24);
+  const palette = [0x694259, 0x8d6570, 0x685378, 0x526581, 0x9c8062, 0xa59982];
+  const dummy = new Object3D();
+  const lines: number[] = [];
+  let index = 0;
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 12; i++) {
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      const x = side * (4.31 + col * 0.25 + (row % 2) * 0.08);
+      const y = 2.2 + row * 0.58 + (col % 2) * 0.18;
+      const z = -7.1 + (col - 1) * 0.29;
+      dummy.position.set(x, y, z);
+      dummy.scale.set(0.91, 1.18, 0.83);
+      dummy.updateMatrix();
+      balloon.setMatrixAt(index, dummy.matrix);
+      balloon.setColorAt(index, new Color(palette[(i + (side + 1) * 2) % palette.length]!));
+      lines.push(x, y - 0.35, z, x + side * 0.14, 1.08, z);
+      index++;
+    }
+  }
+  parent.add(balloon);
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(lines), 3));
+  parent.add(new LineSegments(geometry, luminous(0x8c7e98, 0.65)));
+  // Gold ribbon cascades visually tie balloons to the stage without entering lanes.
+  for (const side of [-1, 1]) {
+    ribbon(parent, Array.from({ length: 12 }, (_, i) => {
+      const t = i / 11;
+      return new Vector3(side * (4.4 + Math.sin(t * Math.PI * 3) * 0.15), 1.3 + t * 3.9, -6.75 + Math.sin(t * Math.PI * 4) * 0.12);
+    }), 0.018, paleGold);
+  }
+}
+
+function makeCandelabra(parent: Group, x: number, z: number): void {
+  const baseY = BOSS_LAYOUT.bossStageY;
+  cylinder(parent, 0.27, 0.34, 0.16, [x, baseY + 0.08, z], gold, 16);
+  cylinder(parent, 0.045, 0.08, 1.65, [x, baseY + 0.96, z], gold, 10);
+  for (const dx of [-0.45, -0.23, 0, 0.23, 0.45]) {
+    const y = baseY + 1.75 - Math.abs(dx) * 0.65;
+    if (dx !== 0) ribbon(parent, [
+      new Vector3(x, baseY + 1.25, z), new Vector3(x + dx * 0.6, baseY + 1.46, z),
+      new Vector3(x + dx, y - 0.23, z),
+    ], 0.036, gold);
+    cylinder(parent, 0.035, 0.035, 0.28, [x + dx, y, z], satin(0xffe9cf), 8);
+    orb(parent, 0.07, [x + dx, y + 0.21, z], luminous(0xffb75b), 8).scale.y = 1.5;
+  }
+}
+
+function makeCakeDisplay(parent: Group, cake: Group): void {
+  const x = BOSS_LAYOUT.cakeX;
+  const z = BOSS_LAYOUT.cakeZ;
+  const stage = BOSS_LAYOUT.bossStageY;
+  cylinder(parent, 0.68, 0.82, 0.18, [x, stage + 0.09, z], gold, 24);
+  cylinder(parent, 0.35, 0.45, 0.82, [x, stage + 0.58, z], satin(0x512559), 20);
+  cylinder(parent, 0.74, 0.47, 0.18, [x, stage + 1.06, z], gold, 24);
+  cylinder(parent, 1.1, 0.93, 0.09, [x, stage + 1.19, z], paleGold, 32);
+  // The stolen cake floats above its platter; Aurora's tether holds it there.
+  const top = stage + 1.53;
+  cake.position.set(x, top, z);
+  const sponge = buildCake();
+  sponge.scale.setScalar(1.72);
+  cake.add(sponge);
+  parent.add(cake);
+  // Piped cream and red berries turn the small shared cake into the hero prop.
+  const cream = satin(0xfff2e3);
+  const berry = satin(0xb80e36, 0.06, 0.36);
+  for (const [radius, y, count] of [[0.84, top + 0.45, 24], [0.59, top + 0.98, 16]] as const) {
+    for (let i = 0; i < count; i++) {
+      const a = i / count * Math.PI * 2;
+      const px = Math.cos(a) * radius;
+      const pz = Math.sin(a) * radius;
+      const swirl = orb(cake, 0.095, [px, y - top, pz], cream, 8);
+      swirl.scale.y = 0.72;
+      if (i % 3 === 0) orb(cake, 0.067, [px, y - top + 0.09, pz], berry, 8);
+    }
+  }
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    orb(cake, 0.075, [Math.cos(a) * 0.47, 1.2, Math.sin(a) * 0.47], berry, 8);
+  }
+  const halo = new Mesh(new TorusGeometry(1.23, 0.025, 6, 48), luminous(0xc56aff, 0.8));
+  halo.rotation.x = Math.PI / 2.6;
+  halo.position.set(0, stage + 1.23 - top, 0);
+  cake.add(halo);
+}
+
+function makeScatteredPartyPaper(parent: Group): void {
+  const paper = new InstancedMesh(new PlaneGeometry(0.095, 0.17), luminous(0xffffff, 0.95), 64);
+  const colors = [0xf8c776, 0xe475a8, 0xa68be6, 0x82bcea];
+  const dummy = new Object3D();
+  for (let i = 0; i < 64; i++) {
+    const x = -4.55 + (i * 19 % 67) / 67 * 9.1;
+    const z = -8.25 + (i * 23 % 61) / 61 * 13.2;
+    dummy.position.set(x, 0.058, z);
+    dummy.rotation.set(-Math.PI / 2, 0, i * 2.1);
+    dummy.updateMatrix();
+    paper.setMatrixAt(i, dummy.matrix);
+    paper.setColorAt(i, new Color(colors[i % colors.length]!));
+  }
+  parent.add(paper);
+}
+
+/** Collapse repeated static trim into material batches; the cake stays movable. */
+function batchArchitecture(root: Group, cake: Group): void {
+  root.updateMatrixWorld(true);
+  const worldToRoot = root.matrixWorld.clone().invert();
+  const groups = new Map<string, Mesh[]>();
+  const visit = (object: Object3D): void => {
+    if (object === cake || object instanceof InstancedMesh) return;
+    if (object instanceof Mesh && !Array.isArray(object.material)) {
+      const group = groups.get(object.material.uuid) ?? [];
+      group.push(object);
+      groups.set(object.material.uuid, group);
+    }
+    for (const child of object.children) visit(child);
+  };
+  for (const child of [...root.children]) visit(child);
+  for (const meshes of groups.values()) {
+    if (meshes.length < 2) continue;
+    const parts = meshes.map((mesh) => {
+      const geometry = mesh.geometry.clone();
+      geometry.applyMatrix4(new Matrix4().multiplyMatrices(worldToRoot, mesh.matrixWorld));
+      return geometry;
+    });
+    const merged = mergeGeometries(parts, false);
+    for (const part of parts) part.dispose();
+    if (!merged) continue;
+    const combined = new Mesh(merged, meshes[0]!.material);
+    root.add(combined);
+    for (const mesh of meshes) {
+      mesh.removeFromParent();
+      mesh.geometry.dispose();
+    }
+  }
+}
+
+export class BossEnvironment {
+  readonly root = new Group();
+  readonly cake = new Group();
+  private time = 0;
+
+  constructor() {
+    makeMoonAndSkyline(this.root);
+    makeDeck(this.root);
+    makeDais(this.root);
+    makeArchitecture(this.root);
+    makeSideWings(this.root);
+    makeBalloons(this.root);
+    makeCandelabra(this.root, -3.55, -5.5);
+    makeCandelabra(this.root, 3.55, -5.5);
+    makeCakeDisplay(this.root, this.cake);
+    makeScatteredPartyPaper(this.root);
+    batchArchitecture(this.root, this.cake);
+    batchArchitecture(this.cake, new Group());
+  }
+
+  update(step: number): void {
+    this.time += step;
+    this.cake.position.y = BOSS_LAYOUT.bossStageY + 1.53 + Math.sin(this.time * 1.4) * 0.055;
+  }
+
+  addProps(models: ReadonlyMap<string, Group>, catalog: readonly BossProp[]): void {
+    const byId = new Map(catalog.map((item) => [item.id, item]));
+    const place = (id: string, x: number, y: number, z: number, height: number, rotation = 0) => {
+      const model = models.get(id);
+      const spec = byId.get(id);
+      if (!model || !spec) return;
+      const clone = model.clone(true);
+      clone.scale.setScalar(height / spec.nativeHeight);
+      const bounds = new Box3().setFromObject(clone);
+      clone.position.set(x, y - bounds.min.y, z);
+      clone.rotation.y = rotation;
+      this.root.add(clone);
+    };
+    const stage = BOSS_LAYOUT.bossStageY;
+    // Cluster real pack gifts at the wings; the playable deck remains empty.
+    place('decorGiftRed', -4.12, stage, -6.1, 0.78, 0.2);
+    place('decorGiftGreen', -4.5, stage, -7.2, 1.05, -0.2);
+    place('decorGiftRed', -4.85, stage, -7.8, 0.55);
+    place('decorGiftGreen', 4.18, stage, -6.55, 0.96, 0.2);
+    place('decorGiftRed', 4.63, stage, -7.4, 0.7, -0.1);
+    place('lantern', -4.65, 0.15, -4.65, 2.15);
+    place('lantern', 4.65, 0.15, -4.65, 2.15);
+    const placeCity = (id: string, x: number, z: number, height: number) => {
+      const model = models.get(id);
+      const spec = byId.get(id);
+      if (!model || !spec) return;
+      const clone = model.clone(true);
+      clone.scale.setScalar(height / spec.nativeHeight);
+      clone.traverse((object) => {
+        if (!(object instanceof Mesh)) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        const toned = materials.map((original) => {
+          const material = original.clone();
+          if (material instanceof MeshStandardMaterial) material.color.lerp(new Color(0x1a294c), 0.68);
+          return material;
+        });
+        object.material = Array.isArray(object.material) ? toned : toned[0]!;
+      });
+      const bounds = new Box3().setFromObject(clone);
+      clone.position.set(x, -0.7 - bounds.min.y, z);
+      this.root.add(clone);
+    };
+    placeCity('cityA', -8.1, -12.8, 7.2);
+    placeCity('cityG', -6.2, -13.8, 9.2);
+    placeCity('cityC', 5.5, -13.6, 8.6);
+    placeCity('cityA', 7.5, -12.7, 6.8);
+    // The wreath and bell are intentionally omitted: their winter motifs would
+    // displace the stronger birthday cake, balloons, and candle silhouette.
+  }
+}

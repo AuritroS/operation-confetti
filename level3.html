@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#10172c" />
-  <title>Level 3 · Controls practice</title>
+  <title>Level 3 · Aurora's birthday gala</title>
   <link rel="stylesheet" href="/src/level3.css" />
 </head>
 <body>
@@ -12,20 +12,22 @@
     <canvas id="practice-stage" aria-hidden="true"></canvas>
     <div id="practice-surface" aria-label="Game area: swipe left or right to change lanes, tap to fire"></div>
     <header class="practice-hud">
-      <div><span class="eyebrow">LEVEL 3 / CONTROL TEST</span><strong>Confetti practice</strong></div>
+      <div><span class="eyebrow">LEVEL 3 / ENVIRONMENT PREVIEW</span><strong>Aurora’s birthday gala</strong></div>
       <button id="practice-pause" type="button" aria-label="Pause game">Pause</button>
     </header>
     <div class="practice-status" aria-live="polite">
       <span>Lane <strong id="practice-lane">2 / 3</strong></span>
-      <span>Target hits <strong id="practice-hits">0</strong></span>
+      <span>Cannon hits <strong id="practice-hits">0</strong></span>
       <span>Shots <strong id="practice-shots">0</strong></span>
     </div>
     <div id="practice-message" class="practice-message">Swipe to switch lanes · tap to fire</div>
+    <div id="practice-scene-status" class="practice-scene-status" role="status">Loading birthday rooftop…</div>
+    <div id="practice-debug" class="practice-debug" hidden></div>
     <div id="practice-paused" class="practice-overlay" hidden>
       <strong>Paused</strong><span>Tap Resume or press P</span>
       <button id="practice-resume" type="button">Resume</button>
     </div>
-    <footer class="practice-help">Swipe left/right · Tap to fire<br /><span>Keyboard: ← → / A D · short Space · P pause · R reset</span></footer>
+    <footer class="practice-help">Swipe left/right · Tap to fire<br /><span>Environment preview · Combat comes next</span><br /><span>Keyboard: ← → / A D · short Space · P pause · R reset</span></footer>
   </main>
   <script type="module" src="/src/level3.ts"></script>
 </body>

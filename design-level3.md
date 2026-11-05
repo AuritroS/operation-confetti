@@ -1,25 +1,29 @@
 # Level 3 — Aurora's Christmas birthday showdown
 
-Status: rooftop-party setting accepted by the user, 5 November 2026. The first
-asset-free control practice slice is implemented on `codex/level3`; boss combat,
-assets and environment remain future stages. The branch started at `0081761`.
+Status: a dramatic birthday gala environment preview is implemented on
+`codex/level3`. The user removed snow and asked for birthday details to lead
+the visual design. The environment now uses a low perspective camera that
+makes Aurora about 1.6–1.7 times Matthew's screen height, a stepped theatrical
+dais, velvet and gold proscenium, floating red velvet cake, candle stands,
+muted balloons, rooftop side banners, a clouded night sky, a prominent CN
+Tower and layered Toronto skyline. Idle magic surrounds Aurora and holds the
+cake. Boss combat remains a later stage. The branch started at `0081761`;
+the original control/asset slice was committed by the user as `6d024f1`.
 The parent project typecheck has existing Level 2 errors, recorded in the
 collaboration document.
-This session cannot write the parent repository's `.git/worktrees/level3` lock,
-so the requested commit remains pending despite finished files and checks.
 Read `docs/COLLABORATION.md` for isolation and ownership before implementation.
 This plan follows the user's build order. Current user decisions override older
 design text; existing runtime manifests and code establish what actually exists.
 
 ## Direction
 
-A Christmas-decorated rooftop party terrace: dry slate, warm lanterns, trees,
-wrapped presents, birthday bunting and a cake on Aurora's raised stage. Three
+A birthday gala on a rooftop terrace: dry slate, velvet, gold, candles,
+wrapped presents, balloon columns and a cake on Aurora's raised stage. Three
 clear lanes face Aurora from a fixed camera behind Matthew. The setting provides
 continuity from the city levels while making the final confrontation celebratory.
 The user has accepted this rooftop-party setting.
 
-Keep trees and decorative presents outside the playable lane envelope. Reserve
+Keep decorative presents outside the playable lane envelope. Reserve
 distinct silhouettes and animation for collectible gifts so scenery cannot look
 collectible. Cool night sky and restrained gold lighting frame purple/gold Aurora;
 attack markings need a distinct shape and high contrast against all decorations.
@@ -91,7 +95,7 @@ Holiday Bits and Adventurers packs are CC0 in the repo.
 | Role | Selection | Measured source/export | Proposed use |
 | --- | --- | --- | --- |
 | Matthew | Recoloured unhooded KayKit `Rogue` with Level 2's custom curls | 6,420 triangles; 468 KB GLB | Same generated model hash as Level 2 commit `4b5d989`; cape hidden |
-| Aurora | Recoloured KayKit `Mage` | 6,668 triangles; 369 KB GLB | 1.45-unit boss on raised stage; hide hat, use existing crown |
+| Aurora | Recoloured KayKit `Mage` | 6,668 triangles; 369 KB GLB | 4.15-unit visual boss on raised stage; hide hat, use existing crown |
 | Gun | Holiday Bits `snowball_cannon` | 1,354 triangles; 68 KB export | Level 2 already mounts it on `handslot.r` with 0.5 scale and rotation `(-π/2, 0, π)` |
 | Main tree | `christmas_tree_decorated` | 13,236 triangles; 552 KB | One lit landmark at arena edge, 3.1-unit height |
 | Repeat tree | `christmas_tree_withoutLights` | 6,886 triangles; 288 KB | At most one second tree, 2.6-unit height |
@@ -100,6 +104,7 @@ Holiday Bits and Adventurers packs are CC0 in the repo.
 | Side lights | `lantern_decorated` | 1,451 triangles; 69 KB | Two warm fixtures outside playfield |
 | Backdrop accent | `wreath` | 2,454 triangles; 112 KB | Behind Aurora; keep attack cues distinct |
 | Stage accent | `bell_decorated` | 1,416 triangles; 64 KB | One bell on the boss backdrop |
+| Skyline flanks | KayKit City Builder buildings A/C/G without base | 435 / 666 / 1,053 triangles; 49 / 63 / 88 KB exports | Four subdued detailed towers behind the gala arch |
 
 The cake and crown reuse existing procedural builders in `src/render/custom.ts`.
 Bunting, balloons, roof trim, magical shield, lane strike, orb and confetti
@@ -117,8 +122,8 @@ Matthew from the game camera. The previous hooded Matthew choice was wrong and
 has been removed from the Level 3 catalog.
 
 The previous gingerbread house pick had a white winter roof and is removed to
-keep the setting snow-free. The nine selected prop exports total about **1,291
-KB on disk**. The two actors add 837 KB;
+keep the setting snow-free. The twelve selected prop exports total about
+**1,491 KB on disk**. The two actors add 837 KB;
 two stripped animation libraries add about 569 KB. These are file sizes, not
 compressed transfer or decoded GPU memory. Each prop GLB embeds an atlas, so
 repeated textures are a transfer-cost risk to measure when the scene is built.
@@ -165,13 +170,46 @@ substitutions have been verified to exist in the generated libraries.
 
 ## 3. Build the environment
 
+### Implemented environment review
+
+`/level3.html` renders a 3D birthday gala behind the working swipe/tap
+practice. `src/levels/boss/layout.ts` owns the three lane centres and
+player/boss/cake positions. `src/render/boss/camera.ts` holds a fixed
+perspective camera at (0, 5.5, 13), angled toward Aurora; Matthew starts one
+unit closer to the lens than in the first scene. `environment.ts` builds a
+dry inlaid roof, stepped oval stage, gold arch, velvet panels, rooftop side
+banners, candle stands, muted balloon clusters, layered city skyline, enlarged
+floating cake and a prominent CN Tower. `sky.ts` provides a gradient sky and
+high/low cloud bands; `magic.ts` animates Aurora's halo, glyphs, motes and
+cake tether. Three City Builder GLBs add detailed skyline flanks.
+`actors.ts` loads the unhooded Matthew export and right-hand cannon used in
+Level 2, plus Aurora and her crown. `scene.ts` adds stronger gold and purple
+lighting and still draws practice shots and hit confetti.
+
+Christmas trees remain in the catalog but are **not placed** in the arena.
+Birthday props lead the theme; there is no snow. The full hero silhouette in
+all three lanes, Aurora, cake and stage arch project inside 360×800, 375×667,
+390×844 and 430×932 portrait views in an automated framing check. Review the
+actual render at `http://127.0.0.1:5303/level3.html`; use `?debug` for
+draw/triangle counts. The sandbox cannot launch Chromium because of a denied
+macOS Mach port, so visual quality and real-phone performance still need the
+user's browser review. The isolated typecheck, 36 focused tests, asset builder
+and standalone build passed. Current shots count hits against a practice
+target; Aurora has no HP, shield cycle or attacks yet.
+
+The procedural environment batches repeated static materials after construction
+while keeping the cake as a movable group. A Node scene-construction check
+counted 43 regular meshes, five instanced meshes and about 31k procedural
+triangles with the moon canvas skipped; runtime actor/prop draw counts should
+be read from `?debug` in a browser. This is not a phone performance result.
+
 Make the setting feel like a **birthday party Aurora has taken over**: a dry
-Toronto rooftop with warm Christmas lights, a visible cake display, and her
+Toronto rooftop gala with warm candlelight, a visible cake display, and her
 purple magic concentrated around the raised boss stage. Keep the centre deck
 spacious. Richness should come from several readable depth layers and a few
 large landmarks, not small props scattered across the attack lanes.
-There is **no snow, snowfall, frost or white roof trim**. Christmas is conveyed
-by lit trees, wrapped presents, wreaths, bells and warm lights. That keeps the
+There is **no snow, snowfall, frost or white roof trim**. The birthday is
+conveyed by the cake, candles, balloons, gifts and warm lights. That keeps the
 weather and surfaces consistent with Levels 1 and 2.
 
 ### Spatial contract
@@ -189,23 +227,24 @@ them to draw lane floor inlays and attack shapes. A tree, lantern or cake mesh
 cannot redefine a lane or contact box. Decoration belongs to a separate set
 of allowed positions, so new props can be added without silently blocking play.
 
-The review camera stays fixed behind Matthew, slightly raised and pitched toward
-Aurora. Matthew occupies the lower third; Aurora and the cake sit in the upper
-third; the middle third stays clear for incoming magic and confetti travel.
+The review camera stays fixed behind Matthew at (0, 5.5, 13), pitched toward
+Aurora. Matthew occupies the lower half; Aurora and the cake sit above him;
+the middle remains clear for incoming magic and confetti travel.
 The initial view should show all three lane centres, his full silhouette and
 held cannon, the full boss silhouette, the cake, and an entire lane warning on
-a narrow portrait viewport. Start around a 55–60° vertical field of view,
-then place the camera from measured phone framing; the exact coordinates are
-not a gameplay input. Avoid camera follow or strong shake, which would make
-lane reading and swipe decisions less stable. Use a short, bounded reaction
-only after the base view is approved.
+a narrow portrait viewport. The base field of view is 60° on a wide portrait
+phone and increases on taller phones to preserve horizontal lane room. Camera
+coordinates are not a gameplay input. Avoid camera follow or strong shake,
+which would make lane reading and swipe decisions less stable. Use a short,
+bounded reaction only after the base view is approved.
 
 Reserve the top safe area for both HP displays and pause, and the bottom edge
 for the player's thumb and any brief control prompt. Place no critical target,
 warning or cake detail behind either overlay. Desktop uses the same portrait
 frame rather than a wider combat view. Only after this frame is measured should
 we lock actor and prop visual heights.
-Level 2's world-unit hero height is 2.385; Level 3 currently proposes 1.45.
+Level 2's world-unit hero height is 2.385; Level 3 currently uses 1.55 for
+Matthew and 4.15 for Aurora as visual presentation sizes.
 These are different world scales, so a seamless transition must compare their
 screen-space size rather than assuming equal numerical heights.
 
@@ -213,27 +252,26 @@ screen-space size rather than assuming equal numerical heights.
 
 | Layer | Build | Rule |
 | --- | --- | --- |
-| Far | Dark blue night sky, moon, limited Toronto building silhouettes and a CN Tower nod | Low contrast; no bright shape competes with Aurora or warnings |
-| Middle | Rooftop wall/parapet, dry ledge, windows, warm string lights and birthday bunting | Fixed geometry; preserve a clear horizon behind the boss |
+| Far | Gradient night sky, moon, high clouds, Toronto silhouettes and prominent CN Tower | Lower contrast than Aurora and warnings |
+| Middle | Gold gala arch, velvet folds, parapet, real City Builder flanks, low clouds and lit windows | Fixed geometry; preserve a clear horizon behind the boss |
 | Play deck | Three subtly distinct slate floor panels and a visible stage boundary | Flat enough for colored attack marks to read; no scenery in colliders |
-| Boss stage | Aurora, cake pedestal/plate, one wreath and magical shield anchor | Cake visible through the fight and movable for both endings |
-| Side dressing | One decorated tree, at most one plain tree, two lanterns and grouped presents | Outside playable width; frame as landmarks, not repeated clutter |
-| Atmosphere | Warm lamp glints and occasional magic wisps | Bounded and pooled; never hide a warning or collectible |
+| Boss stage | Aurora, oversized cake display, candelabras and magical halo | Cake visible through the fight and movable for both endings |
+| Side dressing | Muted balloon clusters, rooftop banners, lanterns and grouped presents | Outside playable width; frame as landmarks, not repeated clutter |
+| Atmosphere | Cake tether, Aurora halo, glyphs and charged motes | Confined to boss stage; never hide a warning or collectible |
 
-Custom assets still needed: a rooftop/parapet kit with dry masonry trim; a low boss
-dais and cake pedestal; birthday bunting and a small balloon cluster; lane-floor
-inlays with warning/impact states; Aurora's magic shield and lane-strike shape;
-a confetti shot with ribbon/paper pieces; and brief cake-recovery/escape poses.
-The cake and crown already exist in `src/render/custom.ts` and are now shown in
-the asset viewer. Improve the cake only after seeing it at the final camera size:
-the current two-tier red velvet model has frosting, six candles and flames, but
-no platter or richer icing detail.
+The dry rooftop, oval dais, gold arch, velvet drapes, side banners, muted
+balloons and floating cake display are now built. The shared cake and crown remain in
+`src/render/custom.ts`; Level 3 adds a platter, piped cream and berries around
+the cake without editing the shared builder. Game area assets still needed:
+lane warning and impact states, Aurora's shield and strike shape, a magic orb,
+and brief cake recovery/escape poses.
 
 Keep this in Level 3 paths: `src/levels/boss/config.ts` for coordinates and
 combat timing; `src/render/boss/scene.ts` to compose the view;
 `src/render/boss/arena.ts` for floor and stage; `environment.ts` for skyline,
 roof and dressing; `actors.ts` for Matthew/Aurora and held cannon;
-`effects.ts` for bounded particles and attack cues; `camera.ts` for framing.
+`magic.ts` for ambient spellcraft; `sky.ts` for sky/clouds;
+`effects.ts` for bounded attack particles/cues; `camera.ts` for framing.
 The static environment is built once. Each frame updates only actors, the
 active cues, projectiles, cake state and particles. Level 2 rendering stays
 untouched. The asset builder stays Level 3-owned except for consuming the exact

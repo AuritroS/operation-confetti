@@ -1,7 +1,7 @@
 import { InputRecogniser, type Gesture } from './core/input';
 import { FixedLoop } from './core/loop';
 import { BossPractice } from './levels/boss/practice';
-import { PracticeView } from './render/boss/practice-view';
+import { BossScene } from './render/boss/scene';
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -10,7 +10,7 @@ const byId = <T extends HTMLElement>(id: string): T => {
 };
 
 const game = new BossPractice();
-const view = new PracticeView(byId<HTMLCanvasElement>('practice-stage'));
+const view = new BossScene(byId<HTMLCanvasElement>('practice-stage'));
 const input = new InputRecogniser(byId('practice-surface'));
 const lane = byId('practice-lane');
 const hits = byId('practice-hits');
@@ -18,8 +18,14 @@ const shots = byId('practice-shots');
 const message = byId('practice-message');
 const pausedOverlay = byId('practice-paused');
 const pauseButton = byId<HTMLButtonElement>('practice-pause');
+const sceneStatus = byId('practice-scene-status');
+const debug = byId('practice-debug');
+debug.hidden = !new URLSearchParams(location.search).has('debug');
+void view.load().then(() => { sceneStatus.hidden = true; }).catch((error: unknown) => {
+  sceneStatus.textContent = `Scene asset failed to load: ${String(error)}`;
+});
 let paused = false;
-let messageUntil = 0;
+let messageUntil = 2.5;
 let elapsed = 0;
 
 function say(text: string): void {
@@ -59,16 +65,18 @@ const loop = new FixedLoop({
     if (paused) return;
     elapsed += step;
     game.update(step);
+    view.update(game, step);
     if (messageUntil && elapsed >= messageUntil) {
-      message.textContent = 'Swipe to switch lanes · tap to fire';
+      message.textContent = '';
       messageUntil = 0;
     }
   },
   render() {
-    view.draw(game, elapsed);
+    view.render();
     lane.textContent = `${game.lane + 1} / 3`;
     hits.textContent = String(game.hitCount);
     shots.textContent = String(game.shotCount);
+    if (!debug.hidden) debug.textContent = `${view.drawCalls} draws · ${view.triangles.toLocaleString()} triangles`;
   },
 });
 loop.start();
