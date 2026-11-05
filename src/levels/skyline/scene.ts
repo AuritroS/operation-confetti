@@ -105,10 +105,23 @@ export interface SceneDefinition {
 
 // ---------------------------------------------------------------- layout ---
 
-/** Where the canyon's inner faces stand. The street is the gap between. */
-export const FACADE_X = 6.9;
-/** Pavement line for lamps and dressing, outside the interactive zone. */
-export const KERB_X = 5.6;
+/**
+ * Where the canyon's inner faces stand. The street is the gap between.
+ *
+ * Widened from 6.9 with the kerb, because the furniture did not fit. The
+ * audit measured a lamp arm reaching x=3.00 — inside the 4.6 zone and
+ * almost exactly on the outer lane centre, so a swinging player passed
+ * through it — plus signs at 3.37 and dumpsters at 3.71.
+ */
+export const FACADE_X = 9.6;
+/**
+ * Pavement line for lamps and dressing, outside the interactive zone.
+ *
+ * Derived, not chosen: the deepest inward reach of any kerb prop is the
+ * streetlight's 2.6-unit arm, so the post must stand at least 4.6 + 2.6
+ * out for the arm to clear the zone.
+ */
+export const KERB_X = 7.4;
 /** How far the scene extends past each end of the route. */
 export const MARGIN = 60;
 
@@ -142,8 +155,8 @@ function pick(n: number, salt: number, count: number): number {
 
 /** A pedestrian crossing every N tiles, to break up the repeat. */
 const CROSSING_EVERY = 5;
-/** One Kenney tile is the whole street, kerbs and all; 17 is its scaled width. */
-const TILE = 17;
+/** One Kenney tile is the whole street, kerbs and all; 19 is its scaled width. */
+const TILE = 19;
 
 const objects: Placement[] = [];
 

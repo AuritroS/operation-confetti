@@ -56,6 +56,8 @@ export class SkylineStreet {
 
   private owned: (BufferGeometry | MeshStandardMaterial | LineBasicMaterial)[] = [];
   private meshes: (InstancedMesh | Mesh | Line | LineSegments)[] = [];
+  /** Instanced pools by prop, so the census is readable rather than uuids. */
+  private pools = new Map<string, InstancedMesh>();
   private dummy = new Object3D();
 
   /** Resolved wires, exposed so anchors and the overlay read the same curve. */
@@ -124,6 +126,7 @@ export class SkylineStreet {
       }
       mesh.count = written;
       mesh.instanceMatrix.needsUpdate = true;
+      this.pools.set(prop, mesh);
       this.meshes.push(mesh);
       this.object.add(mesh);
     }
@@ -186,13 +189,10 @@ export class SkylineStreet {
     this.object.position.z = playerZ;
   }
 
-  /** Instance counts, for the no-churn test. */
+  /** Instance counts by prop, for the no-churn test and for review. */
   get census(): Record<string, number> {
     const out: Record<string, number> = {};
-    for (const mesh of this.meshes) {
-      const instanced = mesh as InstancedMesh;
-      if (instanced.isInstancedMesh) out[mesh.uuid] = instanced.count;
-    }
+    for (const [prop, mesh] of this.pools) out[prop] = mesh.count;
     out['(wires)'] = this.wires.length;
     out['(anchors)'] = this.anchors.size;
     return out;

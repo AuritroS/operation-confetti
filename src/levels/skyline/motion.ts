@@ -1,4 +1,5 @@
 import type { Anchor, Course, Kinematic, Lane, Phase, Point3, RouteSample, TravelMode } from './types';
+import { MOTION_LIMIT_X } from './config';
 
 interface Axis { p: number; v: number; a: number }
 /** Quintic boundary interpolation preserves position, velocity AND acceleration. */
@@ -67,17 +68,30 @@ export class Motion {
     // Choose a bounded curve when reversing at speed. Preserve derivatives;
     // shorten the braking interval rather than clipping position at a wall.
     let candidate: Transfer = { start: time, duration, from, to, lane, mode };
+    let accepted = false;
     for (let attempt = 0; attempt < 12; attempt++) {
       let valid = true;
       for (let i = 1; i <= 32; i++) {
         const p = this.evaluate(candidate, time + duration * i / 32).p;
-        if (p.y < this.c.groundY - 0.001 || Math.abs(p.x) > this.c.laneWidth + 2.5) { valid = false; break; }
+        if (p.y < this.c.groundY - 0.001 || Math.abs(p.x) > MOTION_LIMIT_X) { valid = false; break; }
       }
-      if (valid) break;
+      if (valid) { accepted = true; break; }
       duration *= 0.8;
       to = route(this.c, lane, time + duration, mode);
       candidate = { start: time, duration, from, to, lane, mode };
+      accepted = false;
     }
+    /**
+     * Refuse rather than accept on exhaustion.
+     *
+     * The loop used to fall through and install the last candidate whether
+     * or not it certified, so a reversal at speed could overshoot to
+     * x=5.204 against a declared zone of 4.6. Keeping the current
+     * trajectory is always safe — it was certified when it was chosen — and
+     * the requested lane and mode are still recorded, so the next step
+     * retries from a position where the curve can be bounded.
+     */
+    if (!accepted) return true;
     this.transfer = candidate;
     return true;
   }

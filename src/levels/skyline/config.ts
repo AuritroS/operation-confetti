@@ -53,6 +53,17 @@ export const GAME_ZONE_HALF = 4.6;
 export const PLAYER_HALF = { x: 0.35, y: 0.9, z: 0.35 } as const;
 
 /**
+ * The furthest the player's CENTRE may travel from the middle lane.
+ *
+ * Derived, not chosen: the body adds `PLAYER_HALF.x`, so a centre at this
+ * limit still keeps the whole collider inside the zone. `motion.ts` used
+ * `laneWidth + 2.5` = 5.7, independently of the zone, and a probe reached
+ * x=5.204 with ordinary inputs — past decoration that is placed on the
+ * assumption of being unreachable.
+ */
+export const MOTION_LIMIT_X = GAME_ZONE_HALF - PLAYER_HALF.x;
+
+/**
  * The two canonical height bands, as [bottom, top].
  *
  * Level 2 is three lanes by two heights. Running puts the player's collider

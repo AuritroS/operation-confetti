@@ -167,9 +167,9 @@ export const STREET_PROPS = {
    * runs along Z, every lane marking ran across the street instead of down
    * it.
    */
-  road: K('road-straight', [0.25, 0.4], 'street surface, one tile is the whole street', 17,
+  road: K('road-straight', [0.3, 0.45], 'street surface, one tile is the whole street', 19,
     { long: 'X' }),
-  roadCrossing: K('road-crossing', [0.25, 0.4], 'street surface, pedestrian crossing', 17,
+  roadCrossing: K('road-crossing', [0.3, 0.45], 'street surface, pedestrian crossing', 19,
     { long: 'X' }),
 
   // ---- anchors ----------------------------------------------------------
