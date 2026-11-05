@@ -83,7 +83,7 @@ export class BossScene {
   update(game: BossPractice, step: number): void {
     this.sky.update(step);
     this.environment.update(step);
-    this.magic.update(step, this.environment.cake.position.y);
+    this.magic.update(step);
     this.actors.update(game, step);
     for (let i = 0; i < this.shots.length; i++) {
       const mesh = this.shots[i]!;

@@ -327,7 +327,7 @@ function makeCandelabra(parent: Group, x: number, z: number): void {
  * and tethered, it is visibly hers and visibly out of reach, and both endings
  * stage themselves — the tether snaps and it falls, or it leaves with her.
  */
-function makeCakeDisplay(parent: Group, cake: Group): void {
+function makeCakeDisplay(parent: Group, cake: Group, cakeRings: Mesh[]): void {
   const top = BOSS_LAYOUT.cakeY;
   cake.position.set(BOSS_LAYOUT.cakeX, top, BOSS_LAYOUT.cakeZ);
   const sponge = buildCake();
@@ -351,11 +351,27 @@ function makeCakeDisplay(parent: Group, cake: Group): void {
     const a = i / 10 * Math.PI * 2;
     orb(cake, 0.075, [Math.cos(a) * 0.47, 1.2, Math.sin(a) * 0.47], berry, 8);
   }
-  // A shallow magic saucer under it, so nothing reads as unsupported by accident.
-  const halo = new Mesh(new TorusGeometry(1.23, 0.025, 6, 48), luminous(0xc56aff, 0.8));
-  halo.rotation.x = Math.PI / 2.6;
-  halo.position.set(0, -0.3, 0);
-  cake.add(halo);
+  /*
+   * Three rings it rests in, smallest at the top.
+   *
+   * A single hairline circle read as a dinner plate. Stacking them into an
+   * inverted cone makes the cake look held up by something, and giving each
+   * ring its own rotation in `update` makes that something look alive. They
+   * live in the cake group so they bob with it; nothing else needs to know
+   * where the cake is.
+   */
+  for (const [radius, drop, tube] of [[0.5, -0.26, 0.055], [0.94, -0.5, 0.048], [1.4, -0.76, 0.04]] as const) {
+    // Bake the lie-flat rotation into the geometry rather than the mesh. With
+    // it on the transform, animating rotation.z tipped each ring out of its
+    // own plane instead of spinning it, and they read as loose crossing
+    // ellipses rather than a stack.
+    const geometry = new TorusGeometry(radius, tube, 7, 44);
+    geometry.rotateX(Math.PI / 2);
+    const ring = new Mesh(geometry, luminous(0xd07bff, 0.9));
+    ring.position.set(0, drop, 0);
+    cake.add(ring);
+    cakeRings.push(ring);
+  }
 }
 
 /**
@@ -433,8 +449,14 @@ function batchArchitecture(root: Group, cake: Group): void {
  */
 function makeGift(parent: Group, x: number, y: number, z: number, size: number, plum: boolean, spin = 0): void {
   const gift = new Group();
-  const wrap = plum ? satin(0x4a1a56, 0.04, 0.72) : satin(0xb98448, 0.3, 0.46);
-  const ribbon = plum ? paleGold : satin(0x6d2a7c, 0.04, 0.7);
+  // Light boxes on a dark stage.
+  //
+  // The first pass wrapped them plum (0x4a1a56) and stood them on a velvet
+  // dais (0x40194e) — the same hue at the same value, which is camouflage,
+  // not decoration. Hue cannot fix that while the dais is also purple, so
+  // these jump the value instead: luminance around 230 against the dais's 34.
+  const wrap = plum ? satin(0xf2e4cd, 0.05, 0.62) : satin(0xffd28a, 0.32, 0.42);
+  const ribbon = plum ? satin(0x7b2f8c, 0.05, 0.6) : satin(0x5f2470, 0.05, 0.64);
   const w = size;
   const h = size * 0.82;
   gift.add(new Mesh(new BoxGeometry(w, h, w), wrap));
@@ -455,6 +477,10 @@ function makeGift(parent: Group, x: number, y: number, z: number, size: number, 
   gift.position.set(x, y + h / 2, z);
   gift.rotation.y = spin;
   parent.add(gift);
+  // A contact shadow, so each box sits on the step instead of hovering over it.
+  const shade = new Mesh(new CylinderGeometry(w * 0.72, w * 0.72, 0.012, 10), satin(0x1d0f2a));
+  shade.position.set(x, y + 0.008, z);
+  parent.add(shade);
 }
 
 /**
@@ -470,12 +496,12 @@ function makeGiftStacks(parent: Group): void {
   const stage = BOSS_LAYOUT.bossStageY;
   const placements: readonly (readonly [number, number, number, number, boolean, number])[] = [
     // Dais steps, directly under her.
-    [-2.42, step, -4.42, 0.74, true, 0.34],
-    [-1.74, step, -4.18, 0.54, false, -0.22],
-    [-2.92, step + 0.5, -4.66, 0.48, false, 0.5],
-    [2.38, step, -4.42, 0.7, false, -0.3],
-    [1.7, step, -4.16, 0.52, true, 0.26],
-    [2.9, step + 0.46, -4.66, 0.46, true, -0.46],
+    [-2.46, step, -4.42, 0.88, true, 0.34],
+    [-1.68, step, -4.14, 0.66, false, -0.22],
+    [-3.04, step + 0.6, -4.68, 0.58, false, 0.5],
+    [2.42, step, -4.42, 0.84, false, -0.3],
+    [1.64, step, -4.12, 0.64, true, 0.26],
+    [3.02, step + 0.56, -4.68, 0.56, true, -0.46],
     // Wings, well clear of the corridor.
     [-3.86, stage, -6.1, 0.78, true, 0.2],
     [-4.18, stage, -7.2, 0.96, false, -0.2],
@@ -549,6 +575,7 @@ class DriftingConfetti {
 export class BossEnvironment {
   readonly root = new Group();
   readonly cake = new Group();
+  private readonly cakeRings: Mesh[] = [];
   private readonly confetti = new DriftingConfetti();
   private time = 0;
 
@@ -566,7 +593,7 @@ export class BossEnvironment {
     makeBalloons(this.root);
     makeCandelabra(this.root, -3.55, -5.5);
     makeCandelabra(this.root, 3.55, -5.5);
-    makeCakeDisplay(this.root, this.cake);
+    makeCakeDisplay(this.root, this.cake, this.cakeRings);
     makeGiftStacks(this.root);
     makeScatteredPartyPaper(this.root);
     batchArchitecture(this.root, this.cake);
@@ -579,6 +606,10 @@ export class BossEnvironment {
     this.time += step;
     this.confetti.update(step);
     this.cake.position.y = BOSS_LAYOUT.cakeY + Math.sin(this.time * 1.4) * 0.075;
+    // Each ring turns at its own rate, and the middle one against the others.
+    for (let i = 0; i < this.cakeRings.length; i++) {
+      this.cakeRings[i]!.rotation.y = this.time * (i === 1 ? -0.5 : 0.3 + i * 0.16);
+    }
   }
 
   addProps(models: ReadonlyMap<string, Group>, catalog: readonly BossProp[]): void {

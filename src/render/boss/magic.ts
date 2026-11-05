@@ -1,7 +1,7 @@
 import {
   AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CatmullRomCurve3,
   Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D,
-  Points, PointsMaterial, TextureLoader, TorusGeometry, TubeGeometry, Vector3,
+  PlaneGeometry, Points, PointsMaterial, TextureLoader, TorusGeometry, TubeGeometry, Vector3,
 } from 'three';
 import { BOSS_ACTORS, BOSS_PARTICLES } from '../../assets/boss/catalog';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
@@ -25,8 +25,8 @@ export class BossMagic {
   private readonly halo = new Group();
   private readonly rings: Mesh[] = [];
   private readonly glyphs: InstancedMesh;
-  private readonly cakeRing: Mesh;
-  private readonly wingSeals: Mesh[] = [];
+  private readonly sigils: Mesh[] = [];
+  private readonly ticks: InstancedMesh;
   private readonly tether: Mesh[] = [];
   private readonly motes: Points;
   private readonly points = new Float32Array(18 * 3);
@@ -55,19 +55,45 @@ export class BossMagic {
     }
     this.halo.position.set(0, CHEST, BOSS_LAYOUT.bossZ - 1.05);
     this.root.add(this.halo);
-    for (const side of [-1, 1]) {
-      const seal = new Mesh(
-        new TorusGeometry(0.5, 0.018, 5, 28),
+
+    /*
+     * The sigil behind her.
+     *
+     * `magic_01` in the Kenney particle set is a pentagram with glowing
+     * nodes — an actual magic circle, already shipped as a runtime texture
+     * and until now unused. Two concentric tori read as a hoop; a pentagram
+     * under a counter-rotating star reads as a working spell.
+     *
+     * Counter-rotation across the layers is what sells it. Everything turning
+     * the same way reads as one decal spinning.
+     */
+    const loader = new TextureLoader();
+    for (const [source, size, tint, opacity] of [
+      [BOSS_PARTICLES.castRing, AURORA_HEIGHT * 1.02, 0xd862ff, 0.5],
+      [BOSS_PARTICLES.chargedMagic, AURORA_HEIGHT * 0.6, 0xf2a6ff, 0.42],
+    ] as const) {
+      const plate = new Mesh(
+        new PlaneGeometry(size, size),
         new MeshBasicMaterial({
-          color: 0x9b54c4, transparent: true, opacity: 0.34,
-          depthWrite: false, blending: AdditiveBlending,
+          map: loader.load(source), color: tint, transparent: true,
+          opacity, depthWrite: false, blending: AdditiveBlending,
         }),
       );
-      seal.position.set(side * 3.5, CHEST + 0.35, BOSS_LAYOUT.bossZ - 1.65);
-      seal.scale.y = 1.3;
-      this.wingSeals.push(seal);
-      this.root.add(seal);
+      plate.position.set(0, CHEST, BOSS_LAYOUT.bossZ - 1.12);
+      this.sigils.push(plate);
+      this.root.add(plate);
     }
+
+    // Radial ticks around the outer boundary, like the graduations on a dial.
+    this.ticks = new InstancedMesh(
+      new BoxGeometry(0.03, 0.17, 0.02),
+      new MeshBasicMaterial({
+        color: 0xe79bff, transparent: true, opacity: 0.5,
+        depthWrite: false, blending: AdditiveBlending,
+      }),
+      36,
+    );
+    this.root.add(this.ticks);
 
     this.glyphs = new InstancedMesh(
       new BoxGeometry(0.085, 0.22, 0.025),
@@ -82,16 +108,6 @@ export class BossMagic {
     }
     this.root.add(this.glyphs);
 
-    this.cakeRing = new Mesh(
-      new TorusGeometry(1.17, 0.032, 6, 48),
-      new MeshBasicMaterial({
-        color: 0xca62ec, transparent: true, opacity: 0.6,
-        depthWrite: false, blending: AdditiveBlending,
-      }),
-    );
-    this.cakeRing.rotation.x = Math.PI / 2;
-    this.cakeRing.position.set(BOSS_LAYOUT.cakeX, BOSS_LAYOUT.cakeY - 0.1, BOSS_LAYOUT.cakeZ);
-    this.root.add(this.cakeRing);
 
     // A fine tether makes the stolen cake visibly Aurora's captive.
     for (const sign of [-1, 1]) {
@@ -127,21 +143,17 @@ export class BossMagic {
       }),
     );
     this.root.add(this.motes);
-    this.update(0, BOSS_LAYOUT.cakeY);
+    this.update(0);
   }
 
-  update(step: number, cakeY: number): void {
+  update(step: number): void {
     if (!this.reducedMotion) this.time += step;
     const t = this.time;
     this.rings[0]!.rotation.z = 0.1 + t * 0.09;
     this.rings[1]!.rotation.z = -0.15 - t * 0.13;
     this.halo.scale.setScalar(1 + Math.sin(t * 1.1) * 0.025);
-    this.wingSeals[0]!.rotation.z = t * 0.12;
-    this.wingSeals[1]!.rotation.z = -t * 0.12;
-    this.cakeRing.position.y = cakeY - 0.1;
-    this.cakeRing.rotation.z = t * 0.18;
     for (let i = 0; i < 22; i++) {
-      const a = i / 22 * Math.PI * 2 + t * 0.13;
+      const a = i / 22 * Math.PI * 2 - t * 0.21;
       const r = AURORA_HEIGHT * 0.564 + (i % 3) * 0.05;
       this.dummy.position.set(
         Math.cos(a) * r,
@@ -153,6 +165,23 @@ export class BossMagic {
       this.glyphs.setMatrixAt(i, this.dummy.matrix);
     }
     this.glyphs.instanceMatrix.needsUpdate = true;
+    this.sigils[0]!.rotation.z = t * 0.11;
+    this.sigils[1]!.rotation.z = -t * 0.29;
+    for (let i = 0; i < 36; i++) {
+      const a = (i / 36) * Math.PI * 2 - t * 0.07;
+      const r = AURORA_HEIGHT * (i % 3 === 0 ? 0.6 : 0.575);
+      this.dummy.position.set(
+        Math.cos(a) * r,
+        CHEST + Math.sin(a) * r,
+        BOSS_LAYOUT.bossZ - 1.1,
+      );
+      this.dummy.rotation.set(0, 0, a + Math.PI / 2);
+      this.dummy.scale.setScalar(i % 3 === 0 ? 1.5 : 1);
+      this.dummy.updateMatrix();
+      this.ticks.setMatrixAt(i, this.dummy.matrix);
+    }
+    this.dummy.scale.setScalar(1);
+    this.ticks.instanceMatrix.needsUpdate = true;
     for (let i = 0; i < 18; i++) {
       const a = i * 2.39996 + t * (0.13 + i % 3 * 0.035);
       const radius = 0.6 + (i % 5) * 0.26;

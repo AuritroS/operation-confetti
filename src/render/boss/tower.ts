@@ -106,10 +106,11 @@ function makeShaft(parent: Group): void {
   }
   // Neon risers on the camera-facing faces: the detail that makes it this
   // tower at night rather than a grey column.
-  // No neon striping on the shaft: distinct strips turned the landmark into a
-  // barber's pole. The shaft stays white concrete inside one soft magenta
-  // sleeve, so the colour reads as light falling on it.
-  ring(parent, 1.42, 2.12, 14.6, 4.6, z, bloom, 12);
+  // The shaft carries no glow at all. Striping it read as a barber's pole,
+  // and sleeving it lit a magenta column directly behind Aurora — the one
+  // place in the frame nothing is allowed to compete. The antenna keeps its
+  // glow: it is far above her, and it is what makes the landmark read at
+  // night from the other two levels.
 
   // Flared saucer: underside cone, lit window band, shallow cap.
   ring(parent, 2.0, 1.1, 0.6, 12.3, z, concreteDark, 20);
