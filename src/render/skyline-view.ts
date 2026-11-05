@@ -25,11 +25,11 @@
 /**
  * Stand-off from the hero along +Z, before the portrait correction.
  *
- * 18 put Matthew at 10.6% of frame height. 16 puts him at roughly 12.7%,
- * which is the size asked for once the curl shell landed. Level 1 still
- * frames him far larger, at 22.3%, so this remains the wider of the two.
+ * Reduced from 16 to 12.5 so Matthew occupies ~16% of frame height (closer to
+ * level 1's hero presence and intimacy, while preserving room for the high swing
+ * arcs).
  */
-export const CAMERA_DISTANCE = 16;
+export const CAMERA_DISTANCE = 12.5;
 
 /**
  * Extra distance on narrow screens.
@@ -39,14 +39,14 @@ export const CAMERA_DISTANCE = 16;
  * than letting them slide off the edge.
  */
 export const CAMERA_ASPECT_REFERENCE = 0.48;
-export const CAMERA_ASPECT_PULLBACK = 9;
+export const CAMERA_ASPECT_PULLBACK = 8;
 
-/** Height above the tracked focus point. */
-export const CAMERA_HEIGHT = 4.6;
+/** Height above the tracked focus point. Steeper down-pitch opens road vertically. */
+export const CAMERA_HEIGHT = 5.4;
 /** Vertical offset of the look-at target, relative to the same focus point. */
-export const CAMERA_LOOK_HEIGHT = 1.2;
+export const CAMERA_LOOK_HEIGHT = 0.6;
 /** How far down the route the camera aims, in units ahead. */
-export const CAMERA_LOOK_AHEAD = -14;
+export const CAMERA_LOOK_AHEAD = -17;
 
 /**
  * Lateral offset and yaw, for an oblique variant.
@@ -60,15 +60,15 @@ export const CAMERA_SIDE = 0;
 export const CAMERA_YAW = 0;
 
 /** Altitude tracking: how much of the hero's height the focus point follows. */
-export const FOCUS_BASE = 3.4;
-export const FOCUS_FOLLOW = 0.4;
+export const FOCUS_BASE = 3.2;
+export const FOCUS_FOLLOW = 0.52;
 /** Reduced motion follows less, so the frame moves less. */
-export const FOCUS_FOLLOW_REDUCED = 0.25;
+export const FOCUS_FOLLOW_REDUCED = 0.32;
 /** Exponential settle rate for the focus point. */
 export const FOCUS_SETTLE = 4;
 
 /** Starting focus height, also used on reset. */
-export const FOCUS_START = 6.2;
+export const FOCUS_START = 5.6;
 
 /**
  * Fog, clip and draw distance — one interlocking set, not three dials.

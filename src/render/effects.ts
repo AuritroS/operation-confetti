@@ -24,6 +24,7 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  PlaneGeometry,
   Points,
   PointsMaterial,
   type Texture,
@@ -94,6 +95,35 @@ export function glowTexture(): Texture {
   return sharedGlow;
 }
 
+let sharedShadow: Texture | null = null;
+
+/**
+ * Soft radial contact drop shadow texture.
+ *
+ * Dark circular gradient with exponential falloff to ground characters
+ * and objects to the road surface.
+ */
+export function shadowTexture(): Texture {
+  if (sharedShadow) return sharedShadow;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const center = size / 2;
+    const g = ctx.createRadialGradient(center, center, 0, center, center, center);
+    g.addColorStop(0.0, 'rgba(0, 0, 0, 0.85)');
+    g.addColorStop(0.3, 'rgba(0, 0, 0, 0.65)');
+    g.addColorStop(0.65, 'rgba(0, 0, 0, 0.22)');
+    g.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  sharedShadow = new CanvasTexture(canvas);
+  return sharedShadow;
+}
+
 function crossedQuads(size: number): BufferGeometry {
   const h = size / 2;
   const geom = new BufferGeometry();
@@ -145,6 +175,7 @@ export interface GiftGlowOptions {
 export class GiftGlowField {
   readonly group = new Group();
   private readonly mesh: InstancedMesh;
+  private readonly groundMesh: InstancedMesh;
   private readonly matrix = new Matrix4();
   private readonly dummy = new Group();
   private readonly anchors: Vector3[] = [];
@@ -157,9 +188,10 @@ export class GiftGlowField {
     options: GiftGlowOptions = {},
   ) {
     this.baseSize = options.size ?? 1.6;
+    const color = new Color(options.color ?? PALETTE.gold);
     const geometry = crossedQuads(this.baseSize);
     const material = new MeshBasicMaterial({
-      color: new Color(options.color ?? PALETTE.gold),
+      color,
       map: glowTexture(),
       transparent: true,
       opacity: 0.85,
@@ -172,12 +204,29 @@ export class GiftGlowField {
     this.mesh.frustumCulled = false;
     this.group.add(this.mesh);
 
+    // Ground projection pool on the asphalt road surface
+    const groundGeom = new PlaneGeometry(this.baseSize * 1.35, this.baseSize * 1.35);
+    groundGeom.rotateX(-Math.PI / 2);
+    const groundMat = new MeshBasicMaterial({
+      color,
+      map: glowTexture(),
+      transparent: true,
+      opacity: 0.42,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    });
+    this.groundMesh = new InstancedMesh(groundGeom, groundMat, Math.max(1, maxAnchors));
+    this.groundMesh.frustumCulled = false;
+    this.group.add(this.groundMesh);
+
     for (let i = 0; i < maxAnchors; i++) {
       this.anchors.push(new Vector3());
       this.matrix.makeTranslation(0, -9999, 0);
       this.mesh.setMatrixAt(i, this.matrix);
+      this.groundMesh.setMatrixAt(i, this.matrix);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.groundMesh.instanceMatrix.needsUpdate = true;
   }
 
   setAnchors(positions: readonly Vector3[]): void {
@@ -196,22 +245,34 @@ export class GiftGlowField {
     for (let i = 0; i < this.maxAnchors; i++) {
       if (i < this.active) {
         const a = this.anchors[i]!;
+        // 3D aura at the gift's mid-air altitude
         this.dummy.position.copy(a);
         this.dummy.rotation.set(0, spin + i * 0.7, 0);
         this.dummy.scale.setScalar(pulse);
         this.dummy.updateMatrix();
         this.mesh.setMatrixAt(i, this.dummy.matrix);
+
+        // Projected puddle pool on the road asphalt at y = 0.006
+        this.dummy.position.set(a.x, 0.006, a.z);
+        this.dummy.rotation.set(0, 0, 0);
+        this.dummy.scale.setScalar(pulse * 1.05);
+        this.dummy.updateMatrix();
+        this.groundMesh.setMatrixAt(i, this.dummy.matrix);
       } else {
         this.matrix.makeTranslation(0, -9999, 0);
         this.mesh.setMatrixAt(i, this.matrix);
+        this.groundMesh.setMatrixAt(i, this.matrix);
       }
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.groundMesh.instanceMatrix.needsUpdate = true;
   }
 
   dispose(): void {
     this.mesh.geometry.dispose();
     (this.mesh.material as MeshBasicMaterial).dispose();
+    this.groundMesh.geometry.dispose();
+    (this.groundMesh.material as MeshBasicMaterial).dispose();
     this.group.removeFromParent();
   }
 }

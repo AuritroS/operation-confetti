@@ -2,7 +2,7 @@ import {
   BoxGeometry, Color, FogExp2, Group,
   DirectionalLight,
   InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial,
-  Object3D, OctahedronGeometry, Vector2, Vector3,
+  Object3D, OctahedronGeometry, PlaneGeometry, Vector2, Vector3,
 } from 'three';
 import { Stage } from './stage';
 import { SkylineCamera } from './skyline-camera';
@@ -11,7 +11,7 @@ import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower } from './custom';
-import { GiftGlowField, SparkleField } from './effects';
+import { GiftGlowField, shadowTexture, SparkleField } from './effects';
 import { PALETTE } from './palette';
 import { darken, disposeTree, unfog } from './environment/skyline';
 import type { EnvironmentLayer } from './environment/layer';
@@ -124,11 +124,13 @@ export class SkylineScene {
   private markBuffer: Vector3[] = [];
   private landmark: Object3D | null = null;
   private gameplayVisible = true;
+  private playerShadow: Mesh;
 
   setGameplayVisible(visible: boolean): void {
     this.gameplayVisible = visible;
     this.hero.visible = visible && !this.rigged;
     if (this.rigged) this.rigged.object.visible = visible;
+    this.playerShadow.visible = visible;
     this.rope.object.visible = visible && this.rope.currentPhase !== 'idle';
     this.giftMarks.group.visible = visible;
     this.hazardMarks.points.visible = visible;
@@ -190,6 +192,18 @@ export class SkylineScene {
       this.root.add(layer.object);
     }
     this.hero.add(this.torso); this.root.add(this.hero);
+    // Contact drop shadow on the asphalt road surface
+    const shadowGeom = new PlaneGeometry(1.6, 1.6);
+    shadowGeom.rotateX(-Math.PI / 2);
+    const shadowMat = new MeshBasicMaterial({
+      map: shadowTexture(),
+      transparent: true,
+      opacity: 0.60,
+      depthWrite: false,
+    });
+    this.playerShadow = new Mesh(shadowGeom, shadowMat);
+    this.playerShadow.position.set(0, 0.008, 0);
+    this.root.add(this.playerShadow);
     this.cube(this.torso, this.blue, 0, 0.1, 0, 0.75, 0.9, 0.45);
     this.cube(this.torso, this.blue, 0, 0.87, 0, 0.5, 0.55, 0.5);
     this.cube(this.torso, this.gold, 0, 0.85, -0.26, 0.42, 0.13, 0.04);
@@ -347,6 +361,14 @@ export class SkylineScene {
       this.rigged.object.rotation.copy(this.hero.rotation);
       this.rigged.update(s, dt, reduced);
     }
+    // Update player contact drop shadow
+    const altitude = Math.max(0, s.p.y - this.course.groundY);
+    const shadowScale = 1.0 + Math.min(1.5, altitude * 0.12);
+    const shadowOpacity = Math.max(0.12, 0.60 - altitude * 0.045);
+    this.playerShadow.position.set(s.p.x, 0.008, 0);
+    this.playerShadow.scale.set(shadowScale, 1, shadowScale * 1.15);
+    (this.playerShadow.material as MeshBasicMaterial).opacity = shadowOpacity;
+    this.playerShadow.visible = this.gameplayVisible;
     this.torso.rotation.x = landing ? -0.35 : hit * 0.3;
     this.blue.emissive.setHex(s.protection > 0 ? 0x50324d : 0x102a59);
     this.arms.forEach((arm, i) => {
@@ -522,6 +544,9 @@ export class SkylineScene {
     this.labels?.dispose();
     this.giftMarks.dispose();
     this.hazardMarks.dispose();
+    this.playerShadow.geometry.dispose();
+    (this.playerShadow.material as MeshBasicMaterial).dispose();
+    this.playerShadow.removeFromParent();
     if (this.landmark) disposeTree([this.landmark]);
     this.rigged?.dispose();
     for (const layer of this.backdrop) layer.dispose();
