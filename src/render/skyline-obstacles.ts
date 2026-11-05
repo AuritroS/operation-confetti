@@ -40,10 +40,15 @@ import type { StreetPropId } from './skyline-props';
 import type { Entity } from '../levels/skyline/types';
 import { ANCHOR_HEIGHT } from '../levels/skyline/motion';
 
-/** How wide a hazard has to be before it counts as spanning the street. */
-const SPAN_THRESHOLD = 3;
-/** Collider underside below this is a ground obstacle, above it overhead. */
-const GROUND_THRESHOLD = 0.6;
+/**
+ * Threshold-based inference is gone.
+ *
+ * This file used to work out whether to build a bridge, a sign or a
+ * barricade by measuring the collider it was given — wider than 3 meant a
+ * span, a bottom above 0.6 meant overhead. That is reading intent out of a
+ * number, and it is how `cone-right` came to render as a row of barriers.
+ * The entity now carries `assembly`, named by the scene.
+ */
 /** Where a bridge pillar stands: on the kerb, clear of every lane. */
 const PILLAR_X = 6.2;
 
@@ -84,17 +89,30 @@ export class ObstacleKit {
    * Build the visual for one hazard, in the collider's LOCAL space.
    *
    * y=0 is the collider's centre, because the scene positions the returned
-   * group at the entity. The archetype is read from the volume itself rather
-   * than from a field, because the shape of the box is exactly what the
-   * player has to learn to read.
+   * group at the entity. The assembly is NAMED by the scene; it used to be
+   * inferred from the collider's width and bottom height, which is reading
+   * intent out of a number and is how `cone-right` rendered as barriers.
    */
   hazard(e: Entity): Group {
     const group = new Group();
-    const span = e.halfX > SPAN_THRESHOLD;
     const clearance = e.y - e.halfY;
 
-    if (clearance < GROUND_THRESHOLD) this.ground(group, e, span);
-    else this.overhead(group, e, span, clearance);
+    switch (e.assembly) {
+      case 'barricade':
+        this.ground(group, e, true);
+        break;
+      case 'laneBlock':
+        this.ground(group, e, false);
+        break;
+      case 'bridge':
+        this.overhead(group, e, true, clearance);
+        break;
+      case 'hangingSign':
+        this.overhead(group, e, false, clearance);
+        break;
+      default:
+        break;
+    }
     return bake(group);
   }
 

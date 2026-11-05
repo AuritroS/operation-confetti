@@ -9,6 +9,8 @@ export type Phase = 'swing' | 'flight' | 'descend' | 'land' | 'run' | 'launch' |
 export interface Anchor extends Point3 { id: string; lane: Lane; kind: 'upper' | 'lower' }
 export interface Entity extends Point3 {
   id: string; lane: Lane; kind: 'gift' | 'hazard'; halfX: number; halfY: number; halfZ: number; scored: boolean;
+  /** Which assembly to build. Named by the scene, never inferred from size. */
+  assembly: import('./config').AssemblyId;
 }
 export interface Course {
   duration: number; speed: number; laneWidth: number; groundY: number;

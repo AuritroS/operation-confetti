@@ -35,7 +35,9 @@
  * has somewhere to be going.
  */
 import type { Lane } from './types';
-import { SKYLINE } from './course';
+import { COURSE, ROUTE_LENGTH, type AssemblyId, type Encounter } from './config';
+
+export type { AssemblyId, Encounter };
 
 /** Placement intent. A placement never writes radians; see `resolveFacing`. */
 export type Facing =
@@ -93,16 +95,6 @@ export interface Landing {
   readonly z: number;
 }
 
-/** What to build, named outright instead of inferred from collider shape. */
-export type AssemblyId = 'barricade' | 'bridge' | 'hangingSign' | 'laneBlock' | 'gift';
-
-export interface Encounter {
-  readonly id: string;
-  readonly assembly: AssemblyId;
-  readonly lane: Lane;
-  readonly z: number;
-}
-
 export interface SceneDefinition {
   readonly objects: readonly Placement[];
   readonly wires: readonly Wire[];
@@ -126,9 +118,9 @@ export const MARGIN = 60;
  * One building pair per swing, so every wire has a facade on each side to
  * hang from and the canyon rhythm matches the rhythm the player feels.
  */
-export const BAY = SKYLINE.cycle * SKYLINE.speed;
+export const BAY = COURSE.cycle * COURSE.speed;
 
-const ROUTE = SKYLINE.duration * SKYLINE.speed;
+const ROUTE = ROUTE_LENGTH;
 
 const FIRST_BAY = Math.floor(-MARGIN / BAY);
 const LAST_BAY = Math.ceil((ROUTE + MARGIN) / BAY);
@@ -238,27 +230,60 @@ for (let bay = FIRST_BAY; bay <= LAST_BAY; bay++) {
 }
 
 /**
- * Encounters, carried over from the course so the beats are unchanged.
+ * The course, authored here.
  *
- * `assembly` is named outright. The renderer used to infer "bridge" or
- * "sign" or "barrier" from a collider's width and bottom height, which is
- * why `cone-right` rendered as a row of barriers.
+ * THE SCENE IS AUTHORITATIVE. This list used to be derived from
+ * `course.ts`, with the renderer then guessing which assembly to build from
+ * the collider's width and bottom height — which is how `cone-right` came
+ * to render as a row of barriers. The arrow now runs the other way: an
+ * encounter names its assembly, and `course.ts` derives the collider from
+ * `ASSEMBLY`. One edit, both the visuals and the gameplay follow.
+ *
+ * Authored in SECONDS. Beats are a rhythm the player feels; changing the
+ * speed should move the geometry, not the pacing.
+ *
+ * Four acts. Scored gifts are capped at four by the scoring rules, so the
+ * route's length buys hazard variety and breathing room, not collectibles.
+ *
+ *   teach    0-11   one archetype at a time
+ *   commit   11-23  the bridge and the barricade, each admitting one answer
+ *   mix      23-34  lane choice and height choice in the same beat
+ *   closing  34-45  tightest spacing, every archetype in play
  */
-const encounters: Encounter[] = SKYLINE.entities.map((e) => ({
-  id: e.id,
-  assembly:
-    e.kind === 'gift'
-      ? 'gift'
-      : e.halfX > 3
-        ? e.y - e.halfY < 0.6
-          ? 'barricade'
-          : 'bridge'
-        : e.y - e.halfY < 0.6
-          ? 'laneBlock'
-          : 'hangingSign',
-  lane: e.lane,
-  z: e.z,
-}));
+const encounters: Encounter[] = ([
+  // ---- teach -----------------------------------------------------------
+  { id: 'teach', assembly: 'gift', lane: 0, t: 3.5, mode: 'swing', scored: false },
+  { id: 'gift-left', assembly: 'gift', lane: -1, t: 7, mode: 'swing', scored: true },
+  // A lane shut at every height is a COMPOSITION of the two bands, not an
+  // archetype: no prop in any pack honestly fills a 0-12 volume, and the
+  // one that tried rendered as a barrier stretched to five times the
+  // character's height.
+  { id: 'first-middle-low', assembly: 'laneBlock', lane: 0, t: 7 },
+  { id: 'first-middle-high', assembly: 'hangingSign', lane: 0, t: 7 },
+  { id: 'cone-right', assembly: 'laneBlock', lane: 1, t: 11 },
+
+  // ---- commit ----------------------------------------------------------
+  { id: 'gift-ground', assembly: 'gift', lane: 0, t: 13.5, mode: 'run', scored: true },
+  { id: 'bridge', assembly: 'bridge', lane: 0, t: 15.5 },
+  { id: 'sign-left', assembly: 'hangingSign', lane: -1, t: 19.5 },
+  { id: 'barricade', assembly: 'barricade', lane: 0, t: 22 },
+
+  // ---- mix -------------------------------------------------------------
+  { id: 'gift-right', assembly: 'gift', lane: 1, t: 25, mode: 'swing', scored: true },
+  { id: 'upper-left', assembly: 'hangingSign', lane: -1, t: 25 },
+  { id: 'centre-tower-low', assembly: 'laneBlock', lane: 0, t: 29 },
+  { id: 'centre-tower-high', assembly: 'hangingSign', lane: 0, t: 29 },
+  { id: 'fence-right', assembly: 'laneBlock', lane: 1, t: 31.5 },
+
+  // ---- closing ---------------------------------------------------------
+  { id: 'gift-low-left', assembly: 'gift', lane: -1, t: 34, mode: 'run', scored: true },
+  { id: 'low-right', assembly: 'laneBlock', lane: 1, t: 34 },
+  { id: 'mid-high', assembly: 'hangingSign', lane: 0, t: 38 },
+  { id: 'final-ground', assembly: 'laneBlock', lane: 0, t: 41 },
+  { id: 'final-high', assembly: 'hangingSign', lane: 1, t: 41 },
+  { id: 'last-left-low', assembly: 'laneBlock', lane: -1, t: 43.5 },
+  { id: 'last-left-high', assembly: 'hangingSign', lane: -1, t: 43.5 },
+] satisfies Encounter[]).sort((a, b) => a.t - b.t);
 
 /** Landing markings, one per lane at each bay, for the low road. */
 const landings: Landing[] = [];
