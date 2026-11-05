@@ -264,38 +264,42 @@ for (let bay = FIRST_BAY; bay <= LAST_BAY; bay++) {
  *   closing  34-45  tightest spacing, every archetype in play
  */
 const encounters: Encounter[] = ([
-  // ---- teach -----------------------------------------------------------
+  // ---- teach (0-11s) ----------------------------------------------------
   { id: 'teach', assembly: 'gift', lane: 0, t: 3.5, mode: 'swing', scored: false },
   { id: 'gift-left', assembly: 'gift', lane: -1, t: 7, mode: 'swing', scored: true },
-  // A lane shut at every height is a COMPOSITION of the two bands, not an
-  // archetype: no prop in any pack honestly fills a 0-12 volume, and the
-  // one that tried rendered as a barrier stretched to five times the
-  // character's height.
+  // Double-decker blocker closing lane 0
   { id: 'first-middle-low', assembly: 'laneBlock', lane: 0, t: 7 },
   { id: 'first-middle-high', assembly: 'hangingSign', lane: 0, t: 7 },
-  { id: 'cone-right', assembly: 'laneBlock', lane: 1, t: 11 },
+  { id: 'cone-right', assembly: 'laneBlock', lane: 1, t: 10.5 },
 
-  // ---- commit ----------------------------------------------------------
+  // ---- commit (11-23s) ---------------------------------------------------
   { id: 'gift-ground', assembly: 'gift', lane: 0, t: 13.5, mode: 'run', scored: true },
   { id: 'bridge', assembly: 'bridge', lane: 0, t: 15.5 },
-  { id: 'sign-left', assembly: 'hangingSign', lane: -1, t: 19.5 },
+  // Choice gate: overhead in lane -1, cones in lane 0; lane 1 open
+  { id: 'sign-left', assembly: 'hangingSign', lane: -1, t: 18.5 },
+  { id: 'mid-cones', assembly: 'laneBlock', lane: 0, t: 18.5 },
   { id: 'barricade', assembly: 'barricade', lane: 0, t: 22 },
 
-  // ---- mix -------------------------------------------------------------
+  // ---- mix & slalom (23-34s) --------------------------------------------
   { id: 'gift-right', assembly: 'gift', lane: 1, t: 25, mode: 'swing', scored: true },
   { id: 'upper-left', assembly: 'hangingSign', lane: -1, t: 25 },
-  { id: 'centre-tower-low', assembly: 'laneBlock', lane: 0, t: 29 },
-  { id: 'centre-tower-high', assembly: 'hangingSign', lane: 0, t: 29 },
-  { id: 'fence-right', assembly: 'laneBlock', lane: 1, t: 31.5 },
+  { id: 'slalom-cones-mid', assembly: 'laneBlock', lane: 0, t: 27.5 },
+  // Choice gate: sign in lane 1, cones in lane -1; lane 0 open
+  { id: 'gate-sign-right', assembly: 'hangingSign', lane: 1, t: 30 },
+  { id: 'gate-cones-left', assembly: 'laneBlock', lane: -1, t: 30 },
+  // Return of the Highway Gantry: high-speed dive beneath
+  { id: 'second-bridge', assembly: 'bridge', lane: 0, t: 32.5 },
 
-  // ---- closing ---------------------------------------------------------
-  { id: 'gift-low-left', assembly: 'gift', lane: -1, t: 34, mode: 'run', scored: true },
-  { id: 'low-right', assembly: 'laneBlock', lane: 1, t: 34 },
-  { id: 'mid-high', assembly: 'hangingSign', lane: 0, t: 38 },
-  { id: 'final-ground', assembly: 'laneBlock', lane: 0, t: 41 },
-  { id: 'final-high', assembly: 'hangingSign', lane: 1, t: 41 },
-  { id: 'last-left-low', assembly: 'laneBlock', lane: -1, t: 43.5 },
-  { id: 'last-left-high', assembly: 'hangingSign', lane: -1, t: 43.5 },
+  // ---- closing climax (34-45s) ------------------------------------------
+  { id: 'gift-low-left', assembly: 'gift', lane: -1, t: 35.5, mode: 'run', scored: true },
+  // Climax double-decker in middle lane
+  { id: 'climax-double-mid-low', assembly: 'laneBlock', lane: 0, t: 37.5 },
+  { id: 'climax-double-mid-high', assembly: 'hangingSign', lane: 0, t: 37.5 },
+  // Return of the Barricade Wall: vault over into flight
+  { id: 'second-barricade', assembly: 'barricade', lane: 0, t: 40 },
+  // Final needle gate: overhead sign in mid, cones on right; thread lane -1
+  { id: 'final-sign-mid', assembly: 'hangingSign', lane: 0, t: 42.5 },
+  { id: 'final-cones-right', assembly: 'laneBlock', lane: 1, t: 42.5 },
 ] satisfies Encounter[]).sort((a, b) => a.t - b.t);
 
 /** Landing markings removed — player can land anywhere on the road. */
