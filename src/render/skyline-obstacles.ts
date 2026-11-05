@@ -85,6 +85,8 @@ export const TURNED_PROPS: readonly StreetPropId[] = [
   'signHanging',
   'signGantry',
   'trafficLightHoriz',
+  'signWarningDiamond',
+  'signStopOctagon',
 ];
 
 export class ObstacleKit {
@@ -166,9 +168,10 @@ export class ObstacleKit {
    * Overhead obstacles:
    * - Full-street bridge: Highway Gantry (signGantry) elevated so the truss clears y ~ 12.5m
    *   (above the swing apex) and sign panels hang across the corridor y in [6.5, 12m].
-   * - Single-lane hangingSign: Vertically stacked traffic signal rig (trafficLightVert +
-   *   trafficLightHoriz) suspended from the cable, blocking the swing corridor y in [6.5, 12m]
-   *   while leaving the road clear underneath for runners to dive/run under.
+   * - Single-lane hangingSign: Heavy-duty cantilever mast-arm overhead sign assembly
+   *   holding both the Warning Diamond (upper) and STOP Sign (lower) across the lane.
+   *   Blocks the swing corridor y in [6.8m, 11.2m] from any flight angle while leaving
+   *   the road clear underneath (y in [0, 6.8m]) for runners to dive/run under.
    */
   private overhead(group: Group, e: Entity, span: boolean): void {
     if (span) {
@@ -181,41 +184,57 @@ export class ObstacleKit {
       return;
     }
 
-    // Single lane: Multi-head vertical signal rig in the lane
-    // Upper vertical head at local y = +1.3 (world y = 10.3m, covering apex swing height)
-    const upperHead = this.one(group, 'trafficLightVert', 0, 1.3, 0);
-    if (upperHead) {
-      upperHead.scale.setScalar(1.15);
-    }
+    // Single lane: Cantilever mast-arm holding both Warning Diamond and STOP signs
+    // The vertical mast column sits on the side of the lane nearest the kerb
+    const mastSide = e.x > 0 ? 1 : -1;
+    const mastX = mastSide * (e.halfX - 0.08);
 
-    // Lower horizontal head at local y = -1.2 (world y = 7.8m, covering trough/mid swing height)
-    const lowerHead = this.one(group, 'trafficLightHoriz', 0, -1.2, 0, BLOCKING_TURN);
-    if (lowerHead) {
-      const half = this.assets.half('trafficLightHoriz');
-      const across = Math.max((half ? half.z : 0.91) * 2, 0.01);
+    // Upper Sign: Warning Diamond (covering swing apex, world y ~ 9.2m to 11.0m)
+    const upperSign = this.one(group, 'signWarningDiamond', 0, 0.2, 0, BLOCKING_TURN);
+    if (upperSign) {
+      const half = this.assets.half('signWarningDiamond');
+      const across = Math.max((half ? half.z : 0.87) * 2, 0.01);
       const uniformScale = (e.halfX * 2) / across;
-      lowerHead.scale.setScalar(uniformScale);
+      upperSign.scale.setScalar(uniformScale);
     }
 
-    // Central mounting mast connecting the upper and lower heads
+    // Lower Sign: STOP Sign (covering swing trough/mid height, world y ~ 7.1m to 8.9m)
+    const lowerSign = this.one(group, 'signStopOctagon', 0, -1.9, 0, BLOCKING_TURN);
+    if (lowerSign) {
+      const half = this.assets.half('signStopOctagon');
+      const across = Math.max((half ? half.z : 0.82) * 2, 0.01);
+      const uniformScale = (e.halfX * 2) / across;
+      lowerSign.scale.setScalar(uniformScale);
+    }
+
+    // Cantilever upright mast column
     const mastHeight = 4.8;
     const mast = new Mesh(
-      new BoxGeometry(0.12, mastHeight, 0.12),
+      new BoxGeometry(0.14, mastHeight, 0.14),
       new MeshBasicMaterial({ color: 0x2e384d }),
     );
-    mast.position.set(0, 0.2, 0);
+    mast.position.set(mastX, 0.2, -0.05);
     group.add(mast);
 
-    // Slender vertical suspension cable connecting the rig up to the streetcar cable line
+    // Horizontal cantilever crossbeams spanning the lane behind the signs
+    const armWidth = Math.abs(mastX) * 2;
+    const armMat = new MeshBasicMaterial({ color: 0x2e384d });
+    for (const yArm of [-1.1, 0.2, 1.1]) {
+      const arm = new Mesh(new BoxGeometry(armWidth, 0.09, 0.09), armMat);
+      arm.position.set(0, yArm, -0.05);
+      group.add(arm);
+    }
+
+    // Structural suspension cable connecting the mast up to the streetcar wire line
     const cableTop = ANCHOR_HEIGHT - e.y;
     const mastTop = 0.2 + mastHeight / 2;
     const rise = cableTop - mastTop;
     if (rise > 0) {
       const cable = new Mesh(
         new BoxGeometry(0.04, rise, 0.04),
-        new MeshBasicMaterial({ color: 0x2e384d }),
+        armMat,
       );
-      cable.position.set(0, mastTop + rise / 2, 0);
+      cable.position.set(mastX, mastTop + rise / 2, -0.05);
       group.add(cable);
     }
   }

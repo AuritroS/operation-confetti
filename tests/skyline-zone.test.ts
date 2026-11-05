@@ -26,6 +26,8 @@ const PROP_HALVES: Record<string, { x: number; y: number; z: number }> = {
   barrier: { x: 0.31, y: 0.525, z: 0.91 },
   cone: { x: 0.49, y: 0.61, z: 0.49 },
   signGantry: { x: 0.86, y: 4.60, z: 6.50 },
+  signWarningDiamond: { x: 0.40, y: 0.87, z: 0.87 },
+  signStopOctagon: { x: 0.40, y: 0.82, z: 0.82 },
   trafficLightHoriz: { x: 0.63, y: 0.40, z: 0.93 },
   trafficLightVert: { x: 0.40, y: 0.95, z: 0.40 },
   gift: { x: 0.80, y: 0.80, z: 0.80 },
