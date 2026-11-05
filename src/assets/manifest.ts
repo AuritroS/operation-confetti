@@ -34,7 +34,7 @@ export const SOURCES = {
     '/models/src/Rig_Medium_MovementBasic.glb',
   ],
   props: {
-    /** Confetti blaster / grappling gun. Uses Kenney compact blaster for sleek silhouette. */
+    /** Confetti blaster / grappling gun. Kenney's compact pistol, tinted gold by the asset build. */
     blaster: '/models/props/blaster.glb',
     gift: '/models/props/present_A_blue.glb',
     grappleHook: '/models/props/candycane_small.glb',
@@ -142,7 +142,13 @@ export const ATTACH_OFFSETS = {
   blaster: {
     position: [0, 0, 0] as [number, number, number],
     rotationEuler: [-Math.PI / 2, 0, Math.PI] as [number, number, number],
-    /** Sleek handheld carbine/blaster scale for Matthew's hand */
+    /**
+     * A pistol, not a carbine.
+     *
+     * The swing animations put his arm through a wide arc, and a long barrel
+     * fouls it — which is why this is Kenney's compact blaster rather than
+     * level 3's cannon, despite the two otherwise wanting to be one gun.
+     */
     scale: 0.95,
   },
 } as const;

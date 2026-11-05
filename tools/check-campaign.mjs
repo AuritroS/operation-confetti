@@ -45,15 +45,6 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
 const errors = [];
 const missing = new Set();
-/**
- * Assets the build is known not to produce yet.
- *
- * `src/assets/manifest.ts` points level 2's hero at a blaster the asset
- * pipeline never generates, so the model 404s and the hero loads without it.
- * It predates the campaign shell and belongs to the level 2 asset work;
- * listed here so the gate still fails on a NEW missing file.
- */
-const KNOWN_MISSING = new Set(['/models/props/blaster.glb']);
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 page.on('requestfailed', (r) => errors.push(`requestfailed: ${r.url()}`));
@@ -113,12 +104,8 @@ try {
   assert.equal(contexts, 1, 'the campaign must run on exactly one canvas');
   console.log('ok  one canvas, one renderer across three mounts');
 
-  const unexpected = [...missing].filter((p) => !KNOWN_MISSING.has(p));
-  assert.deepEqual(unexpected, [], 'every requested file must exist in the build');
-  for (const path of missing) console.log(`note  known missing asset: ${path}`);
-  // A 404 for a known-missing asset also shows up here as a console error.
-  const unexplained = errors.filter((e) => !e.includes('404'));
-  assert.deepEqual(unexplained, [], 'no console errors, page errors or failed requests');
+  assert.deepEqual([...missing], [], 'every requested file must exist in the build');
+  assert.deepEqual(errors, [], 'no console errors, page errors or failed requests');
   console.log('\nPASS campaign gate: 1 -> 2 -> 3 on one renderer, score accumulating, no errors.');
 } catch (error) {
   if (missing.size) console.error('Missing files:', [...missing]);

@@ -24,6 +24,7 @@ const A = 'assets/KayKit_Adventurers_2.0_FREE';
 const CITY = 'assets/KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf';
 const HOLIDAY = 'assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf';
 const KENNEY = 'assets/kenney_city-kit-roads/Models/GLB format';
+const BLASTER = 'assets/kenney_blaster-kit_2.1/Models/GLB format';
 const KENNEY_OUT = 'public/models/city';
 
 /**
@@ -250,6 +251,49 @@ for (const src of CONVERT) {
   }
 }
 
+// Optional, and needed by both the blaster tint and the story images.
+let sharp = null;
+try {
+  sharp = (await import('sharp')).default;
+} catch {
+  warnings.push('sharp not installed; image steps skipped. Run: npm i -D sharp');
+}
+
+// ---- 2d. Matthew's blaster, tinted gold --------------------------------
+/*
+ * `src/assets/manifest.ts` has always pointed level 2's hero at
+ * `/models/props/blaster.glb`, and nothing ever produced it: the model 404'd
+ * and the grapple started at his bare hands.
+ *
+ * A pistol rather than a carbine, because the swing animations put his arm
+ * through a wide arc and a long barrel fouls it. Kenney's pack ships it in
+ * purple, which is Aurora's colour — so the shared colormap is desaturated
+ * and multiplied toward gold on the way out. `palette.ts` reserves gold for
+ * Matthew, and his trim, the score and the reward glow already use it.
+ *
+ * Tinting rather than flat-filling keeps the atlas's own shading, so the
+ * model still reads as a solid object instead of a gold silhouette.
+ */
+{
+  const src = `${BLASTER}/blaster-a.glb`;
+  const texture = `${BLASTER}/Textures/colormap.png`;
+  if (!existsSync(src) || !existsSync(texture)) {
+    warnings.push(`missing Kenney blaster source: ${src}`);
+  } else if (!sharp) {
+    warnings.push('sharp not installed; blaster not tinted. Run: npm i -D sharp');
+  } else {
+    ensure(join(PROPS_OUT, 'Textures'));
+    copyFileSync(src, join(PROPS_OUT, 'blaster.glb'));
+    // The GLB references Textures/colormap.png relatively, so the folder has
+    // to survive beside it. City props keep their own copy under city/.
+    await sharp(texture)
+      .greyscale()
+      .tint({ r: 0xea, g: 0xac, b: 0x5b })
+      .toFile(join(PROPS_OUT, 'Textures', 'colormap.png'));
+    report.push({ file: 'props/blaster.glb', step: 'copy + gold tint', kb: kb(join(PROPS_OUT, 'blaster.glb')) });
+  }
+}
+
 // ---- 3. strip animation libraries --------------------------------------
 // These ship a mannequin mesh the game never draws, because clips are
 // transplanted onto the character skeletons instead. See strip-anim-library.mjs
@@ -276,13 +320,6 @@ for (const src of PRUNE) {
 }
 
 // ---- 4. story images ----------------------------------------------------
-let sharp = null;
-try {
-  sharp = (await import('sharp')).default;
-} catch {
-  warnings.push('sharp not installed; story images not resized. Run: npm i -D sharp');
-}
-
 for (const src of STORY) {
   if (!existsSync(src)) {
     warnings.push(`missing source: ${src}`);
