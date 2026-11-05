@@ -116,6 +116,28 @@ class RogueVisual implements PlayerVisual {
     }
   }
 
+  setHitTint(age: number): void {
+    const DURATION = 0.25;
+    if (age >= DURATION) {
+      if (this.flashing) {
+        this.flashing = false;
+        for (const { material, original } of this.materials) {
+          material.emissive.setHex(original);
+        }
+      }
+      return;
+    }
+    this.flashing = true;
+    const t = 1 - age / DURATION;
+    const r = Math.round(0x7a * t);
+    const g = Math.round(0x14 * t);
+    const b = Math.round(0x20 * t);
+    const hex = (r << 16) | (g << 8) | b;
+    for (const { material } of this.materials) {
+      material.emissive.setHex(hex);
+    }
+  }
+
   /** Seconds left of a one-shot, during which the movement clip is held off. */
   private oneShot = 0;
 

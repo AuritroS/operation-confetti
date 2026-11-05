@@ -22,7 +22,6 @@ import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from '
 import { EntityVisuals } from './render/entities';
 import { loadGameplayProps, type PropProvider } from './render/props-loader';
 import { buildVaultDoor } from './render/custom';
-import { CLIPS } from './assets/manifest';
 import { loadRoguePlayer } from './render/rogue';
 import { Environment, requestedLayers } from './render/environment';
 import { DebugPanel, Hud } from './ui/hud';
@@ -103,23 +102,11 @@ const run = {
 /** Rises when the runner reports a collision, which drives hit feedback. */
 let lastIncidents = 0;
 
-/** Seconds of the current protection window, for a time-based blink. */
-let invulnClock = 0;
+/** Time since last collision, for the short red tint reaction. */
+let hitAge = 100;
 
-const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
-
-/**
- * Hit feedback.
- *
- * A collision previously only flashed the character. Now it also plays the
- * hit reaction and swings the bell, which matters because the doc requires
- * damage to be distinguishable without sound (§12 Phase 4).
- *
- * None of this touches the simulation: the penalty is already recorded by
- * the time this runs.
- */
 function onHit(): void {
-  player.playOneShot(CLIPS.matthew.hit);
+  hitAge = 0;
   hud.showPenalty(POINTS.incident);
 }
 
@@ -129,6 +116,10 @@ function onEvent(event: RunEvent): void {
   // Worker will recompute it, so the HUD can never drift from the server.
   run.score = scoreRun(run.events).total;
   hud.setScore(run.score);
+  if (event.t === 'gift') {
+    hud.showReward(POINTS.gift);
+    hud.setGifts(runner.snapshot.giftsCollected + 1);
+  }
 }
 
 runner.onEvent(onEvent);
@@ -148,21 +139,16 @@ function update(step: number): void {
 
   const snap = runner.snapshot;
   environment?.update(snap.travelled, step);
-  player.setHitFlash(snap.invulnerable);
+  hitAge += step;
+  if (player.setHitTint) {
+    player.setHitTint(hitAge);
+  } else {
+    player.setHitFlash(hitAge < 0.25);
+  }
   // Bank into the lane change; there is no strafe clip to play instead.
   player.setLean(runner.lanes.lean);
-  // Blink while protected.
-  //
-  // Driven by TIME, not distance. Tying it to travelled distance made the
-  // parity flip 1.13 times per frame — a 34 Hz strobe that read as the run
-  // breaking, and a genuine photosensitivity hazard. It would also have got
-  // worse with the speed ramp. Reduced motion holds a steady dim instead of
-  // flashing at all.
-  invulnClock = snap.invulnerable ? invulnClock + step : 0;
-  player.setBlink(
-    snap.invulnerable && (reducedMotion ? false : Math.floor(invulnClock * 12) % 2 === 0),
-  );
-  player.setDimmed(snap.invulnerable && reducedMotion);
+  player.setBlink(false);
+  player.setDimmed(false);
   player.update(step, true);
 
   // The vault grows out of the fog as the route ends, so the run has a
@@ -308,6 +294,8 @@ function resetRun(): void {
   rebuildEntities();
 
   lastIncidents = 0;
+  hitAge = 100;
+  player.setHitFlash(false);
   player.setBlink(false);
   player.setLean(0);
   run.score = 0;

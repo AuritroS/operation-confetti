@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "claude": "vite --host 127.0.0.1 --port 5173 --strictPort",
-    "codex": "test -d .worktrees/level3 || { echo '\\nNo .worktrees/level3 here. Run npm run codex from the ORIGINAL checkout, not from inside a worktree.\\n' >&2; exit 1; }; cd .worktrees/level3 && npm run dev -- --host 127.0.0.1 --port 5303 --strictPort",
+    "lvl2": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "lvl3": "test -d .worktrees/level3 || { echo '\\nNo .worktrees/level3 here. Run npm run codex from the ORIGINAL checkout, not from inside a worktree.\\n' >&2; exit 1; }; cd .worktrees/level3 && npm run dev -- --host 127.0.0.1 --port 5303 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",

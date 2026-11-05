@@ -24,9 +24,16 @@
       complete one, and none of those numbers change a decision mid-run.
     -->
     <div id="hud" class="hud">
-      <span class="hud__score" id="hud-score">0</span>
-      <span class="hud__delta" id="hud-delta" hidden></span>
-      <button class="hud__btn" id="btn-pause" type="button" aria-label="Pause">II</button>
+      <div class="hud__stats">
+        <div class="hud__score-row">
+          <span class="hud__score" id="hud-score">0</span>
+          <span class="hud__delta" id="hud-delta" hidden></span>
+        </div>
+        <div class="hud__gifts" id="hud-gifts" aria-label="Gifts collected"></div>
+      </div>
+      <div class="hud__controls">
+        <button class="hud__btn" id="btn-pause" type="button" aria-label="Pause">II</button>
+      </div>
     </div>
 
     <!-- Brief edge pulse on a hit. Readable at any screen size, no draw calls. -->

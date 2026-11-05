@@ -41,6 +41,8 @@ export interface PlayerVisual {
   readonly object: Object3D;
   /** Flash on a hit, and blink while protection is active. */
   setHitFlash(active: boolean): void;
+  /** Short red tint fading over ~0.25s on a collision. */
+  setHitTint?(age: number): void;
   /** Called with the fixed simulation step; drives animation if any. */
   update(step: number, moving: boolean): void;
   /**

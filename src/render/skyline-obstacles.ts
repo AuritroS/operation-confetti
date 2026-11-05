@@ -49,9 +49,6 @@ import { ANCHOR_HEIGHT } from '../levels/skyline/motion';
  * number, and it is how `cone-right` came to render as a row of barriers.
  * The entity now carries `assembly`, named by the scene.
  */
-/** Where a bridge pillar stands: on the kerb, clear of every lane. */
-const PILLAR_X = 6.2;
-
 /**
  * Quarter turn that puts a prop ACROSS the player's path instead of along it.
  *
@@ -80,7 +77,15 @@ export const BLOCKING_TURN = Math.PI / 2;
  * restates which props are long passes however wrong the builder is — the
  * facade test made exactly that mistake in draft.
  */
-export const TURNED_PROPS: readonly StreetPropId[] = ['barrier', 'fence', 'dumpster', 'bridgeDeck', 'signHanging'];
+export const TURNED_PROPS: readonly StreetPropId[] = [
+  'barrier',
+  'fence',
+  'dumpster',
+  'bridgeDeck',
+  'signHanging',
+  'signGantry',
+  'trafficLightHoriz',
+];
 
 export class ObstacleKit {
   constructor(private assets: StreetAssets) {}
@@ -95,7 +100,6 @@ export class ObstacleKit {
    */
   hazard(e: Entity): Group {
     const group = new Group();
-    const clearance = e.y - e.halfY;
 
     switch (e.assembly) {
       case 'barricade':
@@ -105,10 +109,10 @@ export class ObstacleKit {
         this.ground(group, e, false);
         break;
       case 'bridge':
-        this.overhead(group, e, true, clearance);
+        this.overhead(group, e, true);
         break;
       case 'hangingSign':
-        this.overhead(group, e, false, clearance);
+        this.overhead(group, e, false);
         break;
       default:
         break;
@@ -140,50 +144,33 @@ export class ObstacleKit {
       const t = (i + 0.5) / cones;
       this.one(group, 'cone', (t - 0.5) * width, -e.halfY, e.halfZ * 0.9);
     }
-    // A beacon on a full-street wall: it is the one the player must act on
-    // well before arriving, so it earns the extra read.
-    if (span) {
-      for (const side of [-1, 1]) {
-        this.one(group, 'workLight', side * (e.halfX - 0.5), -e.halfY, e.halfZ * 0.4);
-      }
-    }
   }
 
   /**
    * Overhead blockage.
    *
-   * The full-street form is the bridge, and it gets pillars carried to the
-   * road: a nine-unit deck floating on nothing is the most obvious unreality
-   * available. The single-lane form is a hanging sign, which already looks
-   * like something bolted to a gantry.
+   * The full-street form is the highway gantry (`signGantry`), whose upright posts
+   * stand on the kerbs outside the lanes and whose wide crossbeam spans all 3 lanes.
+   * The single-lane form is a suspended traffic signal head (`trafficLightHoriz` or
+   * `trafficLightVert`) dropped from the overhead streetcar cable line.
    */
-  private overhead(group: Group, e: Entity, span: boolean, clearance: number): void {
+  private overhead(group: Group, e: Entity, span: boolean): void {
+    const clearance = e.y - e.halfY;
     if (span) {
-      this.tile(group, 'bridgeDeck', e.halfX * 2, -e.halfY, 0, BLOCKING_TURN, e.halfY * 2, e.halfZ * 2);
-      /**
-       * Pillars go on the KERB, not in the carriageway.
-       *
-       * They were at +/-(halfX - 0.6) = 3.9 against an outer-lane edge of
-       * 3.55 — 0.35 units of clearance, so they read as columns planted in
-       * the road the player sprints down. Collision never cared (the deck
-       * blocks every lane anyway), which is exactly why only the eye caught
-       * it. PILLAR_X is outside the lanes and outside the zone.
-       */
+      this.tile(group, 'signGantry', e.halfX * 2, -e.halfY, 0, BLOCKING_TURN, e.halfY * 2, e.halfZ * 2);
       for (const side of [-1, 1]) {
-        const pillar = this.one(group, 'bridgePillar', side * PILLAR_X, -e.halfY, 0);
-        if (pillar) this.stretch(pillar, 1, clearance, 1, 'down');
+        const leg = this.one(group, 'trafficLightVert', side * 6.2, -e.halfY, 0);
+        if (leg) this.stretch(leg, 0.4, clearance, 0.4, 'down');
       }
       return;
     }
-    // Single lane: a hanging sign filling the clearance the player must duck,
-    // plus a hanger carrying it up to the overhead line the anchors use. A
-    // sign suspended from nothing is the same lie as a floating deck, and
-    // the cable line is already there to hang it from.
-    const sign = this.one(group, 'signHanging', 0, e.halfY, 0, BLOCKING_TURN);
+    // Single lane: horizontal traffic light head spanning the lane's collider box,
+    // plus a vertical hanger carrying it up to the overhead cable line.
+    const sign = this.one(group, 'trafficLightHoriz', 0, e.halfY, 0, BLOCKING_TURN);
     if (sign) this.fit(sign, e.halfX * 2, e.halfY * 2, e.halfZ * 2, 'top');
     const rise = ANCHOR_HEIGHT - e.y - e.halfY;
     if (rise > 0) {
-      const hanger = this.one(group, 'bridgePillar', 0, e.halfY, 0);
+      const hanger = this.one(group, 'trafficLightVert', 0, e.halfY, 0);
       if (hanger) this.stretch(hanger, 0.25, rise, 0.25, 'up');
     }
   }
@@ -257,8 +244,6 @@ export class ObstacleKit {
 
   /** Scale a prop to exactly fill a box, anchored at its top or bottom. */
   private fit(prop: Object3D, w: number, h: number, d: number, anchor: 'top' | 'bottom'): void {
-    // Measure AFTER any turn: a rotated prop's world extents are not its
-    // authored ones, and fitting to the authored pair transposes the result.
     prop.updateMatrixWorld(true);
     const size = new Box3().setFromObject(prop).getSize(new Vector3());
     prop.scale.set(

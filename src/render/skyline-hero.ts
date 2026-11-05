@@ -26,7 +26,7 @@
  * anything applied before `update()` is discarded. The override has to come
  * after, every frame.
  */
-import { Box3, MathUtils, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import { Box3, MathUtils, Mesh, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AssetBundle, type Actor } from '../assets/characters';
 import { ATTACH_NODES, ATTACH_OFFSETS, CLIPS, HIDDEN_MESHES, SOURCES } from '../assets/manifest';
@@ -203,8 +203,31 @@ export async function loadSkylineHero(): Promise<SkylineHero | null> {
   }
 }
 
+type MaterialRecord = { material: MeshStandardMaterial; original: number };
+
+function collectMaterials(root: Object3D): MaterialRecord[] {
+  const out: MaterialRecord[] = [];
+  root.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const mat = m as MeshStandardMaterial;
+      const cloned = mat.clone();
+      if (Array.isArray(mesh.material)) {
+        mesh.material[mesh.material.indexOf(mat)] = cloned;
+      } else {
+        mesh.material = cloned;
+      }
+      out.push({ material: cloned, original: cloned.emissive.getHex() });
+    }
+  });
+  return out;
+}
+
 class RiggedHero implements SkylineHero {
   readonly object: Object3D;
+  private readonly materials: MaterialRecord[];
+  private wasHitTinted = false;
 
   /**
    * Both arm bones per side, not just the shoulder.
@@ -261,6 +284,7 @@ class RiggedHero implements SkylineHero {
     // scale and foot offset baked into the model's own transform.
     this.object = new Object3D();
     this.object.add(actor.root);
+    this.materials = collectMaterials(actor.root);
 
     /**
      * Derive each arm's rest direction from the rig instead of assuming one.
@@ -301,6 +325,25 @@ class RiggedHero implements SkylineHero {
     this.actor.update(dt);
     this.clock += dt;
     this.playFor(s);
+
+    // Short red tint reaction on hit, decaying smoothly over 0.25s
+    const TINT_DURATION = 0.25;
+    if (s.hitAge < TINT_DURATION) {
+      this.wasHitTinted = true;
+      const t = 1 - s.hitAge / TINT_DURATION;
+      const r = Math.round(0x7a * t);
+      const g = Math.round(0x14 * t);
+      const b = Math.round(0x20 * t);
+      const hex = (r << 16) | (g << 8) | b;
+      for (const { material } of this.materials) {
+        material.emissive.setHex(hex);
+      }
+    } else if (this.wasHitTinted) {
+      this.wasHitTinted = false;
+      for (const { material, original } of this.materials) {
+        material.emissive.setHex(original);
+      }
+    }
 
     // Hand a finished one-shot over to the clip that should follow it,
     // rather than letting `clampWhenFinished` freeze the last frame.
@@ -536,6 +579,7 @@ class RiggedHero implements SkylineHero {
   }
 
   dispose(): void {
+    for (const { material } of this.materials) material.dispose();
     this.actor.dispose();
     this.bundle.dispose(SOURCES.characters.matthew);
     this.object.removeFromParent();

@@ -135,7 +135,7 @@ html, body {
 }
 
 /* ---- HUD -------------------------------------------------------------
-   Score and pause only. */
+   Minimal top-left HUD: score counter, floating delta, and 4 gift slots. */
 .hud {
   position: absolute;
   z-index: 20;
@@ -143,9 +143,23 @@ html, body {
   left: calc(var(--safe-l) + 16px);
   right: calc(var(--safe-r) + 16px);
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
   pointer-events: none;
+}
+
+.hud__stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.hud__score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  position: relative;
 }
 
 .hud__score {
@@ -157,28 +171,88 @@ html, body {
   /* Tabular figures: without them the score jitters as digits change. */
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-  /* Legible over both the bright moon and the dark roof. */
+  /* Legible over bright and dark backgrounds. */
   text-shadow: 0 2px 10px rgba(8, 10, 20, 0.85);
 }
 
-/* The cost of a hit, so a dropping number is connected to a cause. */
+/* Floating point notifications beside score: +100 gold or -50 amber-red */
 .hud__delta {
   font-family: var(--font-ui);
   font-size: var(--text-body);
   font-weight: 700;
-  color: var(--magenta);
   font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  animation: hud-delta-float 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   text-shadow: 0 2px 8px rgba(8, 10, 20, 0.9);
-  animation: delta-rise 900ms ease-out forwards;
 }
 
-@keyframes delta-rise {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-14px); }
+.hud__delta--reward {
+  color: #ffd166;
+}
+
+.hud__delta--penalty {
+  color: #ff5555;
+}
+
+@keyframes hud-delta-float {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  35% {
+    transform: translateY(-2px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+.hud__gifts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud__gift-slot {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(16, 31, 51, 0.65);
+  border: 1px solid rgba(87, 118, 147, 0.45);
+  color: rgba(161, 189, 204, 0.3);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hud__gift-slot svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.hud__gift-slot.collected {
+  color: #ffd166;
+  border-color: #ffcd78;
+  background: rgba(69, 54, 38, 0.85);
+  box-shadow: 0 0 10px rgba(255, 205, 120, 0.35);
+  transform: scale(1.08);
+}
+
+.hud__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
 }
 
 .hud__btn {
-  margin-left: auto;
   pointer-events: auto;
   width: 38px;
   height: 38px;

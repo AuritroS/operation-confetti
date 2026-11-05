@@ -42,8 +42,7 @@ const modes = document.createElement('div'); modes.className = 'skyline-modes';
 modes.innerHTML = '<span data-mode="swing">↑ Swing</span><span data-mode="run">↓ Run</span>';
 const divisions = document.createElement('div'); divisions.className = 'skyline-divisions';
 divisions.innerHTML = '<i></i><i></i>';
-const reward = document.createElement('span'); reward.className = 'skyline-reward'; reward.hidden = true;
-app.append(heading, instruction, lanes, modes, divisions, reward);
+app.append(heading, instruction, lanes, modes, divisions);
 const action = document.getElementById('skyline-action')!;
 const note = document.getElementById('skyline-note')!;
 const hint = document.getElementById('hint')!;
@@ -53,15 +52,7 @@ const hud = new Hud(), debug = new DebugPanel();
 const params = new URLSearchParams(location.search);
 let debugVisible = params.has('debug') && !params.has('clean'); debug.setVisible(debugVisible);
 
-/**
- * The course as played, with the obstacles switched off for the movement
- * pass. Typed from the course rather than left as a bare `[]`, which infers
- * `never[]` and makes every read of an entity below a type error.
- */
-const courseForPlay: Course = {
-  ...SKYLINE,
-  entities: [],
-};
+const courseForPlay: Course = SKYLINE;
 
 const view = new SkylineScene(document.getElementById('stage') as HTMLCanvasElement, courseForPlay);
 
@@ -84,8 +75,12 @@ function update(dt: number): void {
   runner.update(dt); const s = runner.snapshot;
   for (const entity of courseForPlay.entities) {
     if (runner.entityStates.get(entity.id) !== 'collected' || collected.has(entity.id)) continue;
-    collected.add(entity.id); reward.textContent = entity.scored ? '+100' : 'Nice catch';
-    reward.hidden = true; void reward.offsetWidth; reward.hidden = false;
+    collected.add(entity.id);
+    if (entity.scored) {
+      hud.showReward(POINTS.gift);
+      const giftsCollected = runner.events.filter((e) => e.t === 'gift').length;
+      hud.setGifts(giftsCollected);
+    }
   }
   view.update(s, dt, reduced, runner.entityStates);
   for (const indicator of lanes.querySelectorAll<HTMLElement>('[data-lane]')) {
@@ -96,8 +91,6 @@ function update(dt: number): void {
     indicator.classList.toggle('selected', indicator.dataset['mode'] === s.requestedMode);
   }
   divisions.classList.toggle('started', s.started);
-  app.classList.toggle('skyline-hit', s.hitAge < 0.22);
-  if (s.hitAge > 0.45) document.getElementById('vignette')!.hidden = true;
   if (s.complete) { action.textContent = 'Skyline cleared'; note.textContent = 'Tap Replay for another run.'; }
   else if (!s.started) { action.textContent = 'Swipe to start'; note.textContent = '← → change lane · ↑ swing · ↓ run'; }
   else if (s.pendingLaunch) { action.textContent = 'Swing selected'; note.textContent = 'Launching as soon as the overhead path clears.'; }
@@ -136,7 +129,7 @@ function swipe(direction: Direction): void {
   if (!paused) { runner.swipe(direction); update(0); render(); }
 }
 function restart(): void {
-  input.clear(); runner = makeRunner(); view.reset(); hud.reset(); collected.clear(); reward.hidden = true;
+  input.clear(); runner = makeRunner(); view.reset(); hud.reset(); collected.clear();
   update(0); render(); if (document.visibilityState === 'visible' && rotate.hidden) resume();
 }
 input.onGesture((g) => {
@@ -174,5 +167,5 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   loop.stop(); input.detach(); lifecycle.detach(); view.dispose();
   pauseButton.removeEventListener('click', togglePause); replay.removeEventListener('click', replayRun);
   window.removeEventListener('keydown', debugKey);
-  for (const el of [replay, heading, instruction, lanes, modes, divisions, reward]) el.remove();
+  for (const el of [replay, heading, instruction, lanes, modes, divisions]) el.remove();
 });
