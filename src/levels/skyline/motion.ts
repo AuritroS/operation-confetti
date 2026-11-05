@@ -58,10 +58,14 @@ function forwardMotion(c: Course, t: number, mode: TravelMode): Axis {
     return { p: t * c.speed, v: c.speed, a: 0 };
   }
   const w = 2 * Math.PI / c.cycle;
-  // Kinetic velocity surge: 1.9 delivers a punchy 2.5x speed contrast
+  // Kinetic velocity surge with elastic slingshot tug:
+  // surge * w * cos(w * t) gives macro trough acceleration (4.8 -> 12.2 u/s).
+  // 0.16 * sin(2w * t) delivers the visceral elastic "yank" right as the cable snaps taut.
   const surge = 1.9;
-  const v = c.speed + surge * w * Math.cos(w * t);
-  const a = -surge * w * w * Math.sin(w * t);
+  const sin2 = Math.sin(2 * w * t);
+  const cos2 = Math.cos(2 * w * t);
+  const v = c.speed + surge * w * (Math.cos(w * t) + 0.16 * sin2);
+  const a = -surge * w * w * (Math.sin(w * t) - 0.32 * cos2);
   return { p: t * c.speed, v, a };
 }
 

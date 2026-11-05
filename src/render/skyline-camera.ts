@@ -104,10 +104,12 @@ export class SkylineCamera {
     this.focusY += (FOCUS_BASE + s.p.y * follow - this.focusY) * blend;
 
     // Portrait crops horizontally, so a narrow frame needs more stand-off to
-    // keep the outer lanes on screen.
+    // keep the outer lanes on screen. Dynamic speed surge breathes subtly:
+    // pulls back on high-speed trough surge, tucks in on apex float.
     const crop = Math.max(0, CAMERA_ASPECT_REFERENCE / this.camera.aspect - 1);
     const full = CAMERA_DISTANCE + crop * CAMERA_ASPECT_PULLBACK;
-    const distance = this.closeup ? full * CLOSEUP : full;
+    const speedSurge = reduced ? 0 : Math.max(-0.35, Math.min(0.55, (s.v.z - 8.5) * 0.12));
+    const distance = this.closeup ? full * CLOSEUP : full + speedSurge;
 
     this.camera.position.set(
       CAMERA_SIDE,
@@ -119,6 +121,11 @@ export class SkylineCamera {
       this.focusY + (this.closeup ? CAMERA_LOOK_HEIGHT * 0.4 : CAMERA_LOOK_HEIGHT),
       this.closeup ? CAMERA_LOOK_AHEAD * 0.4 : CAMERA_LOOK_AHEAD,
     );
+    if (!reduced && !this.closeup) {
+      // Subtle dynamic camera bank framing matching lateral carve
+      const bankRoll = Math.max(-0.022, Math.min(0.022, -s.v.x / (s.v.z || 1) * 0.03));
+      this.camera.rotation.z = bankRoll;
+    }
   }
 
   reset(): void {

@@ -373,8 +373,9 @@ export class SkylineScene {
     } else {
       this.ropeOriginSource = source;
     }
+    const cyclePhase = (2 * Math.PI / this.course.cycle) * s.elapsed;
     const surgeZ = s.mode === 'swing'
-      ? 1.35 * Math.sin((2 * Math.PI / this.course.cycle) * s.elapsed)
+      ? 1.35 * (Math.sin(cyclePhase) - 0.10 * (Math.cos(2 * cyclePhase) - 1))
       : s.phase === 'land'
       ? -0.15 * (1 - Math.min(1, s.landingAge / LAND_TIME))
       : 0;

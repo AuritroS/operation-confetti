@@ -45,10 +45,15 @@ const FIRE_TIME = 0.04;
 const RELEASE_TIME = 0.06;
 
 /**
- * Gravity droop: near-zero under high-tensile 12 m/s pull tension.
- * Reads as a taut, vibrating cable rather than a slack cord.
+ * Dynamic cable tension parameters:
+ * - SAG_SLACK: Initial flexible catenary droop at apex float before full body weight catches.
+ * - SAG_TAUT: Laser-taut droop under high-speed pull tension.
+ * - SNAP_START & SNAP_DURATION: Window where cable catches mass and snaps laser-taut.
  */
-const SAG = 0.002;
+const SAG_SLACK = 0.030;
+const SAG_TAUT = 0.0018;
+const SNAP_START = 0.07;
+const SNAP_DURATION = 0.09;
 
 /**
  * There is deliberately no hook model on the far end.
@@ -73,6 +78,7 @@ export class SkylineRope {
 
   private phase: RopePhase = 'idle';
   private elapsed = 0;
+  private attachedElapsed = 0;
   /** Where the far end of the line currently is, which is not always the anchor. */
   private readonly tip = new Vector3();
   /** The last anchor seen, so a release has somewhere to retract from. */
@@ -153,6 +159,7 @@ export class SkylineRope {
       const u = Math.min(1, this.elapsed / FIRE_TIME);
       this.tip.copy(from).lerp(this.held, 1 - (1 - u) * (1 - u));
     } else if (this.phase === 'attached') {
+      this.attachedElapsed += step;
       this.tip.copy(this.held);
     } else {
       // Release: the far end comes home rather than the whole line vanishing.
@@ -174,6 +181,7 @@ export class SkylineRope {
         this.elapsed = 0;
       } else if (this.phase === 'fire' && this.elapsed >= FIRE_TIME) {
         this.phase = 'attached';
+        this.attachedElapsed = 0;
       }
       return;
     }
@@ -192,7 +200,40 @@ export class SkylineRope {
       this.object.visible = false;
       return;
     }
-    const droop = SAG * span;
+
+    const isGroundPull = to.y < from.y + 0.5;
+    let sag = SAG_TAUT;
+    if (!isGroundPull && this.phase === 'attached') {
+      if (this.attachedElapsed < SNAP_START) {
+        sag = SAG_SLACK;
+      } else if (this.attachedElapsed < SNAP_START + SNAP_DURATION) {
+        const t = (this.attachedElapsed - SNAP_START) / SNAP_DURATION;
+        const ease = 1 - Math.pow(1 - t, 3);
+        sag = SAG_SLACK + (SAG_TAUT - SAG_SLACK) * ease;
+        // Layer in 2 cycles of high-frequency tension shudder
+        const shudder = 0.005 * Math.exp(-t * 3.5) * Math.sin(t * Math.PI * 4);
+        sag += shudder;
+      } else {
+        const postT = this.attachedElapsed - (SNAP_START + SNAP_DURATION);
+        if (postT < 0.25) {
+          const microShudder = 0.001 * Math.exp(-postT * 6) * Math.sin(postT * Math.PI * 16);
+          sag = SAG_TAUT + microShudder;
+        }
+      }
+    }
+
+    // Material tension pulse on snap
+    if (!isGroundPull && this.phase === 'attached' && this.attachedElapsed >= SNAP_START && this.attachedElapsed < SNAP_START + SNAP_DURATION + 0.10) {
+      const flashT = Math.min(1, (this.attachedElapsed - SNAP_START) / (SNAP_DURATION + 0.10));
+      const flash = Math.sin(flashT * Math.PI);
+      const g = (234 + flash * 20) / 255;
+      const b = (136 + flash * 90) / 255;
+      this.material.color.setRGB(1.0, g, b);
+    } else {
+      this.material.color.setHex(0xffea88);
+    }
+
+    const droop = sag * span;
     this.tangent.copy(to).sub(from).normalize();
 
     // A fixed reference up degenerates when the line points at it, which a
@@ -229,6 +270,8 @@ export class SkylineRope {
   reset(): void {
     this.phase = 'idle';
     this.elapsed = 0;
+    this.attachedElapsed = 0;
+    this.material.color.setHex(0xffea88);
     this.object.visible = false;
   }
 
