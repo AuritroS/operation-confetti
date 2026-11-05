@@ -267,9 +267,13 @@ if (debug) {
     get switching() { return switching; },
     get over() { return campaignOver; },
     get contexts() { return host.renderer.info.memory; },
-    skip(): boolean {
-      if (current instanceof RouteLevel) { current.fastForward(Number.MAX_SAFE_INTEGER); return true; }
-      if (current instanceof SkylineLevel) { current.fastForward(600); return true; }
+    /** Advance a level. Omit `seconds` to run it to its endpoint. */
+    skip(seconds?: number): boolean {
+      if (current instanceof RouteLevel) {
+        current.fastForward(seconds === undefined ? Number.MAX_SAFE_INTEGER : seconds * 12);
+        return true;
+      }
+      if (current instanceof SkylineLevel) { current.fastForward(seconds ?? 600); return true; }
       return false;
     },
   } });

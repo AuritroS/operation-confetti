@@ -11,7 +11,7 @@ import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
-import { buildCnTower, buildMoon } from './custom';
+import { buildCnTower, buildMoon, buildVaultDoor } from './custom';
 import { MOON } from './look';
 import { GiftGlowField, shadowTexture } from './effects';
 import { PALETTE } from './palette';
@@ -64,6 +64,8 @@ export class SkylineScene {
   private gold = new MeshBasicMaterial({ color: 0xe6b86a, fog: false });
   private pale = new MeshBasicMaterial({ color: 0xfff0c9, fog: false });
   private cyan = new MeshBasicMaterial({ color: 0x4aaeb8, fog: false });
+  /** The level-end marker, shared with level 1. Moves with the scroll. */
+  private readonly finishDoor: Group;
   private idle = new MeshBasicMaterial({ color: 0x3d4f66, transparent: true, opacity: 0.5 });
   private pink = new MeshBasicMaterial({ color: 0xff609f, fog: false });
   private darkPink = new MeshStandardMaterial({ color: 0x562b49, roughness: 0.85 });
@@ -183,6 +185,20 @@ export class SkylineScene {
     this.stage.scene.add(fill);
     this.stage.scene.add(this.root); this.stage.observe();
     this.blocks = new InstancedMesh(this.box, this.city, 100);
+    /*
+     * The end of the street is a vault door, the same one level 1 finishes on.
+     *
+     * It used to be three bare trim bars framing nothing, so the chase ended
+     * on an empty gap with the environment visibly running out behind it.
+     * A solid door blocks the view, and reusing level 1's makes "you reach a
+     * door at the end of a level" a beat the player has already learned —
+     * which is also the thing a transition can fade from.
+     *
+     * Sized to span the canyon the trims used to frame: 24 wide, 17 tall.
+     */
+    this.finishDoor = buildVaultDoor(26, 18);
+    this.stage.scene.add(this.finishDoor);
+
     this.trims = new InstancedMesh(this.box, this.windowMat, 500);
     for (const mesh of [this.blocks, this.trims]) { mesh.frustumCulled = false; this.root.add(mesh); }
     this.ground = this.cube(this.root, this.groundMat, 0, -1, -60, 28, 2, 260);
@@ -480,8 +496,7 @@ export class SkylineScene {
       pool.instanceMatrix.needsUpdate = true;
     });
     const finish = scrollZ - (this.course.duration === 45 ? ROUTE_LENGTH : this.course.duration * this.course.speed);
-    this.instance(this.trims, w++, 0, 17, finish, 24, 0.5, 0.5);
-    for (const side of [-1, 1]) this.instance(this.trims, w++, side * 12, 8.5, finish, 0.5, 17, 0.5);
+    this.finishDoor.position.z = finish;
     for (const [mesh, count] of [[this.blocks, b], [this.trims, w]] as const) {
       mesh.count = count; mesh.instanceMatrix.needsUpdate = true;
     }
