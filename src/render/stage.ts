@@ -11,30 +11,28 @@ import {
   HemisphereLight,
   PerspectiveCamera,
   Scene,
-  WebGLRenderer,
 } from 'three';
 import { PALETTE } from './palette';
+import { MAX_PIXEL_RATIO, type RendererHost } from './renderer-host';
 
-export const MAX_PIXEL_RATIO = 1.5;
+export { MAX_PIXEL_RATIO };
 
 /** Exponential fog density. Exported so spawn distances can be checked. */
 export const FOG_DENSITY = 0.013;
 
+/**
+ * The outdoor look levels 1 and 2 share: fogged night, three lights, no
+ * postprocessing. It no longer owns a renderer — `RendererHost` does — so two
+ * levels can hand the same renderer different scenes without leaking a GL
+ * context on every transition.
+ */
 export class Stage {
-  readonly renderer: WebGLRenderer;
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
-  private pixelRatioCap = MAX_PIXEL_RATIO;
-  private resizeObserver: ResizeObserver | null = null;
+  private unobserve: (() => void) | null = null;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
-    this.renderer = new WebGLRenderer({
-      canvas,
-      antialias: true,
-      powerPreference: 'high-performance',
-      alpha: false,
-    });
-    this.renderer.setClearColor(new Color(PALETTE.ink), 1);
+  constructor(private readonly host: RendererHost) {
+    this.host.renderer.setClearColor(new Color(PALETTE.ink), 1);
 
     this.scene = new Scene();
     this.scene.background = new Color(PALETTE.ink);
@@ -71,47 +69,31 @@ export class Stage {
     rim.position.set(-5, 5, -9);
     this.scene.add(rim);
 
-    this.resize();
+    this.unobserve = this.host.onResize(this.fit);
   }
 
   /** Lower this on weak devices rather than changing simulation behaviour. */
   setPixelRatioCap(cap: number): void {
-    this.pixelRatioCap = Math.max(0.75, cap);
-    this.resize();
+    this.host.setPixelRatioCap(cap);
   }
 
   observe(): void {
-    window.addEventListener('resize', this.resize);
-    window.addEventListener('orientationchange', this.resize);
-    if ('ResizeObserver' in window) {
-      this.resizeObserver = new ResizeObserver(this.resize);
-      this.resizeObserver.observe(this.canvas.parentElement ?? document.body);
-    }
+    this.host.observe();
   }
 
+  /** Force a re-measure. The host recomputes and notifies every subscriber. */
+  resize(): void {
+    this.host.resize();
+  }
+
+  /** Drop the resize subscription. The renderer belongs to the shell. */
   dispose(): void {
-    window.removeEventListener('resize', this.resize);
-    window.removeEventListener('orientationchange', this.resize);
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = null;
-    this.renderer.dispose();
+    this.unobserve?.();
+    this.unobserve = null;
   }
 
-  readonly resize = (): void => {
-    // The parent is the portrait frame, which CSS letterboxes on wide
-    // screens, so these dimensions are already the playfield rather than the
-    // window. Desktop and phone therefore see an identical field of view —
-    // previously desktop saw 75 degrees horizontally against the phone's 32,
-    // which is why side content read as floating there and not on mobile.
-    const parent = this.canvas.parentElement;
-    const w = Math.max(1, Math.round(parent?.clientWidth ?? window.innerWidth));
-    const h = Math.max(1, Math.round(parent?.clientHeight ?? window.innerHeight));
-
-    const dpr = Math.min(window.devicePixelRatio || 1, this.pixelRatioCap);
-    this.renderer.setPixelRatio(dpr);
-    this.renderer.setSize(w, h, false);
-
-    this.camera.aspect = w / h;
+  private readonly fit = (width: number, height: number): void => {
+    this.camera.aspect = width / height;
     // Portrait screens are narrow: widen the FOV so the lanes and the next
     // hazard stay visible without moving the camera back.
     this.camera.fov = this.camera.aspect < 0.72 ? 64 : 54;
@@ -119,14 +101,10 @@ export class Stage {
   };
 
   render(): void {
-    this.renderer.render(this.scene, this.camera);
+    this.host.render(this.scene, this.camera);
   }
 
-  get drawCalls(): number {
-    return this.renderer.info.render.calls;
-  }
-
-  get triangles(): number {
-    return this.renderer.info.render.triangles;
-  }
+  get renderer(): RendererHost['renderer'] { return this.host.renderer; }
+  get drawCalls(): number { return this.host.drawCalls; }
+  get triangles(): number { return this.host.triangles; }
 }

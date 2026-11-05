@@ -10,6 +10,7 @@
 import { Mesh, MeshStandardMaterial, Object3D, PlaneGeometry } from 'three';
 import { FixedLoop } from './core/loop';
 import { Stage } from './render/stage';
+import { RendererHost } from './render/renderer-host';
 import { DebugPanel } from './ui/hud';
 import { AssetBundle, type Actor } from './assets/characters';
 import { ASSET_VERSION, ATTACH_NODES, CLIPS, SOURCES } from './assets/manifest';
@@ -18,7 +19,7 @@ const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const ui = document.getElementById('probe-ui') as HTMLElement;
 const debug = new DebugPanel();
 
-const stage = new Stage(canvas);
+const stage = new Stage(new RendererHost(canvas));
 stage.observe();
 // Gameplay camera distance: this is the silhouette that has to read on a phone.
 stage.camera.position.set(0, 1.9, 4.4);

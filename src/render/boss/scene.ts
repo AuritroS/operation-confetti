@@ -1,8 +1,9 @@
 import {
   AmbientLight, Color, DirectionalLight, Group, HemisphereLight,
   InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PointLight, Scene,
-  BoxGeometry, DoubleSide, WebGLRenderer, ACESFilmicToneMapping,
+  BoxGeometry, DoubleSide, ACESFilmicToneMapping, NoToneMapping,
 } from 'three';
+import type { RendererHost } from '../renderer-host';
 import type { BossPractice } from '../../levels/boss/practice';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { BossCamera } from './camera';
@@ -28,19 +29,18 @@ export class BossScene {
   readonly effects: BossEffects;
   private readonly celebration = new BossCelebration();
   private readonly bossLight: PointLight;
-  readonly renderer: WebGLRenderer;
   private readonly shots: Group[] = [];
   private readonly confetti: InstancedMesh;
   private confettiTime = 0;
   private lastHits = 0;
-  private width = 0;
-  private height = 0;
+  private unobserve: (() => void) | null = null;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
-    this.renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25;
+  constructor(private readonly host: RendererHost) {
+    // Tone mapping is renderer state, not scene state, and levels 1 and 2 do
+    // not want it. Applied on mount and undone in dispose, so the shared
+    // renderer goes back the way it was found.
+    this.host.renderer.toneMapping = ACESFilmicToneMapping;
+    this.host.renderer.toneMappingExposure = 1.25;
     this.world.background = new Color(0x081329);
     this.world.add(new HemisphereLight(0x8aa7ef, 0x271435, 1.5));
     this.world.add(new AmbientLight(0xffffff, 0.35));
@@ -81,6 +81,8 @@ export class BossScene {
     pieces.visible = false;
     this.confetti = pieces;
     this.world.add(pieces);
+
+    this.unobserve = this.host.onResize(this.fit);
   }
 
   async load(): Promise<void> {
@@ -155,27 +157,23 @@ export class BossScene {
     }
   }
 
+  private readonly fit = (width: number, height: number): void => {
+    this.camera.resize(width, height);
+    // The victory shower spans whatever the lens actually sees, so it stays
+    // full-width at 360px and on desktop rather than only where it was tuned.
+    // Recomputed here because this is where fov and aspect settle.
+    const lens = this.camera.camera;
+    const depth = Math.abs(lens.position.z - (BOSS_LAYOUT.playerZ + 2.9) / 2);
+    const halfHeight = Math.tan((lens.fov * Math.PI) / 360) * depth;
+    this.celebration.setSpread(halfHeight * lens.aspect);
+  };
+
   render(): void {
-    const width = Math.max(1, Math.round(this.canvas.clientWidth));
-    const height = Math.max(1, Math.round(this.canvas.clientHeight));
-    if (width !== this.width || height !== this.height) {
-      this.width = width;
-      this.height = height;
-      this.renderer.setSize(width, height, false);
-      this.camera.resize(width, height);
-      // The victory shower spans whatever the lens actually sees, so it stays
-      // full-width at 360px and on desktop rather than only where it was
-      // tuned. Recomputed here because this is where fov and aspect settle.
-      const lens = this.camera.camera;
-      const depth = Math.abs(lens.position.z - (BOSS_LAYOUT.playerZ + 2.9) / 2);
-      const halfHeight = Math.tan((lens.fov * Math.PI) / 360) * depth;
-      this.celebration.setSpread(halfHeight * lens.aspect);
-    }
-    this.renderer.render(this.world, this.camera.camera);
+    this.host.render(this.world, this.camera.camera);
   }
 
-  get drawCalls(): number { return this.renderer.info.render.calls; }
-  get triangles(): number { return this.renderer.info.render.triangles; }
+  get drawCalls(): number { return this.host.drawCalls; }
+  get triangles(): number { return this.host.triangles; }
   reset(): void {
     this.lastHits = 0;
     this.confettiTime = 0;
@@ -184,11 +182,15 @@ export class BossScene {
     this.effects.reset();
   }
   dispose(): void {
+    this.unobserve?.();
+    this.unobserve = null;
+    // Hand the shared renderer back in the state levels 1 and 2 expect.
+    this.host.renderer.toneMapping = NoToneMapping;
+    this.host.renderer.toneMappingExposure = 1;
     this.celebration.dispose();
     this.effects.dispose();
     this.actors.dispose();
     this.sky.dispose();
     this.magic.dispose();
-    this.renderer.dispose();
   }
 }

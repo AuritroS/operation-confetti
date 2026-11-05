@@ -5,6 +5,7 @@ import {
   Object3D, OctahedronGeometry, PlaneGeometry, Vector2, Vector3,
 } from 'three';
 import { Stage } from './stage';
+import { RendererHost } from './renderer-host';
 import { SkylineCamera } from './skyline-camera';
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
@@ -139,7 +140,7 @@ export class SkylineScene {
   }
 
   constructor(canvas: HTMLCanvasElement, private course: Course) {
-    this.stage = new Stage(canvas); this.camera = new SkylineCamera(this.stage.camera);
+    this.stage = new Stage(new RendererHost(canvas)); this.camera = new SkylineCamera(this.stage.camera);
     this.stage.scene.background = new Color(0x111e32);
     /**
      * Thinner fog than level 1, and a further clip plane.

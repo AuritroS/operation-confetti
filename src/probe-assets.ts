@@ -2,6 +2,7 @@ import './probe-assets.css';
 import { Box3, Color, DirectionalLight, GridHelper, Group, HemisphereLight, Vector3 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Stage } from './render/stage';
+import { RendererHost } from './render/renderer-host';
 import { loadStreetAssets } from './render/skyline-assets';
 import { loadSkylineHero } from './render/skyline-hero';
 import { buildAssetReview, type AssetReviewItem } from './render/skyline-asset-review';
@@ -43,7 +44,7 @@ try {
   }
 } catch { canSave = false; }
 
-const stage = new Stage(get<HTMLCanvasElement>('stage'));
+const stage = new Stage(new RendererHost(get<HTMLCanvasElement>('stage')));
 stage.scene.fog = null;
 stage.scene.background = new Color('#eef1f5');
 // Neutral light makes dark, game-toned materials readable without replacing them.

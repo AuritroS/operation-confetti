@@ -18,6 +18,7 @@ import { POINTS, scoreRun, type RunEvent } from './core/scoring';
 import { LevelRunner } from './levels/runner';
 import { LEVEL_1 } from './levels/level1';
 import { Stage } from './render/stage';
+import { RendererHost } from './render/renderer-host';
 import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from './render/primitives';
 import { EntityVisuals } from './render/entities';
 import { loadGameplayProps, type PropProvider } from './render/props-loader';
@@ -34,7 +35,7 @@ const pausePill = document.getElementById('pause') as HTMLElement;
 const pauseNote = document.getElementById('pause-note') as HTMLElement;
 const pauseBtn = document.getElementById('btn-pause') as HTMLButtonElement;
 
-const stage = new Stage(canvas);
+const stage = new Stage(new RendererHost(canvas));
 stage.observe();
 
 const hud = new Hud();
