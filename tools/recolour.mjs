@@ -83,7 +83,18 @@ const SKIN = {
  * runs from an almost-black base to a dark warm brown rather than to grey.
  */
 const HAIR = {
-  matthew: { light: '#3b2a22', dark: '#0f0a09' },
+  /*
+   * Lifted off near-black.
+   *
+   * The ramp ran #3b2a22 to #0f0a09, which is almost no range and almost no
+   * light: the grafted curl shell has plenty of facets, but at phone size
+   * none of them caught the rim light and the whole thing read as one jagged
+   * silhouette. The reference is still dark hair with a warm sheen, so the
+   * hue is unchanged — the light end is raised far enough for the facets to
+   * separate, and the dark end lifted off pure black so the shadows read as
+   * hair rather than as a hole in the character.
+   */
+  matthew: { light: '#6b4b36', dark: '#241714' },
 };
 
 const RECIPES = [
