@@ -11,9 +11,9 @@ import {
   BoxGeometry,
   Group,
   InstancedMesh,
-  Matrix4,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   PlaneGeometry,
 } from 'three';
 import { PALETTE, ROLE } from '../palette';
@@ -22,7 +22,23 @@ import type { EnvironmentLayer, LayerContext } from './layer';
 
 /** How far the surface extends ahead; fog hides the end. */
 const SURFACE_LENGTH = 150;
-const GRAVEL_PATCHES = 60;
+const GRAVEL_PATCHES = 96;
+/**
+ * The distance over which the gravel arrangement repeats.
+ *
+ * Larger than anything the player can see through the fog, so the pattern
+ * never appears twice on screen at once. The patches used to sit at an exact
+ * 2.5-unit pitch and scroll by `travelled % 10` — a multiple of that pitch —
+ * so the lattice mapped onto itself and read as a fixed grid of blocks
+ * painted on the roof rather than surface the player was moving over.
+ */
+const GRAVEL_PERIOD = 86;
+
+/** Deterministic hash in 0..1. A regular formula is what made the grid. */
+function scatter(i: number, salt: number): number {
+  const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
 
 export class RooftopLayer implements EnvironmentLayer {
   readonly id = 'rooftop' as const;
@@ -31,7 +47,6 @@ export class RooftopLayer implements EnvironmentLayer {
   private readonly surface: Mesh;
   private readonly parapets: Mesh[] = [];
   private readonly gravel: InstancedMesh;
-  private readonly matrix = new Matrix4();
   private readonly width: number;
 
   constructor(ctx: LayerContext) {
@@ -78,21 +93,27 @@ export class RooftopLayer implements EnvironmentLayer {
       GRAVEL_PATCHES,
     );
     this.gravel.frustumCulled = false;
+    const dummy = new Object3D();
     for (let i = 0; i < GRAVEL_PATCHES; i++) {
-      const x = (((i * 29) % 17) / 17 - 0.5) * this.width;
-      const z = -((i * 2.5) % SURFACE_LENGTH);
-      this.matrix.makeRotationX(-Math.PI / 2);
-      this.matrix.setPosition(x, 0.012, z);
-      this.gravel.setMatrixAt(i, this.matrix);
+      // Irregular in all of position, size and spin, so no axis lines up.
+      dummy.position.set(
+        (scatter(i, 1) - 0.5) * this.width,
+        0.012,
+        -scatter(i, 2) * GRAVEL_PERIOD,
+      );
+      dummy.rotation.set(-Math.PI / 2, 0, scatter(i, 3) * Math.PI);
+      dummy.scale.setScalar(0.55 + scatter(i, 4) * 1.1);
+      dummy.updateMatrix();
+      this.gravel.setMatrixAt(i, dummy.matrix);
     }
     this.gravel.instanceMatrix.needsUpdate = true;
     this.object.add(this.gravel);
   }
 
   update(travelled: number): void {
-    // The surface and parapets are long enough to wrap on a short period.
-    const wrap = travelled % 10;
-    this.gravel.position.z = wrap;
+    // Wrapping on the arrangement's own period is what makes it tile
+    // seamlessly; wrapping on anything else re-registers the pattern.
+    this.gravel.position.z = travelled % GRAVEL_PERIOD;
   }
 
   dispose(): void {
