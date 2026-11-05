@@ -24,14 +24,6 @@
     "role": "Wing scenery, clear of the lane corridor"
   },
   {
-    "id": "lantern",
-    "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/lantern_decorated.gltf",
-    "url": "/models/level3/lantern_decorated.glb",
-    "nativeHeight": 3.991,
-    "targetHeight": 2.5,
-    "role": "Two warm fixtures on the terrace parapet"
-  },
-  {
     "id": "cannon",
     "source": "assets/KayKit_Holiday_Bits_1.0_FREE/Assets/gltf/snowball_cannon.gltf",
     "url": "/models/level3/snowball_cannon.glb",

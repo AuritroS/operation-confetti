@@ -1,6 +1,6 @@
 import {
-  CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
-  PlaneGeometry, SphereGeometry, TorusGeometry,
+  AdditiveBlending, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
+  MeshStandardMaterial, PlaneGeometry, SphereGeometry, TorusGeometry,
 } from 'three';
 import { concrete, concreteDark, gold, luminous, satin } from './materials';
 
@@ -61,40 +61,80 @@ function makePod(parent: Group): void {
   }
 }
 
-/** Shaft, upper pod and spire: a vertical line rising out of frame behind her. */
+/**
+ * Shaft, pod and antenna.
+ *
+ * Proportioned against the frame rather than against the real tower, because
+ * both ends are pinned: the pod has to clear the gala arch at screen y 267,
+ * and the beacon has to clear the HUD status row at y 130. That leaves 6.3
+ * world units for everything above the shaft, so the pod is a thin flared
+ * saucer and the antenna takes the rest — roughly the 4:1 antenna-to-pod
+ * ratio the real tower has.
+ *
+ * Lit like the reference art: pale concrete carrying magenta neon up the
+ * shaft and needle and a cyan-lit pod, each wrapped in an additive sleeve so
+ * the colour spills onto the stone instead of sitting flat on it.
+ */
 function makeShaft(parent: Group): void {
   const z = TOWER_AXIS_Z;
-  // Slender. A wide shaft becomes the subject: the first pass at 2.6 units
-  // read as a rocket and dwarfed Aurora, which is the opposite of the point.
-  // It stays narrower than she is wide, so she owns the centre and the open
-  // sky either side does the work.
+  const neon = luminous(0xcc29c3, 0.95);
+  const cyan = luminous(0x53a6f9, 0.9);
+  // One shared additive material, so every glow sleeve in the tower batches
+  // into a single extra draw call.
+  const bloom = new MeshBasicMaterial({
+    color: 0xff5ae8, transparent: true, opacity: 0.3,
+    depthWrite: false, blending: AdditiveBlending,
+  });
+  const cyanBloom = new MeshBasicMaterial({
+    color: 0x6cc0ff, transparent: true, opacity: 0.3,
+    depthWrite: false, blending: AdditiveBlending,
+  });
+
   // Runs below the deck plane as well as above it; the pod we stand on hides
   // the lower end, so the shaft never shows a cut base.
-  ring(parent, 1.35, 1.85, 16, 5.0, z, concrete, 12);
+  ring(parent, 1.1, 1.75, 15, 4.5, z, concrete, 12);
   for (const offset of [-1, 1]) {
-    const rib = new Mesh(new CylinderGeometry(0.24, 0.34, 16, 5), concreteDark);
-    rib.position.set(offset * 1.42, 5.0, z - 0.5);
+    const rib = new Mesh(new CylinderGeometry(0.2, 0.32, 15, 5), concreteDark);
+    rib.position.set(offset * 1.3, 4.5, z - 0.45);
     parent.add(rib);
   }
-  // Upper observation level, lifted well clear of the gala arch beneath it.
-  ring(parent, 2.2, 2.45, 1.0, 13.3, z, concrete, 16);
-  ring(parent, 2.3, 2.3, 0.14, 13.85, z, concreteDark, 16);
-  const windows = ring(parent, 2.22, 2.38, 0.56, 13.26, z, luminous(0xf0b872, 0.9), 16);
-  windows.scale.setScalar(1.004);
-  // The lit ring and the beacon are this tower's two colour cues in levels 1
-  // and 2; keeping both is what makes it read as the same landmark.
-  const collar = new Mesh(new TorusGeometry(2.42, 0.085, 6, 22), luminous(0x53a6f9, 0.85));
+  // Neon risers on the camera-facing faces: the detail that makes it this
+  // tower at night rather than a grey column.
+  for (const offset of [-0.92, 0, 0.92]) {
+    const x = offset;
+    const stripZ = z + 1.25 - Math.abs(offset) * 0.22;
+    const strip = new Mesh(new CylinderGeometry(0.075, 0.1, 14.4, 4), neon);
+    strip.position.set(x, 4.6, stripZ);
+    parent.add(strip);
+    const halo = new Mesh(new CylinderGeometry(0.3, 0.36, 14.4, 6), bloom);
+    halo.position.set(x, 4.6, stripZ);
+    parent.add(halo);
+  }
+
+  // Flared saucer: underside cone, lit window band, shallow cap.
+  ring(parent, 2.0, 1.1, 0.6, 12.3, z, concreteDark, 20);
+  ring(parent, 2.0, 2.0, 0.35, 12.78, z, cyan, 20);
+  ring(parent, 2.22, 2.22, 0.78, 12.78, z, cyanBloom, 20);
+  ring(parent, 1.7, 2.0, 0.25, 13.08, z, concrete, 20);
+  const collar = new Mesh(new TorusGeometry(2.06, 0.075, 6, 22), luminous(0x53a6f9, 0.85));
   collar.rotation.x = Math.PI / 2;
-  collar.position.set(0, 14.0, z);
+  collar.position.set(0, 12.98, z);
   parent.add(collar);
 
-  ring(parent, 0.8, 1.45, 1.0, 14.3, z, concrete, 10);
-  // A needle, not a cone: the spire is a vertical line pointing down at her.
-  // Its tip clears the HUD status row, which is what "the top is hidden" was.
-  ring(parent, 0.06, 0.45, 3.8, 16.7, z, concrete, 6);
-  const beacon = new Mesh(new SphereGeometry(0.26, 8, 6), luminous(0xcc29c3));
-  beacon.position.set(0, 18.75, z);
+  // Antenna: a short equipment mast, then a long needle.
+  ring(parent, 0.3, 0.45, 2.2, 14.3, z, concreteDark, 8);
+  const mastNeon = new Mesh(new CylinderGeometry(0.11, 0.15, 2.2, 4), neon);
+  mastNeon.position.set(0, 14.3, z + 0.34);
+  parent.add(mastNeon);
+  ring(parent, 0.04, 0.22, 2.75, 16.78, z, neon, 6);
+  ring(parent, 0.26, 0.52, 2.75, 16.78, z, bloom, 6);
+  ring(parent, 0.46, 0.62, 2.3, 14.3, z, bloom, 6);
+  const beacon = new Mesh(new SphereGeometry(0.24, 8, 6), luminous(0xff7bf0));
+  beacon.position.set(0, 18.3, z);
   parent.add(beacon);
+  const beaconGlow = new Mesh(new SphereGeometry(0.62, 10, 8), bloom);
+  beaconGlow.position.set(0, 18.3, z);
+  parent.add(beaconGlow);
 }
 
 /**

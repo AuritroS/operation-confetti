@@ -69,21 +69,17 @@ export class BossSky {
     backdrop.renderOrder = -10;
     this.root.add(backdrop);
 
-    const high = new MeshBasicMaterial({
-      map: this.cloudMap, color: 0x8b98bd, transparent: true,
-      opacity: 0.25, depthWrite: false, fog: false,
-    });
-    // Brighter and more opaque than the high band. It is read against the lit
-    // city rather than against empty sky, so the contrast it needs is against
-    // window light, not against the backdrop.
+    // The one cloud layer, lying across the city. It is read against lit
+    // windows rather than against empty sky, so that is what it must out-
+    // contrast.
     const low = new MeshBasicMaterial({
       map: this.cloudMap, color: 0xb9c3e8, transparent: true,
       opacity: 0.72, depthWrite: false, fog: false,
     });
     const placements = [
-      [-7.3, 8.2, -20, 7.0, 2.7, 0.11, high],
-      [0.8, 9.0, -22, 6.8, 2.4, -0.08, high],
-      [8.0, 7.7, -19, 6.1, 2.5, 0.09, high],
+      // No high band. Sitting above the stage it only ever read as faint
+      // smudges behind the tower; the layer that matters is the one lying
+      // across the city, which is what says we are above the weather.
       // A layer lying over the city rather than under it: at this height the
       // weather is below us, so cloud should cross the skyline, not sit
       // beneath it. Placed in front of the city band at z -50 and inside the

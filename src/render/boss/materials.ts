@@ -40,6 +40,10 @@ export const velvet = satin(0x40194e, 0.02, 0.92);
 export const wine = satin(0x72264f, 0.03, 0.8);
 export const midnight = satin(0x141d3a);
 
-/** The tower's own fabric: cool, desaturated, always quieter than Aurora. */
-export const concrete = satin(0x6b7490, 0.04, 0.78);
-export const concreteDark = satin(0x3b4463, 0.04, 0.82);
+/**
+ * The tower's own fabric: pale concrete, as the landmark actually is, with the
+ * night colour carried by the neon and glow sleeves in `tower.ts` rather than
+ * baked into the stone. See `assets/aurora.png` for the lit reference.
+ */
+export const concrete = satin(0xc6cde0, 0.05, 0.74);
+export const concreteDark = satin(0x97a0ba, 0.05, 0.8);

@@ -76,7 +76,7 @@ export class BossScene {
 
   async load(): Promise<void> {
     const loader = new GLTFLoader();
-    const selected = BOSS_PROPS.filter((item) => ['decorGiftRed', 'decorGiftGreen', 'lantern'].includes(item.id));
+    const selected = BOSS_PROPS.filter((item) => ['decorGiftRed', 'decorGiftGreen'].includes(item.id));
     const [models] = await Promise.all([
       Promise.all(selected.map(async (item) => [item.id, (await loader.loadAsync(item.url)).scene] as const)),
       this.actors.load(),

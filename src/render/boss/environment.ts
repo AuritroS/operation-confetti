@@ -451,8 +451,6 @@ export class BossEnvironment {
     place('decorGiftRed', -4.4, stage, -7.8, 0.55);
     place('decorGiftGreen', 3.84, stage, -6.55, 0.96, 0.2);
     place('decorGiftRed', 4.22, stage, -7.4, 0.7, -0.1);
-    place('lantern', -4.22, 0.15, -4.65, 2.15);
-    place('lantern', 4.22, 0.15, -4.65, 2.15);
     // The City Builder flanks are gone. They are Level 2's street-canyon
     // assets, and standing them beside the gala made the arena read as more
     // of the chase rather than somewhere we had arrived. The skyline band far
