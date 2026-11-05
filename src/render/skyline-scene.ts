@@ -6,7 +6,6 @@ import {
 } from 'three';
 import { Stage } from './stage';
 import { SkylineCamera } from './skyline-camera';
-import { ANCHOR_PROPS } from './skyline-props';
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECT, INSPECTING, InspectLabels, travelArrows } from './skyline-inspect';
@@ -25,7 +24,7 @@ import { LANES } from '../levels/skyline/types';
 import type { Course, Point3, Snapshot } from '../levels/skyline/types';
 
 /** Anchor markers drawn at once, across all three state pools. */
-const ANCHOR_POOL = 18;
+const ANCHOR_POOL = 36;
 
 /** Shared with the asset probe so the landmark uses the actual game model. */
 export function buildSkylineLandmark(): Group {
@@ -45,15 +44,15 @@ export class SkylineScene {
   private arms: Group[] = [];
   private legs: Group[] = [];
   private box = new BoxGeometry();
-  private diamond = new OctahedronGeometry(0.55);
+  private diamond = new OctahedronGeometry(0.25);
   private city = new MeshStandardMaterial({ color: 0x29394e, roughness: 1 });
   private windowMat = new MeshBasicMaterial({ color: 0x547a96 });
   private groundMat = new MeshStandardMaterial({ color: 0x182337, roughness: 1 });
   private blue = new MeshStandardMaterial({ color: 0x448cfa, emissive: 0x102a59, roughness: 0.7, fog: false });
-  private gold = new MeshBasicMaterial({ color: 0xffcd78, fog: false });
+  private gold = new MeshBasicMaterial({ color: 0xe6b86a, fog: false });
   private pale = new MeshBasicMaterial({ color: 0xfff0c9, fog: false });
-  private cyan = new MeshBasicMaterial({ color: 0x7ce6ee, fog: false });
-  private idle = new MeshBasicMaterial({ color: 0x54738b });
+  private cyan = new MeshBasicMaterial({ color: 0x4aaeb8, fog: false });
+  private idle = new MeshBasicMaterial({ color: 0x3d4f66, transparent: true, opacity: 0.5 });
   private pink = new MeshBasicMaterial({ color: 0xff609f, fog: false });
   private darkPink = new MeshStandardMaterial({ color: 0x562b49, roughness: 0.85 });
   private blocks: InstancedMesh;
@@ -92,10 +91,6 @@ export class SkylineScene {
   private kit: ObstacleKit | null = null;
   private boxes: SkylineBoxes | null = null;
   private labels: InspectLabels | null = null;
-  /** Anchor gantries, instanced: one per visible anchor. */
-  private gantries: InstancedMesh | null = null;
-  /** Ground markers under a low anchor, so the descent lands on something. */
-  private lowMarks: InstancedMesh | null = null;
   /**
    * Unfogged markers, so the player can read what is coming.
    *
@@ -128,8 +123,6 @@ export class SkylineScene {
     this.hazardMarks.points.visible = visible;
     for (const pool of this.anchorPools) pool.visible = visible;
     for (const group of this.contents.values()) group.visible = visible;
-    if (this.gantries) this.gantries.visible = visible;
-    if (this.lowMarks) this.lowMarks.visible = visible;
   }
 
   constructor(canvas: HTMLCanvasElement, private course: Course) {
@@ -287,13 +280,6 @@ export class SkylineScene {
      */
     this.kit = new ObstacleKit(assets);
 
-    // Anchor gantries: a carrier spanning the street at the anchor line, so
-    // the cable the player grabs has a visible reason to be strung there.
-    this.gantries = assets.batch(ANCHOR_PROPS.upper, ANCHOR_POOL);
-    if (this.gantries) this.root.add(this.gantries);
-    this.lowMarks = assets.batch(ANCHOR_PROPS.lower, ANCHOR_POOL);
-    if (this.lowMarks) this.root.add(this.lowMarks);
-
     /**
      * The CN Tower, ahead down the street.
      *
@@ -391,61 +377,39 @@ export class SkylineScene {
      * floated them above the carriageway. The Kenney road carries its own
      * painted markings, so there is nothing left for them to do.
      */
-    const cycle = Math.floor(s.elapsed / this.course.cycle);
-    const list = [
-      ...(s.anchor ? [s.anchor] : []),
-      ...Array.from({ length: 12 }, (_, i) => LANES.map((lane) => upperAnchor(this.course, lane, cycle + i))).flat(),
-    ].filter((a, i, all) => all.findIndex((b) => b.id === a.id) === i && a.z > s.p.z - 22 && a.z < s.p.z + ENTITY_DRAW_AHEAD);
+    const BAY = this.course.cycle * this.course.speed;
+    const playerBay = Math.floor(s.p.z / BAY);
+    const targetBay = playerBay + 1;
+    const activeId = s.anchor?.id;
+
     const anchorCounts = [0, 0, 0];
-    let gantryCount = 0;
-    let lowCount = 0;
-    list.slice(0, ANCHOR_POOL).forEach((a) => {
-      const active = a.id === s.anchor?.id;
-      // 0 gold (attached), 1 cyan (reachable, same lane), 2 idle.
-      const slot = active ? 0 : a.lane === s.lane ? 1 : 2;
-      const pool = this.anchorPools[slot];
-      const n = anchorCounts[slot] ?? 0;
-      if (pool) {
-        this.dummy.position.set(a.x, a.y, s.p.z - a.z);
-        this.dummy.rotation.set(0, 0, 0);
-        this.dummy.scale.setScalar(active ? 1.2 : 0.8);
-        this.dummy.updateMatrix();
-        pool.setMatrixAt(n, this.dummy.matrix);
-        anchorCounts[slot] = n + 1;
+    for (let bay = Math.max(0, playerBay - 1); bay <= playerBay + 8; bay++) {
+      const wireZ = bay * BAY;
+      for (const lane of LANES) {
+        const id = `anchor-${bay}-${lane}`;
+        const pos = this.street?.anchors.get(id) ?? {
+          x: lane * this.course.laneWidth,
+          y: 17.6,
+          z: wireZ,
+        };
+        const active = activeId === id;
+        const slot = active ? 0 : bay === targetBay && lane === s.lane ? 1 : 2;
+        const pool = this.anchorPools[slot];
+        const n = anchorCounts[slot] ?? 0;
+        if (pool && n < ANCHOR_POOL) {
+          this.dummy.position.set(pos.x, pos.y, s.p.z - pos.z);
+          this.dummy.rotation.set(0, 0, 0);
+          this.dummy.scale.setScalar(active ? 1.1 : 0.75);
+          this.dummy.updateMatrix();
+          pool.setMatrixAt(n, this.dummy.matrix);
+          anchorCounts[slot] = n + 1;
+        }
       }
-      // One gantry per anchor line, centred: the carrier spans every lane,
-      // so the three lane anchors share a single prop rather than each
-      // sprouting its own bar.
-      if (a.kind !== 'lower' && a.lane === 0 && this.gantries && gantryCount < ANCHOR_POOL) {
-        this.dummy.position.set(0, a.y, s.p.z - a.z);
-        this.dummy.rotation.set(0, 0, 0);
-        this.dummy.scale.setScalar(1);
-        this.dummy.updateMatrix();
-        this.gantries.setMatrixAt(gantryCount++, this.dummy.matrix);
-      } else if (a.kind === 'lower' && this.lowMarks && lowCount < ANCHOR_POOL) {
-        // Something to actually land on. Without this the descent drew a
-        // cable to an invisible point just above the road.
-        this.dummy.position.set(a.x, 0, s.p.z - a.z);
-        this.dummy.rotation.set(0, 0, 0);
-        this.dummy.scale.setScalar(1);
-        this.dummy.updateMatrix();
-        this.lowMarks.setMatrixAt(lowCount++, this.dummy.matrix);
-      } else if (!this.street && a.kind === 'lower') {
-        this.instance(this.blocks, b++, a.x, 0.25, s.p.z - a.z, 1.5, 0.5, 1.5);
-      }
-    });
+    }
     this.anchorPools.forEach((pool, i) => {
       pool.count = anchorCounts[i] ?? 0;
       pool.instanceMatrix.needsUpdate = true;
     });
-    if (this.gantries) {
-      this.gantries.count = gantryCount;
-      this.gantries.instanceMatrix.needsUpdate = true;
-    }
-    if (this.lowMarks) {
-      this.lowMarks.count = lowCount;
-      this.lowMarks.instanceMatrix.needsUpdate = true;
-    }
     const finish = s.p.z - this.course.duration * this.course.speed;
     this.instance(this.trims, w++, 0, 17, finish, 24, 0.5, 0.5);
     for (const side of [-1, 1]) this.instance(this.trims, w++, side * 12, 8.5, finish, 0.5, 17, 0.5);
@@ -511,8 +475,6 @@ export class SkylineScene {
     this.street?.dispose();
     this.boxes?.dispose();
     this.labels?.dispose();
-    this.gantries?.dispose();
-    this.lowMarks?.dispose();
     this.giftMarks.dispose();
     this.hazardMarks.dispose();
     if (this.landmark) disposeTree([this.landmark]);

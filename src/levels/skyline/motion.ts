@@ -29,8 +29,10 @@ function skyHeight(c: Course, t: number): Axis {
 export const ANCHOR_HEIGHT = 19;
 
 export function upperAnchor(c: Course, lane: Lane, cycle: number): Anchor {
-  return { id: `upper-${cycle}-${lane}`, lane, kind: 'upper', x: lane * c.laneWidth,
-    y: ANCHOR_HEIGHT, z: (cycle + 0.55) * c.cycle * c.speed };
+  const bay = cycle + 1;
+  const z = bay * c.cycle * c.speed;
+  return { id: `anchor-${bay}-${lane}`, lane, kind: 'upper', x: lane * c.laneWidth,
+    y: 17.6, z };
 }
 export function lowerAnchor(c: Course, lane: Lane, time: number): Anchor {
   return { id: `lower-${lane}-${time}`, lane, kind: 'lower', x: lane * c.laneWidth, y: 0.6, z: time * c.speed + 6 };
