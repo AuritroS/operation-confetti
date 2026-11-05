@@ -523,6 +523,61 @@ export function buildMaskEmblem(width = 1): Group {
   return emblem;
 }
 
+/**
+ * The gift emblem on Aurora's gates.
+ *
+ * It replaced a bandit mask. The mask was a reference to Matthew's disguise,
+ * and he does not wear one — he is the unhooded Rogue with his own hair — so
+ * the symbol pointed at nothing. A present is what the gates are actually
+ * about: Aurora's line is "your presents are in the vault", and the same
+ * shape is the collectible the player chases through all three levels.
+ *
+ * Built from relief rather than a cut silhouette like the mask. A present
+ * reads by its ribbon crossing its lid, and a flat extruded outline loses
+ * exactly that.
+ *
+ * Relief alone was not enough: the mask could be one flat colour because its
+ * eyes are cut clean through, and a present has no holes, so a single-tone
+ * version came out a gold blob with a bow. The ribbon takes a deeper shade of
+ * the same gold, which separates it from any angle instead of relying on a
+ * highlight the lighting may not provide.
+ */
+export function buildGiftEmblem(width = 1): Group {
+  const emblem = new Group();
+  const gold = matte(PALETTE.gold, 0.32);
+  /** The same gold, shaded down, so the ribbon is legible without a new hue. */
+  const bronze = matte(0xa06a28, 0.4);
+  const depth = width * 0.08;
+
+  const add = (w: number, h: number, d: number, x: number, y: number, z = 0,
+    material = gold): Mesh => {
+    const mesh = new Mesh(new BoxGeometry(w, h, d), material);
+    mesh.position.set(x, y, z);
+    emblem.add(mesh);
+    return mesh;
+  };
+
+  // Box, then a lid a little wider so the silhouette has a shoulder.
+  add(width * 0.84, width * 0.62, depth, 0, -width * 0.12);
+  add(width * 0.96, width * 0.16, depth * 1.2, 0, width * 0.27);
+
+  // Ribbon: shaded and proud of both, so it reads from any angle.
+  add(width * 0.15, width * 0.92, depth * 1.9, 0, 0, depth * 0.5, bronze);
+  add(width * 0.86, width * 0.13, depth * 1.7, 0, -width * 0.12, depth * 0.42, bronze);
+
+  // Two bow loops and a knot.
+  for (const side of [-1, 1]) {
+    const loop = new Mesh(new TorusGeometry(width * 0.15, width * 0.045, 6, 18), bronze);
+    loop.position.set(side * width * 0.17, width * 0.46, depth * 0.3);
+    loop.rotation.z = side * 0.5;
+    loop.scale.set(1, 0.78, 0.6);
+    emblem.add(loop);
+  }
+  add(width * 0.13, width * 0.13, depth * 2.0, 0, width * 0.4, depth * 0.5, bronze);
+
+  return emblem;
+}
+
 // -------------------------------------------------------- vault door -----
 
 /**
@@ -569,7 +624,7 @@ export function buildVaultDoor(width = 4.8, height = 3.4): Group {
   }
 
   // The emblem sized to the door, centred on it, standing off the face.
-  const emblem = buildMaskEmblem(radius * 1.15);
+  const emblem = buildGiftEmblem(radius * 1.15);
   emblem.position.set(0, height * 0.5, 0.22);
   vault.add(emblem);
 

@@ -36,7 +36,16 @@ export const SOURCES = {
   props: {
     /** Confetti blaster / grappling gun. Kenney's compact pistol, tinted gold by the asset build. */
     blaster: '/models/props/blaster.glb',
-    gift: '/models/props/present_A_blue.glb',
+    /**
+     * The scored collectible, as gameplay actually loads it.
+     *
+     * This pointed at `present_A_blue.glb`, which the asset build has never
+     * produced. Nothing noticed because gameplay reads the prop registry in
+     * `render/environment/props.ts`, not this entry — so the manifest simply
+     * described a file that did not exist. Level 3 keeps its own blue
+     * present; levels 1 and 2 collect the yellow one.
+     */
+    gift: '/models/props/present_A_yellow.glb',
     grappleHook: '/models/props/candycane_small.glb',
   },
 } as const;
