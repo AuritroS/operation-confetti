@@ -7,7 +7,7 @@
  * changes a decision mid-run. No timer is ever displayed, which the doc does
  * require.
  */
-const GIFT_ICON_SVG = '<svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.5 2.5 0 0 0-5-0.5L12 6l-1-1.5A2.5 2.5 0 0 0 6 5c0 .35.07.69.18 1H4a2 2 0 0 0-2 2v2a1 1 0 0 0 1 1h1v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9h1a1 1 0 0 0 1-1V8a2 2 0 0 0-2-2zm-7-1.5a1 1 0 1 1 2 0c0 .41-.24.77-.6 1H13v-1zm-4 0a1 1 0 1 1 2 0v1H9.6c-.36-.23-.6-.59-.6-1zM4 8h7v2H4V8zm2 12v-8h5v8H6zm7 0v-8h5v8h-5zm7-10h-7V8h7v2z"/></svg>';
+const GIFT_ICON_SVG = '<svg viewBox="0 0 24 24" class="hud__gift-icon"><path class="hud__gift-bow" d="M12 7c-1.5-2.2-4.5-2-4.5.5 0 2 3.5 2.5 4.5 2.5m0-3c1.5-2.2 4.5-2 4.5.5 0 2-3.5 2.5-4.5 2.5" /><rect class="hud__gift-lid" x="3" y="7" width="18" height="4" rx="1" /><rect class="hud__gift-box" x="4.5" y="11" width="15" height="10" rx="1" /><line class="hud__gift-ribbon" x1="12" y1="7" x2="12" y2="21" /></svg>';
 
 export class Hud {
   private readonly score = document.getElementById('hud-score') as HTMLElement | null;
