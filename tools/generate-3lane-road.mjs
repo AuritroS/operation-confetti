@@ -2,7 +2,7 @@ import { NodeIO } from '@gltf-transform/core';
 
 async function main() {
   const io = new NodeIO();
-  // Read clean asset from assets
+  // Read from original Kenney asset
   const sourceDoc = await io.read('assets/kenney_city-kit-roads/Models/GLB format/road-straight.glb');
   const root = sourceDoc.getRoot();
   const sourceMesh = root.listMeshes()[0];
@@ -18,10 +18,13 @@ async function main() {
   const uv = uvAttr.getArray();
   const indices = idxAttr.getArray();
 
-  // UV constants from Kenney colormap
-  const UV_WHITE = [0.406, 0.875];
-  const UV_ASPHALT = [0.281, 0.875];
-  const UV_GUTTER = [0.031, 0.875];
+  // UV constants from Kenney colormap:
+  // White painted road stripes: [0.4063, 0.8750]
+  // Dark asphalt carriageway:   [0.2813, 0.8750]
+  // Road gutter shoulder:       [0.0313, 0.8750]
+  const UV_WHITE = [0.4063, 0.8750];
+  const UV_ASPHALT = [0.2813, 0.8750];
+  const UV_GUTTER = [0.0313, 0.8750];
 
   // Keep all kerb, underside, and non-carriageway faces.
   // Carriageway top triangles in the original model:
@@ -65,10 +68,17 @@ async function main() {
     newIndices.push(getOrCreateVertex(i0), getOrCreateVertex(i1), getOrCreateVertex(i2));
   }
 
-  // 3-lane carriageway surface
+  // 3-lane carriageway surface:
+  // Elevation: y = 0.010, normal = (0, 1, 0)
   const Y_SURF = 0.010;
   const N_SURF = [0, 1, 0];
 
+  /**
+   * Add a quad on the X-Z plane with CCW winding facing UPWARD (+Y).
+   * In Three.js right-handed system:
+   * v0: (xMin, zMin), v1: (xMax, zMin), v2: (xMax, zMax), v3: (xMin, zMax)
+   * Triangles (0, 2, 1) and (0, 3, 2) have normal = +Y (upward).
+   */
   function addQuad(xMin, xMax, zMin, zMax, uvCoord) {
     const vBase = newPositions.length / 3;
     const pts = [
@@ -82,8 +92,9 @@ async function main() {
       newNormals.push(...N_SURF);
       newUVs.push(...uvCoord);
     }
-    newIndices.push(vBase, vBase + 1, vBase + 2);
-    newIndices.push(vBase, vBase + 2, vBase + 3);
+    // CCW upward-facing (+Y normal) triangles:
+    newIndices.push(vBase, vBase + 2, vBase + 1);
+    newIndices.push(vBase, vBase + 3, vBase + 2);
   }
 
   // Z partitions:
@@ -99,16 +110,17 @@ async function main() {
   const zStripeR_min = zDivRight - halfStripe;
   const zStripeR_max = zDivRight + halfStripe;
 
-  // X segments for dashes (length 1.0, from -0.5 to +0.5):
-  // 3 dashes of length 0.20 (3.8m), with gaps
+  // X segments for dashes (total length 1.0, from -0.5 to +0.5):
+  // 3 dashes of length 0.200 (3.8m), gaps of 0.150 (2.85m).
+  // Edge gaps of 0.075 on each side seamlessly form a 0.150 gap across tile seams.
   const xSegments = [
-    { min: -0.50, max: -0.45, isDash: false },
-    { min: -0.45, max: -0.25, isDash: true },
-    { min: -0.25, max: -0.10, isDash: false },
-    { min: -0.10, max: +0.10, isDash: true },
-    { min: +0.10, max: +0.25, isDash: false },
-    { min: +0.25, max: +0.45, isDash: true },
-    { min: +0.45, max: +0.50, isDash: false },
+    { min: -0.500, max: -0.425, isDash: false },
+    { min: -0.425, max: -0.225, isDash: true },
+    { min: -0.225, max: -0.075, isDash: false },
+    { min: -0.075, max: +0.125, isDash: true },
+    { min: +0.125, max: +0.275, isDash: false },
+    { min: +0.275, max: +0.475, isDash: true },
+    { min: +0.475, max: +0.500, isDash: false },
   ];
 
   // 1. Gutters (full length along x)
