@@ -1,6 +1,7 @@
 import type { RunEvent } from '../../core/scoring';
 import { Motion } from './motion';
 import { PLAYER_HALF, speedAt } from './config';
+
 import type { Course, Direction, Entity, Lane, Point3, Snapshot, TravelMode } from './types';
 
 export function hits(from: Point3, to: Point3, e: Entity): boolean {

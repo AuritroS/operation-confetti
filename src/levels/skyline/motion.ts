@@ -118,6 +118,22 @@ function swingPhase(c: Course, t: number): { phase: Phase; bay: number | null } 
     return { phase: 'flight', bay: null };
   }
   const p = positionAt(t);
+  /*
+   * The opening bay swings from the first frame.
+   *
+   * Every other bay flies for its first half and swings for its second,
+   * which is the rhythm the course is authored against. But zero falls in
+   * that flight half, and flight means the cable is detached — so the level
+   * opened on Matthew hanging with no rope and his arms at his sides, a dead
+   * hang rather than a chase already under way.
+   *
+   * Only the opening is special-cased, and only up to the point where the
+   * normal window would take over anyway. Nothing downstream shifts: the
+   * first authored entity is at z 28.3, past the end of this bay, so no
+   * encounter's phase changes and the solved route is unaffected.
+   */
+  if (p < BAY * 0.5) return { phase: 'swing', bay: 1 };
+
   const u = (p / BAY) - Math.floor(p / BAY);
   const nextBay = Math.floor(p / BAY) + 1;
   if (u >= 0.50 && u < 0.995) {
