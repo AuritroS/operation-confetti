@@ -12,6 +12,7 @@ import { type StoryBeat, STORY_IMAGES, storyImageUrl } from '../story/script';
  */
 export class StoryPlayer {
   private readonly root = document.createElement('div');
+  private readonly frame = document.createElement('div');
   private readonly art = document.createElement('img');
   private readonly lines = document.createElement('div');
   private readonly next = document.createElement('button');
@@ -22,6 +23,9 @@ export class StoryPlayer {
     this.root.className = 'story';
     this.art.className = 'story__art';
     this.art.alt = '';
+
+    this.frame.className = 'story__frame';
+    this.frame.append(this.art);
 
     const foot = document.createElement('div');
     foot.className = 'story__foot';
@@ -37,7 +41,7 @@ export class StoryPlayer {
     this.skip.addEventListener('click', () => this.finish(true));
 
     foot.append(this.lines, this.next);
-    this.root.append(this.art, this.skip, foot);
+    this.root.append(this.frame, this.skip, foot);
     this.root.hidden = true;
     container.append(this.root);
   }
@@ -51,10 +55,10 @@ export class StoryPlayer {
   show(beat: StoryBeat): Promise<boolean> {
     this.art.src = storyImageUrl(beat.image);
     // A cover is letterboxed so its painted title survives; every other
-    // panel fills the frame.
-    this.art.className = beat.cover
-      ? 'story__art story__art--fit'
-      : `story__art story__art--${beat.focus}`;
+    // panel fills the frame and is enlarged onto its subject.
+    this.art.className = beat.cover ? 'story__art story__art--fit' : 'story__art';
+    this.art.style.setProperty('--zoom', String(beat.cover ? 1 : beat.framing.zoom));
+    this.art.style.setProperty('--origin', beat.framing.origin);
     this.next.textContent = beat.next;
     this.skip.hidden = beat.cover === true;
 

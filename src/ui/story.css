@@ -26,13 +26,22 @@
  * survives, and it is the layout the storyboard asks for: artwork in the
  * main frame, caption area beneath it.
  */
-.story__art {
+.story__frame {
   grid-row: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+.story__art {
   width: 100%;
   height: 100%;
-  min-height: 0;
   object-fit: cover;
+  /* Enlarge, then let the origin decide what survives. Positioning alone had
+     almost no overflow to work with at this frame's aspect. */
+  transform: scale(var(--zoom, 1));
+  transform-origin: var(--origin, 50% 50%);
 }
+.story__art--fit { object-fit: contain; transform: none; }
 /*
  * The cover is shown whole.
  *
@@ -43,11 +52,6 @@
  */
 .story__art--fit { object-fit: contain; }
 
-/* Where the crop sits. The same picture, reframed, reads as a new moment. */
-.story__art--centre { object-position: 50% 50%; }
-.story__art--left { object-position: 18% 60%; }
-.story__art--right { object-position: 82% 38%; }
-.story__art--top { object-position: 50% 18%; }
 
 .story__foot {
   position: relative;

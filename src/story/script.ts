@@ -14,8 +14,23 @@
  */
 export type StoryImage = 'matthew' | 'aurora' | 'matthew-aurora';
 
-/** Which part of the artwork fills the frame. Maps to CSS object-position. */
-export type Focus = 'centre' | 'left' | 'right' | 'top';
+/**
+ * How a panel is framed.
+ *
+ * `zoom` of 1 shows the artwork fitted to the panel; above 1 it is enlarged
+ * about `origin`. The origin has to sit *on* the subject, because scaling
+ * holds that point still and pushes everything else outward — an origin
+ * beside a face enlarges the face straight out of frame. Positioning alone was not enough:
+ * the panel frame is close to the illustrations' own aspect, so there was
+ * barely any overflow to pan within and every reframing of the two-shot came
+ * out looking like the same picture. Enlarging first is what creates the room
+ * to move, which is what makes one image read as three moments.
+ */
+export interface Framing {
+  readonly zoom: number;
+  /** CSS transform-origin: what the zoom closes in on. */
+  readonly origin: string;
+}
 
 export interface StoryLine {
   /** Omitted for a caption that nobody says. */
@@ -26,7 +41,7 @@ export interface StoryLine {
 export interface StoryBeat {
   readonly id: string;
   readonly image: StoryImage;
-  readonly focus: Focus;
+  readonly framing: Framing;
   readonly lines: readonly StoryLine[];
   /** Label on the continue button. */
   readonly next: string;
@@ -38,7 +53,7 @@ export const BEATS = {
   title: {
     id: 'title',
     image: 'matthew',
-    focus: 'centre',
+    framing: { zoom: 1, origin: '50% 50%' },
     lines: [],
     next: 'Start',
     cover: true,
@@ -46,7 +61,8 @@ export const BEATS = {
   intro: {
     id: 'intro',
     image: 'aurora',
-    focus: 'centre',
+    // Her whole taunt: crown, cake and the hand reaching for the camera.
+    framing: { zoom: 1, origin: '50% 50%' },
     lines: [
       { who: 'AURORA', text: 'Looking for your cake?' },
       { who: 'MATTHEW', text: "That's my birthday cake." },
@@ -57,7 +73,8 @@ export const BEATS = {
   vault: {
     id: 'vault',
     image: 'matthew-aurora',
-    focus: 'left',
+    // In on Matthew. She is behind him and out of the frame's attention.
+    framing: { zoom: 1.7, origin: '20% 45%' },
     lines: [
       { who: 'MATTHEW', text: 'Okay. These are good presents.' },
       { who: 'AURORA', text: 'Keep up.' },
@@ -67,7 +84,8 @@ export const BEATS = {
   rooftop: {
     id: 'rooftop',
     image: 'matthew-aurora',
-    focus: 'centre',
+    // Both of them, which is the whole point of the confrontation.
+    framing: { zoom: 1, origin: '50% 50%' },
     lines: [
       { who: 'AURORA', text: 'You brought a party popper?' },
       { who: 'MATTHEW', text: 'Birthday equipment.' },
@@ -77,7 +95,8 @@ export const BEATS = {
   win: {
     id: 'win',
     image: 'matthew-aurora',
-    focus: 'right',
+    // In on her and the cake, with Matthew's reach just out of frame.
+    framing: { zoom: 1.5, origin: '68% 26%' },
     lines: [
       { who: 'AURORA', text: 'Save me a slice?' },
       { who: 'MATTHEW', text: "You're on cleanup." },
@@ -87,7 +106,8 @@ export const BEATS = {
   loss: {
     id: 'loss',
     image: 'aurora',
-    focus: 'top',
+    // The cake, held high and leaving with her.
+    framing: { zoom: 1.6, origin: '76% 28%' },
     lines: [
       { who: 'AURORA', text: "I'll save you a slice." },
       { who: 'MATTHEW', text: "You'd better." },
