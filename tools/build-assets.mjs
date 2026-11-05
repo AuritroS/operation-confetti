@@ -286,10 +286,28 @@ try {
     copyFileSync(src, join(PROPS_OUT, 'blaster.glb'));
     // The GLB references Textures/colormap.png relatively, so the folder has
     // to survive beside it. City props keep their own copy under city/.
-    await sharp(texture)
-      .greyscale()
-      .tint({ r: 0xea, g: 0xac, b: 0x5b })
-      .toFile(join(PROPS_OUT, 'Textures', 'colormap.png'));
+    /*
+     * Multiplied by hand rather than with `.greyscale().tint()`.
+     *
+     * sharp applies operations in its own fixed order, not call order, so
+     * greyscale ran last and the purple came out mid-grey. Doing the maths on
+     * raw pixels is predictable, and the luminance multiply keeps the atlas's
+     * shading so the gun still reads as a solid object rather than a
+     * silhouette.
+     */
+    const { data, info } = await sharp(texture).ensureAlpha().raw()
+      .toBuffer({ resolveWithObject: true });
+    const GOLD = [0xea, 0xac, 0x5b];
+    for (let i = 0; i < data.length; i += info.channels) {
+      const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      // Lifted hard: Kenney's body cell is a mid-tone purple, and a straight
+      // luminance multiply left the gun a dark brown rather than gold. This
+      // puts the body near full gold while the dark cells stay shadowed.
+      const k = Math.min(1, 0.28 + lum * 1.9);
+      for (let c = 0; c < 3; c++) data[i + c] = Math.round(GOLD[c] * k);
+    }
+    await sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } })
+      .png().toFile(join(PROPS_OUT, 'Textures', 'colormap.png'));
     report.push({ file: 'props/blaster.glb', step: 'copy + gold tint', kb: kb(join(PROPS_OUT, 'blaster.glb')) });
   }
 }

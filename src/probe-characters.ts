@@ -13,13 +13,16 @@ import { Stage } from './render/stage';
 import { RendererHost } from './render/renderer-host';
 import { DebugPanel } from './ui/hud';
 import { AssetBundle, type Actor } from './assets/characters';
-import { ASSET_VERSION, ATTACH_NODES, CLIPS, SOURCES } from './assets/manifest';
+import { ASSET_VERSION, ATTACH_NODES, ATTACH_OFFSETS, CLIPS, SOURCES } from './assets/manifest';
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const ui = document.getElementById('probe-ui') as HTMLElement;
 const debug = new DebugPanel();
 
 const stage = new Stage(new RendererHost(canvas));
+// Review hook: lets the attachment check read real world axes rather than
+// re-deriving them from the rig by hand.
+(window as unknown as Record<string, unknown>).__probe = { stage, get scene() { return stage.scene; } };
 stage.observe();
 // Gameplay camera distance: this is the silhouette that has to read on a phone.
 stage.camera.position.set(0, 1.9, 4.4);
@@ -91,6 +94,13 @@ async function boot(): Promise<void> {
   try {
     await bundle.loadAll([SOURCES.props.blaster]);
     blaster = bundle.get(SOURCES.props.blaster).scene.clone(true);
+    // The same transform the game applies. Without it this harness showed a
+    // correctly-attached blaster in the wrong pose, so it could not be used
+    // to judge the one thing it exists to judge.
+    const o = ATTACH_OFFSETS.blaster;
+    blaster.position.set(...o.position);
+    blaster.rotation.set(...o.rotationEuler);
+    blaster.scale.setScalar(o.scale);
     attachOk = matthew.attach(ATTACH_NODES.handRight, blaster);
   } catch {
     console.warn('[probe] Optional blaster unavailable; character animations remain available.');

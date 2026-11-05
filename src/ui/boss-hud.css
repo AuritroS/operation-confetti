@@ -23,7 +23,9 @@
 }
 .boss-bar-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .boss-bar-name { font-size: 10px; font-weight: 800; letter-spacing: .14em; color: #e6c7ff; }
-.boss-bar-row strong { font-size: 13px; color: var(--gold-text); font-variant-numeric: tabular-nums; }
+/* Her number, in her colour. Gold is Matthew's: his hearts, his cannon and
+   the score all use it, so a gold figure over her bar read as his. */
+.boss-bar-row strong { font-size: 13px; color: #e6c7ff; font-variant-numeric: tabular-nums; }
 .boss-bar-track {
   height: 9px; border-radius: 999px; overflow: hidden;
   background: #18101acc; border: 1px solid #ffffff1f;

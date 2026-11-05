@@ -133,15 +133,26 @@ export const ATTACH_NODES = {
  * those compose to a barrel pointing along world +Y, which is to say
  * straight up at the sky — which is exactly how it first appeared.
  *
- * Wanting the barrel along world +Z (the way the Rogue faces) and the
- * blaster's +Y still up gives a single 180-degree rotation about the axis
- * bisecting Y and Z, which in three's default XYZ Euler order is
- * (-PI/2, 0, PI).
+ * The final term was PI, which pointed the barrel forward but rolled the gun
+ * ninety degrees onto its side — its width axis ended up as world up. The
+ * hand bone is not axis-aligned, so this is not derivable on paper; it was
+ * measured in `probe.html?characters`, which now applies these same offsets
+ * and can report the attachment's real world axes. At PI/2 the barrel reads
+ * (-0.25, 0, 0.92) and the gun's own up reads (0, 0.95, 0).
  */
 export const ATTACH_OFFSETS = {
   blaster: {
-    position: [0, 0, 0] as [number, number, number],
-    rotationEuler: [-Math.PI / 2, 0, Math.PI] as [number, number, number],
+    /**
+     * The grip, not the centre of the model.
+     *
+     * The blaster's origin sits mid-body — its bounds run Y -0.268..0.153 and
+     * Z -0.37..0.43 — so attaching at zero put the hand bone through the
+     * barrel and Matthew appeared to hold it by the middle. The handle is
+     * back and down in model space; under this rotation that maps to +Y and
+     * +Z in the slot, scaled by the same factor the model is.
+     */
+    position: [0, 0.24, 0.11] as [number, number, number],
+    rotationEuler: [-Math.PI / 2, 0, Math.PI / 2] as [number, number, number],
     /**
      * A pistol, not a carbine.
      *

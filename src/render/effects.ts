@@ -27,7 +27,6 @@ import {
   PlaneGeometry,
   Points,
   PointsMaterial,
-  TorusGeometry,
   type Texture,
 } from 'three';
 
@@ -187,7 +186,6 @@ export class GiftGlowField {
   readonly group = new Group();
   private readonly mesh: InstancedMesh;
   private readonly groundMesh: InstancedMesh;
-  private readonly haloMesh: InstancedMesh;
   private readonly matrix = new Matrix4();
   private readonly dummy = new Group();
   private readonly anchors: Vector3[] = [];
@@ -216,28 +214,22 @@ export class GiftGlowField {
     this.mesh.frustumCulled = false;
     this.group.add(this.mesh);
 
-    // Orbiting electric neon halo ring around the gift
-    const haloGeom = new TorusGeometry(this.baseSize * 0.44, 0.035, 6, 28);
-    haloGeom.rotateX(Math.PI / 2);
-    const haloMat = new MeshBasicMaterial({
-      color: 0x53a6f9,
-      transparent: true,
-      opacity: 0.85,
-      blending: AdditiveBlending,
-      depthWrite: false,
-    });
-    this.haloMesh = new InstancedMesh(haloGeom, haloMat, Math.max(1, maxAnchors));
-    this.haloMesh.frustumCulled = false;
-    this.group.add(this.haloMesh);
 
-    // Ground projection pool on the asphalt road surface
+    /*
+     * A pool of spill light on the road.
+     *
+     * Not the ring that was removed: this is what places a gift in a lane
+     * while it is still distant, which is a gameplay read rather than
+     * decoration. Dimmer than the gift's own glow so it reads as light
+     * falling from it rather than a second effect.
+     */
     const groundGeom = new PlaneGeometry(this.baseSize * 1.35, this.baseSize * 1.35);
     groundGeom.rotateX(-Math.PI / 2);
     const groundMat = new MeshBasicMaterial({
       color,
       map: glowTexture(),
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.34,
       blending: AdditiveBlending,
       depthWrite: false,
     });
@@ -250,11 +242,9 @@ export class GiftGlowField {
       this.matrix.makeTranslation(0, -9999, 0);
       this.mesh.setMatrixAt(i, this.matrix);
       this.groundMesh.setMatrixAt(i, this.matrix);
-      this.haloMesh.setMatrixAt(i, this.matrix);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this.groundMesh.instanceMatrix.needsUpdate = true;
-    this.haloMesh.instanceMatrix.needsUpdate = true;
   }
 
   setAnchors(positions: readonly Vector3[]): void {
@@ -273,19 +263,14 @@ export class GiftGlowField {
     for (let i = 0; i < this.maxAnchors; i++) {
       if (i < this.active) {
         const a = this.anchors[i]!;
-        // 3D aura at the gift's mid-air altitude
+        // Centred on the gift itself, so the light reads as coming from
+        // inside the box rather than orbiting it.
         this.dummy.position.copy(a);
         this.dummy.rotation.set(0, spin + i * 0.7, 0);
         this.dummy.scale.setScalar(pulse);
         this.dummy.updateMatrix();
         this.mesh.setMatrixAt(i, this.dummy.matrix);
 
-        // Orbiting neon ring with floating oscillation
-        this.dummy.position.set(a.x, a.y + Math.sin(this.time * 3.2 + i * 0.8) * 0.08, a.z);
-        this.dummy.rotation.set(Math.sin(this.time * 1.5 + i) * 0.2, spin * 1.4, Math.cos(this.time * 1.5 + i) * 0.2);
-        this.dummy.scale.setScalar(pulse * 1.06);
-        this.dummy.updateMatrix();
-        this.haloMesh.setMatrixAt(i, this.dummy.matrix);
 
         // Projected puddle pool on the road asphalt at y = 0.006
         this.dummy.position.set(a.x, 0.006, a.z);
@@ -297,12 +282,10 @@ export class GiftGlowField {
         this.matrix.makeTranslation(0, -9999, 0);
         this.mesh.setMatrixAt(i, this.matrix);
         this.groundMesh.setMatrixAt(i, this.matrix);
-        this.haloMesh.setMatrixAt(i, this.matrix);
       }
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this.groundMesh.instanceMatrix.needsUpdate = true;
-    this.haloMesh.instanceMatrix.needsUpdate = true;
   }
 
   dispose(): void {
@@ -310,8 +293,6 @@ export class GiftGlowField {
     (this.mesh.material as MeshBasicMaterial).dispose();
     this.groundMesh.geometry.dispose();
     (this.groundMesh.material as MeshBasicMaterial).dispose();
-    this.haloMesh.geometry.dispose();
-    (this.haloMesh.material as MeshBasicMaterial).dispose();
     this.group.removeFromParent();
   }
 }

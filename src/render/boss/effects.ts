@@ -4,6 +4,8 @@ import {
   Shape, ShapeGeometry, SphereGeometry, TorusGeometry, Vector3,
 } from 'three';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
+import { glowTexture } from '../effects';
+import { ROLE } from '../palette';
 import type { BossCues, CakeSnapshot, OrbImpactSnapshot, OrbSnapshot, ShieldSnapshot, StrikeSnapshot } from '../../levels/boss/telegraph';
 import { endingEase, escapeOffset } from './endings';
 import { AURORA_TORSO, MATTHEW_ORB_IMPACT } from './targets';
@@ -522,6 +524,32 @@ class GiftView {
 
   constructor() {
     this.root.add(this.box);
+    /*
+     * The same gold glow levels 1 and 2 give a collectible.
+     *
+     * Level 3 rendered a plain blue present with no aura, so the one thing
+     * worth chasing looked different in the last level of the game — the
+     * catalog even called it "plain blue present until cross-level
+     * collectible treatment is agreed". Crossed quads, lit from inside the
+     * box rather than ringed around it, sharing `glowTexture` so a change to
+     * the reward look reaches all three levels at once.
+     */
+    const glowGeometry = new PlaneGeometry(1.05, 1.05);
+    const glowMaterial = new MeshBasicMaterial({
+      color: ROLE.collectible,
+      map: glowTexture(),
+      transparent: true,
+      opacity: 0.85,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+    for (const turn of [0, Math.PI / 2]) {
+      const quad = new Mesh(glowGeometry, glowMaterial);
+      quad.rotation.y = turn;
+      quad.position.y = 0.3;
+      this.box.add(quad);
+    }
     this.root.visible = false;
   }
 
@@ -547,8 +575,10 @@ class GiftView {
     this.box.position.y = falling ? 0 : Math.sin(time * 2.2) * 0.1;
     this.box.rotation.x = falling ? (1 - drop) * 2.2 : 0;
     if (phase === 'taken') {
-      const pop = 1 + progress * 0.8;
-      this.box.scale.setScalar(Math.max(0, pop * (1 - progress)));
+      // Absorbed rather than popped, matching levels 1 and 2: nothing grows
+      // toward the camera on pickup, because near the lens that hides the
+      // next thing the player has to react to.
+      this.box.scale.setScalar(Math.max(0, 1 - progress * progress));
     } else if (phase === 'expired') {
       this.box.scale.setScalar(Math.max(0, 1 - progress));
     } else {

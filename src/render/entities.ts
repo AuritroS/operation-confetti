@@ -220,19 +220,28 @@ export class EntityVisuals {
       if (!object) continue;
 
       if (t.entity.kind === 'gift' && t.state === 'collected') {
-        // A short pop on pickup, then gone. Feedback lives on the gift so
-        // Matthew's run cycle is never interrupted by a collection.
+        // Absorbed, not popped.
+        //
+        // This used to scale to 1.9x and rise 0.8 units toward the camera.
+        // Collection happens at Matthew's position, which is close to the
+        // lens, so a swelling gift filled the frame at exactly the moment the
+        // player needed to see the next hazard. It now shrinks away and lets
+        // the glow do the celebrating — the same vocabulary level 3 uses.
+        //
+        // Feedback lives on the gift so Matthew's run cycle is never
+        // interrupted by a collection.
         const age = this.collected.get(t.entity.id) ?? 0;
         if (age >= POP_SECONDS) {
           object.visible = false;
           continue;
         }
         this.collected.set(t.entity.id, age + step);
-        const pop = 1 - age / POP_SECONDS;
+        const t01 = age / POP_SECONDS;
         const base = this.baseScale.get(t.entity.id) ?? 1;
         object.visible = true;
-        object.scale.setScalar(base * (1 + (1 - pop) * 0.9));
-        object.position.y = 0.42 + (1 - pop) * 0.8;
+        // Ease out so it leaves quickly and finishes gently.
+        object.scale.setScalar(base * (1 - t01 * t01));
+        object.position.y = 0.42;
         continue;
       }
 
