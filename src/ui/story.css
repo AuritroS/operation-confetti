@@ -102,3 +102,14 @@
   padding: 7px 14px;
   cursor: pointer;
 }
+
+/*
+ * Next, while a widget in the caption area is not satisfied.
+ *
+ * Dimmed rather than hidden: a missing button reads as a broken screen,
+ * where a greyed one reads as "finish the field above me".
+ */
+.story__next:disabled {
+  opacity: .45;
+  cursor: default;
+}

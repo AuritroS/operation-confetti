@@ -1,0 +1,73 @@
+@import './theme.css';
+
+/*
+ * Name entry, as a widget inside the cover panel's caption area.
+ *
+ * Not its own screen: an extra full-page step between "tap to play" and
+ * playing is the step people bounce off, and the cover is already a screen
+ * they are reading.
+ */
+.name {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  max-width: 430px;
+  justify-items: stretch;
+}
+
+.name__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+
+.name__input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: #0b1120;
+  color: var(--ink-fg);
+  font: inherit;
+  /* 16px or larger, or iOS Safari zooms the page on focus and the player
+     lands in a scrolled, half-cropped panel. */
+  font-size: 16px;
+  padding: 11px 13px;
+}
+.name__input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.name__hint {
+  min-height: 1.1em;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--ink-dim);
+}
+/* Only after they have typed something unusable — an empty field is not an
+   error, it is the starting state. */
+.name__hint--bad { color: var(--fault); }
+
+/*
+ * A quiet link under the field.
+ *
+ * Styled as text, not a button: the cover already has one call to action and
+ * a second filled button beside it would split the decision.
+ */
+.name__secondary {
+  justify-self: center;
+  border: 0;
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.name__secondary:hover { color: var(--gold-text); }

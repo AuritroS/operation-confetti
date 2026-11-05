@@ -100,10 +100,25 @@ describe('nothing covers the game unless it is meant to', () => {
 describe('markup and code agree', () => {
   it('declares every element the campaign shell toggles', () => {
     const shell = readFileSync('src/campaign.ts', 'utf8');
-    for (const id of ['pause', 'btn-resume', 'banner', 'rotate', 'surface', 'stage', 'level-hud']) {
+    for (const id of ['pause', 'btn-resume', 'rotate', 'surface', 'stage', 'level-hud']) {
       expect(html, `#${id} must exist in index.html`).toContain(`id="${id}"`);
       expect(shell, `#${id} must be referenced by campaign.ts`).toContain(id);
     }
+  });
+
+  /**
+   * `#banner` is level 1's, not the campaign's.
+   *
+   * The campaign used to end on it — one line of text with the total. That is
+   * now `ResultsScreen`, which has a breakdown, a rank and the board, so the
+   * shell no longer touches the element. It stays in the markup because
+   * `main.ts` (the standalone level 1 page) shares this file and still uses
+   * it, which is the only reason to keep it.
+   */
+  it('leaves #banner to the standalone level 1 page', () => {
+    expect(html).toContain('id="banner"');
+    expect(readFileSync('src/main.ts', 'utf8')).toContain("getElementById('banner')");
+    expect(readFileSync('src/campaign.ts', 'utf8')).not.toContain("byId('banner')");
   });
 
   it('offers no way to pause on purpose', () => {

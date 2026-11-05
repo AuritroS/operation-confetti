@@ -9,6 +9,7 @@ import './hud.css';
  * require.
  */
 export class Hud {
+  private readonly root = document.getElementById('hud') as HTMLElement | null;
   private readonly score = document.getElementById('hud-score') as HTMLElement | null;
   private readonly delta = document.getElementById('hud-delta') as HTMLElement | null;
   private readonly vignette = document.getElementById('vignette') as HTMLElement | null;
@@ -42,6 +43,17 @@ export class Hud {
    */
   showReward(points: number): void {
     this.showDelta(points);
+  }
+
+  /**
+   * Show or hide the whole readout.
+   *
+   * Used at the end of a run: the live score and the stage counter are both
+   * about a run in progress, and leaving "1/3" on screen under a results
+   * card states something that is no longer true.
+   */
+  setVisible(visible: boolean): void {
+    if (this.root) this.root.hidden = !visible;
   }
 
   reset(): void {

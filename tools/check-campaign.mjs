@@ -72,16 +72,39 @@ await page.route('**/*', async (route) => {
  * skipped this would be measuring practice rather than play.
  */
 /**
+ * Wait out the boot preload.
+ *
+ * Every asset is fetched before the title panel now, so until the bar clears
+ * there is nothing on screen to interact with — and `window.__campaign` is
+ * installed at module scope, before any of it, so it cannot be used as the
+ * signal that the game has started.
+ */
+async function waitForBoot(target) {
+  await target.waitForFunction(() => {
+    const bar = document.querySelector('.loading');
+    return bar === null || bar.hidden;
+  }, null, { timeout: 180_000 });
+}
+
+/**
  * Clear any comic panel that is up.
  *
  * The cover has no skip, so it takes a Next; the first story panel then takes
  * a Skip, which suppresses every later beat for the run. A check that walked
  * through all of them would be timing the comic rather than the game.
+ *
+ * The cover also asks who is playing, and its Next stays disabled until the
+ * field holds a usable name. Filling it is part of getting into the game, so
+ * a check that did not would be checking a page no player sees.
  */
 async function dismissStory(target) {
   for (let i = 0; i < 4; i++) {
     const panel = target.locator('.story:not([hidden])');
     if (!(await panel.count())) return;
+
+    const name = target.locator('.name__input:visible');
+    if (await name.count()) await name.fill('Checker');
+
     const skip = target.locator('.story__skip:visible');
     if (await skip.count()) await skip.click();
     else await target.locator('.story__next').click();
@@ -101,6 +124,8 @@ const campaign = () => page.evaluate(() => {
 
 try {
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
+  await waitForBoot(page);
+  console.log('ok  every asset preloaded before the title panel');
   await dismissStory(page);
   await page.waitForFunction(() => window.__campaign && !window.__campaign.switching, null, { timeout: 60_000 });
 

@@ -1,0 +1,60 @@
+@import './theme.css';
+
+/*
+ * The boot screen.
+ *
+ * Above every other overlay, because it is the only thing on screen while it
+ * is up and the story panel underneath it is already loading its artwork.
+ */
+.loading {
+  position: absolute;
+  z-index: 70;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 24px;
+  background: radial-gradient(120% 80% at 50% 18%, #2a1733 0%, var(--ink) 62%);
+  color: var(--ink-fg);
+  text-align: center;
+}
+
+.loading__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+
+/* A fixed track, so the bar grows into a known length rather than the bar
+   itself defining the width and the layout shifting as it fills. */
+.loading__track {
+  width: min(78vw, 320px);
+  height: 8px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: #0b1120;
+  overflow: hidden;
+}
+
+.loading__bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold) 0%, #ffe3a6 100%);
+  /* Matches the step between progress ticks, so the bar reads as moving
+     rather than as a series of jumps. */
+  transition: width .18s ease-out;
+}
+
+.loading__note {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+  /* Reserved, so the line appearing does not nudge the bar upward. */
+  min-height: 1.2em;
+}

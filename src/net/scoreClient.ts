@@ -30,9 +30,30 @@ export interface RunSubmission {
 export interface AcceptedRun {
   runId: string;
   totalScore: number;
-  rank: number;
+  levelScores: [number, number, number];
+  outcome: 'win' | 'loss';
+  /**
+   * The player's position, or null when the server stored the run but could
+   * not read a rank back. Never synthesised here: a position the client made
+   * up is one the player would repeat out loud.
+   */
+  rank: number | null;
   accepted: true;
 }
+
+/**
+ * What became of a submission.
+ *
+ * Three outcomes, not two, because the UI has to say different things:
+ * accepted has a rank, `queued` means offline and will retry on its own, and
+ * `rejected` means the server refused the stream and retrying cannot help.
+ * Collapsing the last two into one null is what made an invalid run look
+ * like a network problem.
+ */
+export type SubmitResult =
+  | { kind: 'accepted'; run: AcceptedRun }
+  | { kind: 'rejected'; status: number; detail: string }
+  | { kind: 'queued' };
 
 function safeLocal<T>(fn: () => T, fallback: T): T {
   try {
@@ -59,9 +80,41 @@ export function normaliseDisplayName(raw: string): string | null {
   return name.length >= 2 && name.length <= 20 ? name : null;
 }
 
+/**
+ * A v4-shaped UUID, always.
+ *
+ * The shape is not cosmetic: the Worker validates both `runId` and `playerId`
+ * against a UUID pattern and answers 400 to anything else, and the column is
+ * a Postgres `uuid`. The old fallback here returned `"mf3k9x-a7b2c1d4"`,
+ * which meant that on any origin without `crypto.randomUUID` — notably plain
+ * http, so `npm run dev:lan` and the tunnel — every submission failed with a
+ * client error that looked like a server fault.
+ *
+ * `randomUUID` and `getRandomValues` both need a secure context; the last
+ * branch does not. It is weaker entropy, used only where the alternative is
+ * not submitting at all, and a collision costs one dropped run rather than a
+ * corrupted row — the ID is the idempotency key, so a clash is ignored as a
+ * duplicate.
+ */
 export function newId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  // Version 4, variant 1, as the pattern the Worker matches expects.
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return [
+    hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20),
+  ].join('-');
 }
 
 function readPending(): RunSubmission[] {
@@ -87,10 +140,14 @@ function dequeue(runId: string): void {
 
 /**
  * Submit a run. Idempotent on `runId`: a retry of the same run produces one
- * stored result. Resolves to null when the server could not be reached, in
- * which case the run is queued for retry.
+ * stored result.
+ *
+ * The run is queued locally *before* the request, so a tab closed mid-flight
+ * still has it to retry. It is dequeued on acceptance, and also on a 4xx —
+ * the server has judged the stream invalid, and replaying it forever would
+ * only mean every future boot starts with a request that cannot succeed.
  */
-export async function submitRun(run: RunSubmission): Promise<AcceptedRun | null> {
+export async function submitRun(run: RunSubmission): Promise<SubmitResult> {
   queue(run);
   try {
     const res = await fetch('/api/run', {
@@ -99,15 +156,20 @@ export async function submitRun(run: RunSubmission): Promise<AcceptedRun | null>
       body: JSON.stringify(run),
     });
     if (!res.ok) {
+      const detail = await res.text().catch(() => '');
       // A 4xx means the server rejected it as invalid; retrying will not help.
-      if (res.status >= 400 && res.status < 500) dequeue(run.runId);
-      return null;
+      if (res.status >= 400 && res.status < 500) {
+        dequeue(run.runId);
+        return { kind: 'rejected', status: res.status, detail };
+      }
+      // A 5xx might be transient, so it stays queued.
+      return { kind: 'queued' };
     }
     const accepted = (await res.json()) as AcceptedRun;
     dequeue(run.runId);
-    return accepted;
+    return { kind: 'accepted', run: accepted };
   } catch {
-    return null;
+    return { kind: 'queued' };
   }
 }
 
@@ -115,8 +177,8 @@ export async function submitRun(run: RunSubmission): Promise<AcceptedRun | null>
 export async function flushPending(): Promise<AcceptedRun[]> {
   const out: AcceptedRun[] = [];
   for (const run of readPending()) {
-    const accepted = await submitRun(run);
-    if (accepted) out.push(accepted);
+    const result = await submitRun(run);
+    if (result.kind === 'accepted') out.push(result.run);
   }
   return out;
 }

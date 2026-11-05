@@ -9,7 +9,12 @@
  *
  * Score is reduced from the event stream with `scoreRun`, the same function
  * the Worker recomputes with, so the number on screen is the number the server
- * would agree with. Nothing is submitted: that arrives with the leaderboard.
+ * would agree with, and the finished stream is what gets submitted — the
+ * client's own total is never the thing stored.
+ *
+ * Every asset is fetched before the title panel, behind a progress bar. The
+ * levels used to load their own models on mount, which put a download in the
+ * seam between level 1's gate and level 2's first swing.
  *
  * `?level=N` jumps straight to one level for development. A jumped run starts
  * mid-stream and is therefore not a campaign result, which is why the flag is
@@ -19,7 +24,7 @@ import { FixedLoop } from './core/loop';
 import { InputRecogniser } from './core/input';
 import { SkylineSwipeInput } from './core/skyline-swipe-input';
 import { Lifecycle } from './core/lifecycle';
-import { POINTS, scoreRun, type RunEvent } from './core/scoring';
+import { POINTS, SCORING_VERSION, scoreRun, type RunEvent } from './core/scoring';
 import type { LevelContext, LevelController } from './core/level';
 import { RendererHost } from './render/renderer-host';
 import { RouteLevel } from './levels/route-level';
@@ -30,6 +35,11 @@ import { BossHud } from './ui/boss-hud';
 import { Tutorial, type TutorialCopy } from './ui/tutorial';
 import { Fade } from './ui/fade';
 import { StoryPlayer } from './ui/story';
+import { LoadingScreen } from './ui/loader';
+import { NameEntry } from './ui/name-entry';
+import { ResultsScreen } from './ui/results';
+import { preloadAssets } from './assets/preload';
+import { flushPending, newId, submitRun, type Identity } from './net/scoreClient';
 import { BEATS, type StoryBeat } from './story/script';
 
 const byId = <T extends HTMLElement>(id: string): T => {
@@ -43,7 +53,6 @@ const surface = byId('surface');
 const rotatePrompt = byId('rotate');
 const pauseOverlay = byId('pause');
 const resumeBtn = byId<HTMLButtonElement>('btn-resume');
-const bannerEl = byId('banner');
 const stageLabel = byId('hud-stage');
 const levelHud = byId('level-hud');
 
@@ -54,7 +63,22 @@ const bossHud = new BossHud(levelHud);
 const app = canvas.parentElement ?? document.body;
 const tutorial = new Tutorial(app);
 const story = new StoryPlayer(app);
+const results = new ResultsScreen(app);
 const fade = new Fade(app);
+const loading = new LoadingScreen(app);
+/**
+ * The cover's name field, with the leaderboard hung off it.
+ *
+ * The board is otherwise only reachable by finishing all three levels, which
+ * at a party is a board almost nobody sees. Opening it from the cover costs
+ * one quiet link.
+ */
+const nameEntry = new NameEntry({
+  secondary: {
+    label: 'See the leaderboard',
+    onClick: () => results.showBoard(nameEntry.identity()?.playerId ?? null),
+  },
+});
 /**
  * Skipping is remembered for the run.
  *
@@ -141,6 +165,29 @@ let current: LevelController | null = null;
 /** True while a level is being swapped, so input and results are ignored. */
 let switching = false;
 let campaignOver = false;
+/**
+ * The run's identity on the server.
+ *
+ * A fresh ID per attempt, so a replay is a new row rather than an overwrite,
+ * and the server's idempotency key does its job if a submission is retried.
+ */
+let runId = newId();
+let identity: Identity | null = null;
+
+/**
+ * Why this run is not a leaderboard result, or null if it is one.
+ *
+ * `?level` and `?tutorial` start mid-stream, `?story` never plays, and
+ * `?debug` hands out a fast-forward. All four produce a stream that is
+ * honestly scored but not comparable, so they are stored with `is_test` set
+ * and kept off the board — the column exists precisely so a dev run does not
+ * have to be silently dropped.
+ */
+const testRunReason: string | null =
+  jumpTo >= 1 && jumpTo <= 3 ? `Level ${jumpTo} jump — not submitted to the leaderboard.`
+    : params.has('story') || params.has('results') ? 'Review screen — not submitted to the leaderboard.'
+      : debug ? 'Debug run — not submitted to the leaderboard.'
+        : null;
 
 const ctx: LevelContext = {
   host,
@@ -155,12 +202,6 @@ const ctx: LevelContext = {
 
 function stage(): StageSpec { return STAGES[index]!; }
 
-function banner(text: string): void {
-  bannerEl.textContent = text;
-  bannerEl.hidden = false;
-}
-
-function hideBanner(): void { bannerEl.hidden = true; }
 function showPause(visible: boolean): void { pauseOverlay.hidden = !visible; }
 
 // ---- input -------------------------------------------------------------
@@ -266,8 +307,8 @@ async function mountStage(): Promise<void> {
   switching = true;
   const spec = stage();
   stageLabel.textContent = `${spec.id}/3`;
+  hud.setVisible(true);
   bossHud.setVisible(false);
-  hideBanner();
 
   // The panel goes up before the level is built, so the comic is what the
   // player looks at while it loads rather than a black screen.
@@ -314,23 +355,83 @@ async function endCampaign(result: 'complete' | 'defeated'): Promise<void> {
   // Let the level's own ending play out, then close on the comic.
   await tell(result === 'complete' ? BEATS.win : BEATS.loss);
   loop.stop();
-  const total = scoreRun(events).total;
-  banner(`${result === 'complete' ? 'Cake recovered!' : 'Aurora escaped'}  ·  ${total}`);
+
+  // The live readout is about a run in progress; the results card is now the
+  // only true statement about the score.
+  hud.setVisible(false);
+
+  const score = scoreRun(events);
+  results.show(
+    { outcome: result === 'complete' ? 'win' : 'loss', total: score.total, levelScores: score.levelScores },
+    identity?.playerId ?? null,
+    () => { void restartCampaign(); },
+  );
+  // Submission is deliberately not awaited: the screen is already up with
+  // "Saving score…" on it, and the rank line fills in when the server
+  // answers. A slow network must never hold the result back.
+  void submitScore(result === 'complete' ? 'win' : 'loss', score.levelScores);
+
   // Keep drawing the ending; the simulation is finished but the scene is not.
   loop.start();
 }
 
+/**
+ * Post the finished run and report what happened to the rank line.
+ *
+ * The event stream goes up as-is and the Worker recomputes from it; the
+ * totals in the body are there for the stored row, never for the ranking.
+ */
+async function submitScore(outcome: 'win' | 'loss', levelScores: [number, number, number]): Promise<void> {
+  if (!identity) {
+    results.setSaveState({ kind: 'skipped', why: 'No name set, so this run was not submitted.' });
+    return;
+  }
+
+  const submission = {
+    runId,
+    playerId: identity.playerId,
+    displayName: identity.displayName,
+    scoringVersion: SCORING_VERSION,
+    outcome,
+    levelScores,
+    events,
+    isTest: testRunReason !== null,
+  };
+
+  const sent = await submitRun(submission);
+  switch (sent.kind) {
+    case 'accepted':
+      // A test run is stored but ranked on a separate board, so showing its
+      // position next to real players' would be the wrong claim.
+      results.setSaveState(
+        testRunReason === null
+          ? { kind: 'saved', rank: sent.run.rank }
+          : { kind: 'skipped', why: testRunReason },
+      );
+      break;
+    case 'queued':
+      results.setSaveState({ kind: 'offline' });
+      break;
+    case 'rejected':
+      console.warn(`[score] rejected ${sent.status}: ${sent.detail}`);
+      results.setSaveState({ kind: 'skipped', why: 'The server could not accept this run.' });
+      break;
+  }
+}
+
 async function restartCampaign(): Promise<void> {
   await fade.cover();
+  results.hide();
   tutorial.hide();
   current?.dispose();
   current = null;
   events = [];
   campaignOver = false;
   storySkipped = false;
+  // A new attempt is a new row, not an edit of the last one.
+  runId = newId();
   index = startIndex();
   hud.reset();
-  hideBanner();
   await mountStage();
 }
 
@@ -370,13 +471,54 @@ if (debug) {
 // ---- boot --------------------------------------------------------------
 
 hud.reset();
-StoryPlayer.preload();
 index = startIndex();
-if (jumpTo >= 1 && jumpTo <= 3) {
-  console.info(`[dev] jumped to level ${jumpTo}; this run is not a campaign result`);
-}
+if (testRunReason) console.info(`[dev] ${testRunReason}`);
 
 void (async () => {
+  /*
+   * `?results=win|loss` holds the end screen up for review.
+   *
+   * Reaching it honestly means beating the boss, and reaching the loss form
+   * means losing to her. It is presentational only: no level is mounted,
+   * nothing is submitted, and the screen says so — it cannot put a
+   * fabricated run anywhere near the board. It also runs before the preload,
+   * because a screen with no 3D behind it needs none of those files.
+   */
+  const endScreen = params.get('results');
+  if (endScreen === 'win' || endScreen === 'loss') {
+    loading.hide();
+    hud.setVisible(false);
+    const sample: [number, number, number] = endScreen === 'win' ? [600, 450, 900] : [500, 250, 150];
+    results.show(
+      { outcome: endScreen, total: sample[0] + sample[1] + sample[2], levelScores: sample },
+      // No run was played, so there is no row of theirs to highlight.
+      null,
+      () => { location.search = ''; },
+    );
+    results.setSaveState({ kind: 'skipped', why: 'Review sample — nothing was submitted.' });
+    return;
+  }
+
+  /*
+   * Everything, before anything.
+   *
+   * The whole catalogue is about 60 files; fetching it here costs one wait
+   * the player understands, instead of several they do not. A missing file
+   * is reported and stepped over — every consumer already falls back to a
+   * primitive, and refusing to boot the party game over one decorative bush
+   * would be the worse failure.
+   */
+  const report = await preloadAssets((fraction) => loading.set(fraction));
+  if (report.failed.length > 0) {
+    console.warn(`[preload] ${report.failed.length} asset(s) unavailable`, report.failed);
+    loading.warn(report.failed.length);
+  }
+  loading.hide();
+
+  // A run made offline last time uploads now, unprompted. Not awaited: it is
+  // housekeeping, and it must not stand between the player and the cover.
+  void flushPending();
+
   /*
    * `?story=<id>` holds one panel up for review.
    *
@@ -391,8 +533,15 @@ void (async () => {
     console.warn(`[dev] no story beat "${only}". Try: ${Object.keys(BEATS).join(', ')}`);
   }
 
-  // The cover opens the game. It is skipped when jumping straight to a level,
-  // because the point of that jump is to reach the level.
-  if (jumpTo === 0) await story.show(BEATS.title);
+  // The cover opens the game, and carries the name field — one screen they
+  // are already reading, rather than a sign-in step before it. It is skipped
+  // when jumping straight to a level, because the point of that jump is to
+  // reach the level, and such a run is not a board result anyway.
+  if (jumpTo === 0) {
+    await story.show(BEATS.title, nameEntry);
+    identity = nameEntry.commit();
+  } else {
+    identity = nameEntry.identity();
+  }
   await mountStage();
 })();

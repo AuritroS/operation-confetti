@@ -1,0 +1,135 @@
+@import './theme.css';
+
+/*
+ * The end-of-run screen, and the board behind it.
+ *
+ * One overlay with two panes rather than two overlays: they share a frame, a
+ * heading style and a back button, and the player moves between them often
+ * enough that a second full-screen component would only duplicate all three.
+ */
+.results {
+  position: absolute;
+  z-index: 62;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 26px 20px calc(26px + var(--safe-b));
+  /* Fully opaque: at 97% the live HUD read through in the top corner, which
+     put a stale "1/3" and a stale score under the final one. */
+  background: radial-gradient(130% 85% at 50% 12%, #2a1733 0%, #0d1320 60%);
+  color: var(--ink-fg);
+  /* The board can exceed the viewport on a short phone in a way the result
+     card never does, so scrolling lives on the overlay. */
+  overflow-y: auto;
+}
+
+.results__pane { display: grid; gap: 16px; justify-items: center; width: 100%; max-width: 430px; }
+
+.results__outcome {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-align: center;
+}
+/* Gold is Matthew's, so only his win wears it. */
+.results__outcome--win { color: var(--gold-text); }
+.results__outcome--loss { color: #e6a8ff; }
+
+.results__total {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.results__score {
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-text);
+}
+.results__of { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
+
+/* Per-level breakdown. Tabular figures so the three rows line up. */
+.results__levels { display: grid; gap: 6px; width: 100%; }
+.results__level {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  background: rgba(27, 39, 92, .42);
+  padding: 9px 13px;
+  font-size: 13px;
+}
+.results__level-name { color: var(--ink-dim); }
+.results__level-score { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/*
+ * The rank line, and the only place a score's fate is reported.
+ *
+ * It starts as "Saving score…" and is only ever replaced by something the
+ * server said. A position invented on the client is a lie the player would
+ * repeat out loud.
+ */
+.results__rank {
+  min-height: 1.3em;
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: .04em;
+  color: var(--ink-dim);
+  text-align: center;
+}
+.results__rank strong { color: var(--gold-text); }
+
+.results__actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+.results__btn {
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: rgba(27, 39, 92, .6);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 12px 24px;
+  cursor: pointer;
+}
+.results__btn--primary { border-color: #ffdf9a; background: #6b2c70; font-weight: 800; }
+
+/* ---- the board ------------------------------------------------------- */
+
+.results__heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+
+.results__board { display: grid; gap: 4px; width: 100%; }
+
+.results__row {
+  display: grid;
+  grid-template-columns: 2.4em 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 13px;
+  background: rgba(27, 39, 92, .34);
+}
+/* The one row the player is looking for. */
+.results__row--self {
+  border-color: var(--gold);
+  background: rgba(234, 172, 91, .14);
+}
+.results__place { font-variant-numeric: tabular-nums; color: var(--ink-dim); }
+.results__row--self .results__place { color: var(--gold-text); }
+.results__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results__points { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+.results__empty { margin: 0; font-size: 13px; color: var(--ink-dim); text-align: center; }
