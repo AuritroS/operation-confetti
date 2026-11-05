@@ -230,3 +230,50 @@ assumed acknowledgment.
   only the 13 known Level 2 baseline diagnostics.
 - **Consumable:** now. Levels 1 and 2 need no change to adopt it.
 
+## Integration completed, 6 November 2026
+
+`codex/level3` is merged into `integration/level3`, branched from `main` at
+`95e16a0`. The parallel boundary this document describes is closed; what
+follows is the record of how it landed, not live guidance.
+
+**Conflicts were minimal**, because the separation held. Only three tracked
+files were touched by both streams:
+
+| File | Outcome |
+| --- | --- |
+| `.gitignore` | Purely additive. Kept both, Level 3 contributing `public/level3-particles/` |
+| `tools/recolour.mjs` | Auto-merged. Level 3's Aurora `C3` belt-satchel fix survived on top of Level 2's unhooded-Rogue work |
+| `src/render/custom.ts` | Took **main's**. Its high-fidelity CN Tower had already absorbed and surpassed Level 3's antenna glow |
+
+`src/core/scoring.ts`, the one coordinated-integration path Level 3 changed,
+was never touched by Level 2 and merged without conflict.
+
+**Verification on the merged tree:** `npx tsc --noEmit` is clean — the first
+time the project typechecks with Level 3 present, and the 13 baseline
+diagnostics this branch was pinned behind are gone. The full suite passes,
+264 tests across 25 files, including the 14 that could only ever fail in the
+Level 3 worktree because `public/models/city` and `props` are generated and do
+not travel. `tools/boss-assets.mjs` ran here without network access and
+produced `public/models/level3/`; `matthew.glb` and `aurora.glb` were
+regenerated with the `C3` fix and the suite was re-run against them. The
+production build emits all three entry pages and every Level 3 runtime asset
+URL resolves under `dist/`.
+
+**Two things this supersedes.** The working copy of this document in the
+original checkout carried a note that the 13 Level 2 typecheck diagnostics were
+fixed but not yet committed — they are now committed and the tree is clean. It
+also documented `npm run claude` and `npm run codex` scripts; `package.json`
+has no such scripts, so that section described commands that do not exist and
+has not been carried forward. `npm run codex` would in any case be obsolete now
+that the stream is merged.
+
+**Still outstanding**, and deliberately out of scope for this pass: the Level 2
+to Level 3 campaign transition in `src/main.ts`, real score submission through
+the Worker (Level 3 remains local-only), and the cross-level consistency pass —
+most visibly Level 3 carrying its own penalty readouts because `src/ui/hud.ts`
+binds fixed element IDs. Real-device and touch review of Level 3 also remain
+open; nothing in this integration tested them.
+
+The `.worktrees/level3` checkout and the `codex/level3` branch can be removed
+once this branch merges back to `main`.
+

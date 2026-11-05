@@ -29,6 +29,11 @@ export default defineConfig({
         // broken page at a public URL. It is a development tool only.
         main: entry('./index.html'),
         probe: entry('./probe.html'),
+        // The boss fight's standalone page. It keeps its own entry while the
+        // campaign transition into it is still to be wired; `boss-assets.html`
+        // stays out for the same reason `assets.html` does — it is a review
+        // tool that depends on dev-only middleware.
+        level3: entry('./level3.html'),
       },
     },
   },
