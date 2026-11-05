@@ -3,6 +3,7 @@ import { SKYLINE } from './course';
 import { SkylineRunner } from './runner';
 import type { Course, Direction } from './types';
 import { SkylineScene } from '../../render/skyline-scene';
+import { LOOK } from '../../render/look';
 import { loadStreetAssets } from '../../render/skyline-assets';
 import { loadSkylineHero } from '../../render/skyline-hero';
 
@@ -23,6 +24,7 @@ export class SkylineLevel implements LevelController {
   result: LevelOutcome | null = null;
 
   constructor(host: LevelContext['host'], readonly course: Course = SKYLINE) {
+    host.setExposure(LOOK.skyline.exposure);
     this.view = new SkylineScene(host, course);
     this.runner = new SkylineRunner(course);
   }

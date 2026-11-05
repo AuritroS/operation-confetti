@@ -10,20 +10,31 @@ import { readFileSync } from 'node:fs';
  * z-index 40 over the gameplay surface and swallowed every touch — the game
  * looked playable but was completely unresponsive on a phone.
  *
+ * The policy has since changed: pause is now automatic, and the overlay is
+ * *meant* to block, because the simulation is frozen and a live-looking frame
+ * invites a swipe that does nothing. What must not change is the guarantee
+ * that made the bug impossible — a covering element is inert unless the game
+ * deliberately shows it. So these tests no longer forbid an overlay; they
+ * check that every covering element ships hidden and that nothing overrides
+ * the global reset.
+ *
  * These are source-level assertions rather than computed-style ones: jsdom
  * does not implement `!important` in getComputedStyle, so asserting through it
- * would test jsdom's cascade rather than the stylesheet. The guarantee being
- * relied on is a CSS rule, not a browser quirk — an `!important` author
- * declaration beats a normal author declaration regardless of specificity or
- * order — so the thing worth locking down is that the reset is present and
- * that no component rule is left depending on source order.
+ * would test jsdom's cascade rather than the stylesheet.
  */
 
 const css = readFileSync('src/styles.css', 'utf8');
 const html = readFileSync('index.html', 'utf8');
 
-/** Every class in the markup that is toggled via the `hidden` attribute. */
-const HIDEABLE = ['pause-pill', 'rotate', 'debug', 'hint'];
+/** Classes on elements that cover the viewport, or otherwise toggle `hidden`. */
+const HIDEABLE = ['overlay', 'rotate', 'debug', 'vignette', 'banner'];
+
+/** The rule body for a class, so a single property can be checked. */
+function rule(selector: string): string {
+  const start = css.indexOf(`${selector} {`);
+  expect(start, `${selector} must exist in styles.css`).toBeGreaterThan(-1);
+  return css.slice(start, css.indexOf('}', start));
+}
 
 describe('the [hidden] reset', () => {
   it('declares a global rule with !important', () => {
@@ -43,54 +54,65 @@ describe('the [hidden] reset', () => {
   });
 
   it('leaves no component rule relying on its own [hidden] guard', () => {
-    // Per-component guards were the inconsistency that let .overlay slip
+    // Per-component guards were the inconsistency that let the overlay slip
     // through. The global reset makes them redundant; keeping them invites
     // the next component to be forgotten.
-    expect(css).not.toMatch(/\.(debug|pause-pill|hint)\[hidden\]/);
+    expect(css).not.toMatch(/\.(debug|overlay|rotate|vignette|banner)\[hidden\]/);
   });
 });
 
-describe('pause never blocks input', () => {
-  it('ships no full-screen overlay in the markup', () => {
-    expect(html).not.toContain('class="overlay"');
-    expect(css).not.toContain('.overlay__card');
+describe('nothing covers the game unless it is meant to', () => {
+  it('ships every covering element hidden in the markup', () => {
+    // The bug was a covering element visible at rest. Whether it blocks input
+    // once shown is a design choice; being visible at rest never is.
+    for (const id of ['pause', 'rotate', 'vignette', 'banner']) {
+      const tag = new RegExp(`id="${id}"[^>]*>`).exec(html)?.[0] ?? '';
+      expect(tag, `#${id} must ship hidden`).toContain('hidden');
+    }
   });
 
-  it('keeps the pause pill non-interactive so a resume tap passes through', () => {
-    const start = css.indexOf('.pause-pill {');
-    expect(start).toBeGreaterThan(-1);
-    expect(css.slice(start, css.indexOf('}', start))).toContain('pointer-events: none');
+  it('blocks input while the pause overlay is up, which is the point', () => {
+    // Pause freezes the simulation, so the frame behind is stale. Letting a
+    // swipe through it would be a gesture the player cannot see the result of.
+    const overlay = rule('.overlay');
+    expect(overlay).toMatch(/inset:\s*0/);
+    expect(overlay).not.toContain('pointer-events: none');
   });
 
-  it('does not stretch the pause pill across the viewport', () => {
-    const start = css.indexOf('.pause-pill {');
-    const rule = css.slice(start, css.indexOf('}', start));
-    // `inset: 0` is what made the old overlay a full-screen input wall.
-    expect(rule).not.toMatch(/inset:\s*0/);
-  });
-
-  it('leaves the gameplay surface below the pill in z-order', () => {
-    const surfaceZ = Number(/#surface\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
-    const pillZ = Number(/\.pause-pill\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
-    expect(surfaceZ).toBeLessThan(pillZ);
+  it('keeps the result banner non-interactive', () => {
+    // The banner is a line of text over a live scene, not a modal.
+    expect(rule('.banner')).toContain('pointer-events: none');
   });
 
   it('still blocks play for the portrait request, which should block', () => {
-    // The rotate prompt is the one case where a full-screen wall is correct:
-    // the game is unplayable in landscape.
-    const start = css.indexOf('.rotate {');
-    const rule = css.slice(start, css.indexOf('}', start));
-    expect(rule).toMatch(/inset:\s*0/);
-    expect(rule).not.toContain('pointer-events: none');
+    const rotate = rule('.rotate');
+    expect(rotate).toMatch(/inset:\s*0/);
+    expect(rotate).not.toContain('pointer-events: none');
+  });
+
+  it('puts both overlays above the gameplay surface', () => {
+    const surfaceZ = Number(/#surface\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
+    const overlayZ = Number(/\.overlay\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
+    expect(surfaceZ).toBeLessThan(overlayZ);
   });
 });
 
 describe('markup and code agree', () => {
-  it('declares every element main.ts toggles', () => {
-    const main = readFileSync('src/main.ts', 'utf8');
-    for (const id of ['pause', 'pause-note', 'rotate', 'hint', 'surface', 'stage']) {
+  it('declares every element the campaign shell toggles', () => {
+    const shell = readFileSync('src/campaign.ts', 'utf8');
+    for (const id of ['pause', 'btn-resume', 'banner', 'rotate', 'surface', 'stage', 'boss-readout']) {
       expect(html, `#${id} must exist in index.html`).toContain(`id="${id}"`);
-      expect(main, `#${id} must be referenced by main.ts`).toContain(id);
+      expect(shell, `#${id} must be referenced by campaign.ts`).toContain(id);
+    }
+  });
+
+  it('offers no way to pause on purpose', () => {
+    // Pause happens because the player left, not because they asked. A pause
+    // button on a one-thumb game is a target to hit by accident mid-run.
+    expect(html).not.toContain('id="btn-pause"');
+    for (const file of ['src/campaign.ts', 'src/main.ts', 'src/level2.ts']) {
+      expect(readFileSync(file, 'utf8'), `${file} must not request a pause`)
+        .not.toMatch(/pause\('user'\)/);
     }
   });
 });

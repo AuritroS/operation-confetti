@@ -11,7 +11,6 @@
 import {
   BackSide,
   CanvasTexture,
-  CircleGeometry,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -44,23 +43,13 @@ function gradientTexture(top: number, bottom: number): CanvasTexture {
   return texture;
 }
 
-export interface SkyLayerOptions {
-  readonly moon?: {
-    readonly x?: number;
-    readonly y?: number;
-    readonly z?: number;
-  };
-}
-
 export class SkyLayer implements EnvironmentLayer {
   readonly id = 'sky' as const;
   readonly object = new Group();
 
   private readonly dome: Mesh;
-  private readonly moon: Mesh;
-  private readonly halo: Mesh;
 
-  constructor(options?: SkyLayerOptions) {
+  constructor() {
     // Inside of a large sphere. Rendered unlit so the gradient is exact.
     const texture = gradientTexture(PALETTE.ink, PALETTE.navyDeep);
     this.dome = new Mesh(
@@ -71,26 +60,15 @@ export class SkyLayer implements EnvironmentLayer {
     this.dome.renderOrder = -10;
     this.object.add(this.dome);
 
-    // Moon: a flat disc is enough at this distance and costs 2 triangles'
-    // worth of fill rather than a lit sphere.
-    this.halo = new Mesh(
-      new CircleGeometry(13, 32),
-      new MeshBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.1, depthWrite: false, fog: false }),
-    );
-    this.moon = new Mesh(
-      new CircleGeometry(7.4, 40),
-      new MeshBasicMaterial({ color: 0xf2f0e4, depthWrite: false, fog: false }),
-    );
-    const moonPos = {
-      x: options?.moon?.x ?? 26,
-      y: options?.moon?.y ?? 44,
-      z: options?.moon?.z ?? -120,
-    };
-    for (const m of [this.halo, this.moon]) {
-      m.position.set(moonPos.x, moonPos.y, moonPos.z);
-      m.renderOrder = -9;
-      this.object.add(m);
-    }
+    /*
+     * No moon here, deliberately.
+     *
+     * This layer used to draw a plain white disc with a halo, while the
+     * skyline layer and level 2's landmark group each drew a textured one
+     * from `buildMoon`. The result was two moons in both levels, the plain
+     * disc clipped behind the pause button. `buildMoon` is now the single
+     * implementation and `look.ts` owns where it goes.
+     */
   }
 
   update(): void {
@@ -98,7 +76,7 @@ export class SkyLayer implements EnvironmentLayer {
   }
 
   dispose(): void {
-    for (const mesh of [this.dome, this.moon, this.halo] as Object3D[]) {
+    for (const mesh of [this.dome] as Object3D[]) {
       const m = mesh as Mesh;
       m.geometry.dispose();
       const mat = m.material as MeshBasicMaterial;

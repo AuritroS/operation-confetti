@@ -36,9 +36,9 @@ const byId = <T extends HTMLElement>(id: string): T => {
 const canvas = byId<HTMLCanvasElement>('stage');
 const surface = byId('surface');
 const rotatePrompt = byId('rotate');
-const pausePill = byId('pause');
-const pauseNote = byId('pause-note');
-const pauseBtn = byId<HTMLButtonElement>('btn-pause');
+const pauseOverlay = byId('pause');
+const resumeBtn = byId<HTMLButtonElement>('btn-resume');
+const bannerEl = byId('banner');
 const stageLabel = byId('hud-stage');
 const bossReadout = byId('boss-readout');
 
@@ -85,13 +85,13 @@ const ctx: LevelContext = {
 
 function stage(): StageSpec { return STAGES[index]!; }
 
-function banner(title: string, note: string): void {
-  pausePill.firstChild!.textContent = `${title} `;
-  pauseNote.textContent = note;
-  pausePill.hidden = false;
+function banner(text: string): void {
+  bannerEl.textContent = text;
+  bannerEl.hidden = false;
 }
 
-function hideBanner(): void { pausePill.hidden = true; }
+function hideBanner(): void { bannerEl.hidden = true; }
+function showPause(visible: boolean): void { pauseOverlay.hidden = !visible; }
 
 // ---- input -------------------------------------------------------------
 
@@ -105,10 +105,13 @@ const laneInput = new InputRecogniser(surface);
 const swingInput = new SkylineSwipeInput(surface);
 
 laneInput.onGesture((g) => {
-  if (switching || lifecycle.isPaused) {
+  // Paused means the player left. Any deliberate input brings them back; no
+  // gesture can start a pause, because pause is never something they ask for.
+  if (lifecycle.isPaused) {
     if (g.type === 'tap' || g.type === 'pauseToggle') resume();
     return;
   }
+  if (switching) return;
   const level = current;
   switch (g.type) {
     case 'swipe':
@@ -117,9 +120,6 @@ laneInput.onGesture((g) => {
       break;
     case 'tap':
       if (level instanceof BossLevel) level.fire();
-      break;
-    case 'pauseToggle':
-      lifecycle.pause('user');
       break;
     case 'restart':
       void restartCampaign();
@@ -136,7 +136,6 @@ swingInput.onGesture((g) => {
   if (!(level instanceof SkylineLevel)) return;
   if (g.type === 'swipe') { level.swipe(g.direction); level.update(0); level.render(); }
   else if (g.type === 'restart') void restartCampaign();
-  else lifecycle.pause('user');
 });
 
 function useInputFor(id: 1 | 2 | 3): void {
@@ -153,10 +152,10 @@ const lifecycle = new Lifecycle({
     loop.stop();
     laneInput.clearHeld();
     swingInput.clear();
-    if (!campaignOver) banner('Paused', 'Tap or press P to resume');
+    if (!campaignOver) showPause(true);
   },
   onResumeRequested: () => {
-    if (!campaignOver) banner('Paused', 'Tap or press P to resume');
+    if (!campaignOver) showPause(true);
   },
   onOrientation: (isLandscape) => { rotatePrompt.hidden = !isLandscape; },
 });
@@ -165,15 +164,11 @@ lifecycle.attach();
 function resume(): void {
   for (const reason of lifecycle.pauseReasons) lifecycle.clear(reason);
   if (lifecycle.isPaused) return;
-  hideBanner();
+  showPause(false);
   if (!campaignOver && !switching) loop.start();
 }
 
-pauseBtn.addEventListener('click', () => {
-  pauseBtn.blur();
-  if (lifecycle.isPaused) resume();
-  else lifecycle.pause('user');
-});
+resumeBtn.addEventListener('click', () => { resumeBtn.blur(); resume(); });
 
 // ---- the loop ----------------------------------------------------------
 
@@ -212,7 +207,7 @@ async function mountStage(): Promise<void> {
   const spec = stage();
   stageLabel.textContent = `${spec.id}/3`;
   bossReadout.hidden = true;
-  banner(spec.title, 'Loading…');
+  hideBanner();
 
   const level = spec.make();
   await level.mount(ctx);
@@ -223,7 +218,6 @@ async function mountStage(): Promise<void> {
   if (level instanceof BossLevel) level.startFight();
 
   useInputFor(spec.id);
-  hideBanner();
   switching = false;
   if (!lifecycle.isPaused) loop.start();
 }
@@ -250,10 +244,7 @@ function endCampaign(result: 'complete' | 'defeated'): void {
   laneInput.detach();
   swingInput.detach();
   const total = scoreRun(events).total;
-  banner(
-    result === 'complete' ? 'Cake recovered!' : 'Aurora escaped',
-    `Score ${total}  ·  press R to play again`,
-  );
+  banner(`${result === 'complete' ? 'Cake recovered!' : 'Aurora escaped'}  ·  ${total}`);
   // Keep drawing the ending; the simulation is finished but the scene is not.
   loop.start();
 }
@@ -265,6 +256,7 @@ async function restartCampaign(): Promise<void> {
   campaignOver = false;
   index = startIndex();
   hud.reset();
+  hideBanner();
   await mountStage();
 }
 

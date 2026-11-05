@@ -31,19 +31,21 @@
     <div class="boss-delta" id="boss-delta" hidden>-50</div>
     <div class="boss-vignette" id="boss-vignette" hidden></div>
     <div class="boss-beat" id="boss-beat" aria-live="polite">Practice · no damage</div>
-    <div id="practice-message" class="practice-message">Swipe to switch lanes · tap to fire</div>
     <div id="practice-scene-status" class="practice-scene-status" role="status">Loading birthday rooftop…</div>
     <div id="practice-debug" class="practice-debug" hidden>Lane <strong id="practice-lane">2 / 3</strong> · <span id="practice-perf"></span></div>
     <div id="practice-cues" class="practice-cues" hidden>1 strike · 2 orb · 3 shield · 4 block · 5 gift · 6 take · 7 win · 8 lose · 9 clear</div>
     <div id="practice-paused" class="practice-overlay" hidden>
-      <strong>Paused</strong><span>Tap Resume or press P</span>
+      <strong>Paused</strong>
       <button id="practice-resume" type="button">Resume</button>
     </div>
     <div id="boss-result" class="practice-overlay" hidden>
       <strong id="boss-result-title"></strong><span id="boss-result-detail"></span>
       <button id="boss-restart" type="button">Practice again</button>
     </div>
-    <footer class="practice-help"><button id="boss-start" type="button">Begin fight</button><br /><span id="practice-counts">Practice: <strong id="practice-shots">0</strong> shots · <strong id="practice-hits">0</strong> hits</span><br />Swipe left/right · Tap to fire<br /><span>Practice shots cannot hurt anyone</span><br /><span>Keyboard: ← → / A D · short Space · P pause · R reset</span></footer>
+    <footer class="practice-help">
+      <button id="boss-start" type="button">Begin fight</button>
+      <span id="practice-counts">Practice: <strong id="practice-shots">0</strong> shots · <strong id="practice-hits">0</strong> hits</span>
+    </footer>
   </main>
   <script type="module" src="/src/level3.ts"></script>
 </body>

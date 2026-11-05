@@ -22,9 +22,9 @@ import { health } from './net/scoreClient';
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const surface = document.getElementById('surface') as HTMLElement;
 const rotatePrompt = document.getElementById('rotate') as HTMLElement;
-const pausePill = document.getElementById('pause') as HTMLElement;
-const pauseNote = document.getElementById('pause-note') as HTMLElement;
-const pauseBtn = document.getElementById('btn-pause') as HTMLButtonElement;
+const pauseOverlay = document.getElementById('pause') as HTMLElement;
+const resumeBtn = document.getElementById('btn-resume') as HTMLButtonElement;
+const bannerEl = document.getElementById('banner') as HTMLElement;
 
 const host = new RendererHost(canvas);
 host.observe();
@@ -49,15 +49,13 @@ const ctx: LevelContext = {
 const level = new RouteLevel(host);
 let finished = false;
 
-function showBanner(title: string, note: string): void {
-  pausePill.firstChild!.textContent = `${title} `;
-  pauseNote.textContent = note;
-  pausePill.hidden = false;
+function showBanner(text: string): void {
+  bannerEl.textContent = text;
+  bannerEl.hidden = false;
 }
 
-function hideBanner(): void {
-  pausePill.hidden = true;
-}
+function hideBanner(): void { bannerEl.hidden = true; }
+function showPause(visible: boolean): void { pauseOverlay.hidden = !visible; }
 
 const loop = new FixedLoop({
   update(step) {
@@ -65,7 +63,7 @@ const loop = new FixedLoop({
     if (!finished && level.result !== null) {
       finished = true;
       input.setEnabled(false);
-      showBanner('Vault reached', `Score ${scoreRun(events).total}  ·  press R to run again`);
+      showBanner(`Vault reached  ·  ${scoreRun(events).total}`);
     }
   },
   render() {
@@ -101,12 +99,9 @@ input.onGesture((g) => {
       level.swipe(g.dir);
       break;
     case 'tap':
-      // Tapping resumes from pause. Level 1 has no tap action of its own.
-      if (lifecycle.isPaused) resume();
-      break;
     case 'pauseToggle':
+      // Pause is automatic; input only ever brings the player back.
       if (lifecycle.isPaused) resume();
-      else lifecycle.pause('user');
       break;
     case 'restart':
       resetRun();
@@ -123,10 +118,10 @@ const lifecycle = new Lifecycle({
   onPause: () => {
     loop.stop();
     input.clearHeld();
-    if (!finished) showBanner('Paused', 'Tap or press P to resume');
+    if (!finished) showPause(true);
   },
   onResumeRequested: () => {
-    if (!finished) showBanner('Paused', 'Tap or press P to resume');
+    if (!finished) showPause(true);
   },
   onOrientation: (isLandscape) => {
     rotatePrompt.hidden = !isLandscape;
@@ -137,7 +132,7 @@ lifecycle.attach();
 function resume(): void {
   for (const reason of lifecycle.pauseReasons) lifecycle.clear(reason);
   if (lifecycle.isPaused) return;
-  hideBanner();
+  showPause(false);
   input.setEnabled(true);
   if (!finished) loop.start();
 }
@@ -152,18 +147,12 @@ function resetRun(): void {
   loop.start();
 }
 
-pauseBtn.addEventListener('click', () => {
-  pauseBtn.blur();
-  if (lifecycle.isPaused) resume();
-  else lifecycle.pause('user');
-});
+resumeBtn.addEventListener('click', () => { resumeBtn.blur(); resume(); });
 
 // ---- boot --------------------------------------------------------------
 
 hud.reset();
 debug.setVisible(false);
-const hint = document.getElementById('hint');
-if (hint) hint.hidden = true;
 
 void level.mount(ctx).then(() => {
   /**

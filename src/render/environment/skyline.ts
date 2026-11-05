@@ -10,6 +10,7 @@
 import { Color, Group, Mesh, MeshStandardMaterial, type Object3D } from 'three';
 import { PALETTE } from '../palette';
 import { buildCnTower, buildMoon } from '../custom';
+import { MOON, TOWER } from '../look';
 import type { EnvironmentLayer, LayerContext } from './layer';
 import type { PropId } from './props';
 
@@ -78,15 +79,18 @@ export class SkylineLayer implements EnvironmentLayer {
 
     // The Toronto signifier, kept inside the portrait frustum: at 150 units
     // the visible half-width is about 43, so x = -58 would have been cropped.
-    this.tower = buildCnTower(52);
-    this.tower.position.set(-26, -4, -165);
+    //
+    // z was -165 against a 160-unit far plane, so the tower was clipped away
+    // and never drawn. It reads as fog swallowing it; it was never there.
+    this.tower = buildCnTower(TOWER.route.height);
+    this.tower.position.set(TOWER.route.x, TOWER.route.y, TOWER.route.z);
     darken(this.tower, 0.5);
     unfog(this.tower);
     this.object.add(this.tower);
 
     // The Toronto night moon, framed high in the sky to the right
-    this.moon = buildMoon(24);
-    this.moon.position.set(22, 26, -175);
+    this.moon = buildMoon(MOON.route.size);
+    this.moon.position.set(MOON.route.x, MOON.route.y, MOON.route.z);
     unfog(this.moon);
     this.object.add(this.moon);
   }
@@ -105,8 +109,12 @@ export class SkylineLayer implements EnvironmentLayer {
       if (!anchor) continue;
       item.position.z = anchor.z + drift;
     }
-    this.tower.position.z = -165 + travelled * 0.05;
-    this.moon.position.z = -175 + travelled * 0.05;
+    // These used to be hardcoded at -165 and -175, overwriting the positions
+    // set in the constructor every frame — which is why moving them there
+    // changed nothing, and why both sat outside the 160-unit far plane for
+    // most of the route. One source of truth, in `look.ts`.
+    this.tower.position.z = TOWER.route.z + travelled * 0.05;
+    this.moon.position.z = MOON.route.z + travelled * 0.05;
   }
 
   dispose(): void {

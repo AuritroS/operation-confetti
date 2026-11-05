@@ -18,7 +18,7 @@
  * filmic tone mapping, levels 1 and 2 are fogged exteriors — so they are
  * applied on mount rather than shared.
  */
-import { WebGLRenderer, type Camera, type Scene } from 'three';
+import { ACESFilmicToneMapping, WebGLRenderer, type Camera, type Scene } from 'three';
 
 export const MAX_PIXEL_RATIO = 1.5;
 
@@ -39,7 +39,14 @@ export class RendererHost {
       powerPreference: 'high-performance',
       alpha: false,
     });
+    // One tone response for every level; only exposure varies. See `look.ts`.
+    this.renderer.toneMapping = ACESFilmicToneMapping;
     this.resize();
+  }
+
+  /** Per-level exposure. The curve itself never changes between levels. */
+  setExposure(value: number): void {
+    this.renderer.toneMappingExposure = value;
   }
 
   /**

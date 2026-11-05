@@ -4,6 +4,7 @@ import { STEP_S } from '../core/loop';
 import { LevelRunner } from './runner';
 import { LEVEL_1 } from './level1';
 import { Stage } from '../render/stage';
+import { LOOK } from '../render/look';
 import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from '../render/primitives';
 import { EntityVisuals } from '../render/entities';
 import { loadGameplayProps, type PropProvider } from '../render/props-loader';
@@ -66,6 +67,7 @@ export class RouteLevel implements LevelController {
 
   constructor(host: LevelContext['host']) {
     this.stage = new Stage(host);
+    host.setExposure(LOOK.route.exposure);
     this.hasRooftop = this.enabledLayers.has('rooftop');
     this.stage.scene.add(this.world);
 

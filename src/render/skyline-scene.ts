@@ -12,6 +12,7 @@ import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
 import { buildCnTower, buildMoon } from './custom';
+import { MOON } from './look';
 import { GiftGlowField, shadowTexture } from './effects';
 import { PALETTE } from './palette';
 import { darken, disposeTree, unfog } from './environment/skyline';
@@ -38,8 +39,8 @@ export function buildSkylineLandmark(): Group {
   landmark.add(tower);
 
   // The Toronto night moon, framed high above the Queen West canyon
-  const moon = buildMoon(28);
-  moon.position.set(16, 32, -155);
+  const moon = buildMoon(MOON.skyline.size);
+  moon.position.set(MOON.skyline.x, MOON.skyline.y, MOON.skyline.z);
   unfog(moon);
   landmark.add(moon);
 
@@ -186,7 +187,7 @@ export class SkylineScene {
     for (const mesh of [this.blocks, this.trims]) { mesh.frustumCulled = false; this.root.add(mesh); }
     this.ground = this.cube(this.root, this.groundMat, 0, -1, -60, 28, 2, 260);
     this.root.add(this.giftMarks.group);
-    for (const layer of [new SkyLayer({ moon: { x: 24, y: 60, z: -120 } })]) {
+    for (const layer of [new SkyLayer()]) {
       this.backdrop.push(layer);
       this.root.add(layer.object);
     }

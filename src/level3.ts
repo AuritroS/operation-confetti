@@ -52,9 +52,7 @@ const startButton = byId<HTMLButtonElement>('boss-start');
 const result = byId('boss-result');
 const resultTitle = byId('boss-result-title');
 const resultDetail = byId('boss-result-detail');
-const message = byId('practice-message');
 const pausedOverlay = byId('practice-paused');
-const pauseButton = byId<HTMLButtonElement>('practice-pause');
 const sceneStatus = byId('practice-scene-status');
 const debug = byId('practice-debug');
 const debugging = new URLSearchParams(location.search).has('debug');
@@ -93,15 +91,10 @@ const ctx: LevelContext = {
 if (debugging) level.cueOverride = () => cues.advance(1 / 60, level.runner.lane);
 
 let paused = false;
-let messageUntil = 2.5;
 let elapsed = 0;
 let outcomeAnnounced = false;
 let shownIncidents = 0;
 
-function say(text: string): void {
-  message.textContent = text;
-  messageUntil = elapsed + 1.5;
-}
 
 function levelScore(): number {
   return scoreRun(runEvents).levelScores[2];
@@ -113,20 +106,14 @@ function setPause(value: boolean): void {
   if (paused) input.clearHeld();
   input.setEnabled(!paused);
   pausedOverlay.hidden = !paused;
-  pauseButton.textContent = paused ? 'Resume' : 'Pause';
-  pauseButton.setAttribute('aria-label', paused ? 'Resume game' : 'Pause game');
 }
 
 function onGesture(g: Gesture): void {
   if (g.type === 'pauseToggle') { setPause(!paused); return; }
   if (g.type === 'restart') { restart(); return; }
   if (paused) return;
-  if (g.type === 'swipe') {
-    say(level.swipe(g.dir) ? `Lane ${level.runner.lane + 1}` : 'Edge lane');
-  } else if (g.type === 'tap') {
-    if (level.fire()) say('Confetti fired!');
-    else say('Gun cooling down');
-  }
+  if (g.type === 'swipe') level.swipe(g.dir);
+  else if (g.type === 'tap') level.fire();
 }
 
 function restart(): void {
@@ -139,12 +126,10 @@ function restart(): void {
   paused = false;
   input.setEnabled(true);
   pausedOverlay.hidden = true;
-  pauseButton.textContent = 'Pause';
   delta.hidden = true;
   vignette.hidden = true;
   result.hidden = true;
   startButton.hidden = false;
-  say('Practice reset');
 }
 
 startButton.addEventListener('click', () => {
@@ -152,7 +137,6 @@ startButton.addEventListener('click', () => {
   input.clearHeld();
   level.startFight();
   startButton.hidden = true;
-  say('Dodge the marked lane. Fire when Aurora’s shield drops!');
 });
 byId<HTMLButtonElement>('boss-restart').addEventListener('click', restart);
 
@@ -166,15 +150,15 @@ byId<HTMLButtonElement>('boss-restart').addEventListener('click', restart);
 if (debugging) {
   const at = () => level.runner.lane;
   const keys: Record<string, () => void> = {
-    Digit1: () => { cues.strike(at()); say('Lane strike'); },
-    Digit2: () => { cues.orb(at()); say('Magic orb'); },
-    Digit3: () => { cues.toggleShield(); say(cues.shieldOpen ? 'Shield down — exposed' : 'Shield up'); },
-    Digit4: () => { cues.blockShot(); say('Shot blocked'); },
-    Digit5: () => { cues.spawnGift(at()); say('Gift'); },
-    Digit6: () => { cues.takeGift(); say('Gift taken'); },
-    Digit7: () => { cues.endCake('recovered'); say('Cake recovered'); },
-    Digit8: () => { cues.endCake('escaped'); say('Aurora escapes'); },
-    Digit9: () => { cues.reset(); say('Cues cleared'); },
+    Digit1: () => { cues.strike(at()); },
+    Digit2: () => { cues.orb(at()); },
+    Digit3: () => { cues.toggleShield(); },
+    Digit4: () => { cues.blockShot(); },
+    Digit5: () => { cues.spawnGift(at()); },
+    Digit6: () => { cues.takeGift(); },
+    Digit7: () => { cues.endCake('recovered'); },
+    Digit8: () => { cues.endCake('escaped'); },
+    Digit9: () => { cues.reset(); },
   };
   window.addEventListener('keydown', (event) => {
     const action = keys[event.code];
@@ -186,7 +170,6 @@ if (debugging) {
 
 input.onGesture(onGesture);
 input.attach();
-pauseButton.addEventListener('click', () => setPause(!paused));
 byId<HTMLButtonElement>('practice-resume').addEventListener('click', () => setPause(false));
 window.addEventListener('blur', () => setPause(true));
 document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
@@ -234,15 +217,10 @@ const loop = new FixedLoop({
       if (!outcomeAnnounced) {
         outcomeAnnounced = true;
         const won = level.result === 'complete';
-        say(won ? 'Cake recovered!' : 'Aurora escapes with the cake!');
         resultTitle.textContent = won ? 'Cake recovered!' : 'Aurora escaped';
         resultDetail.textContent = `Level 3 score: ${levelScore()} / ${LEVEL_MAX[3].toLocaleString()}`;
         result.hidden = false;
       }
-    }
-    if (messageUntil && elapsed >= messageUntil) {
-      message.textContent = '';
-      messageUntil = 0;
     }
   },
   render() {

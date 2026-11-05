@@ -26,12 +26,8 @@ if (new URLSearchParams(location.search).has('inspect')) {
 document.title = 'Skyline Chase · Operation Confetti';
 const surface = document.getElementById('surface')!;
 const rotate = document.getElementById('rotate')!;
-const pausePill = document.getElementById('pause')!;
-const pauseNote = document.getElementById('pause-note')!;
-const pauseButton = document.getElementById('btn-pause') as HTMLButtonElement;
-const replay = document.createElement('button');
-replay.id = 'btn-replay'; replay.type = 'button'; replay.className = 'hud__btn';
-replay.textContent = 'Replay'; replay.setAttribute('aria-label', 'Restart level 2'); pauseButton.before(replay);
+const pauseOverlay = document.getElementById('pause')!;
+const resumeBtn = document.getElementById('btn-resume') as HTMLButtonElement;
 
 const hud = new Hud();
 const host = new RendererHost(document.getElementById('stage') as HTMLCanvasElement);
@@ -61,8 +57,7 @@ const loop = new FixedLoop({
 
 const lifecycle = new Lifecycle({
   onPause: () => {
-    paused = true; input.clear(); loop.stop(); pauseButton.textContent = '▶'; pauseButton.setAttribute('aria-label', 'Resume');
-    pausePill.firstChild!.textContent = 'Paused '; pauseNote.textContent = 'Swipe or press P to resume'; pausePill.hidden = false;
+    paused = true; input.clear(); loop.stop(); pauseOverlay.hidden = false;
   },
   onResumeRequested: () => {},
   onOrientation: (landscape) => { rotate.hidden = !landscape; },
@@ -71,7 +66,7 @@ const lifecycle = new Lifecycle({
 function resume(): void {
   if (!rotate.hidden || document.visibilityState !== 'visible') return;
   for (const reason of lifecycle.pauseReasons) lifecycle.clear(reason);
-  paused = false; pauseButton.textContent = 'II'; pauseButton.setAttribute('aria-label', 'Pause'); pausePill.hidden = true; loop.start();
+  paused = false; pauseOverlay.hidden = true; loop.start();
 }
 
 function swipe(direction: Direction): void {
@@ -91,11 +86,11 @@ function restart(): void {
 input.onGesture((g) => {
   if (g.type === 'swipe') swipe(g.direction);
   else if (g.type === 'restart') restart();
-  else if (paused) resume(); else lifecycle.pause('user');
+  // Pause is automatic; input only ever brings the player back.
+  else if (paused) resume();
 });
-const togglePause = () => { pauseButton.blur(); if (paused) resume(); else lifecycle.pause('user'); };
-const replayRun = () => { replay.blur(); restart(); };
-pauseButton.addEventListener('click', togglePause); replay.addEventListener('click', replayRun);
+const onResume = () => { resumeBtn.blur(); resume(); };
+resumeBtn.addEventListener('click', onResume);
 
 hud.reset();
 input.attach(); lifecycle.attach();
@@ -126,6 +121,5 @@ if (import.meta.env.DEV) Object.assign(window, { __skylineReview: {
 
 if (import.meta.hot) import.meta.hot.dispose(() => {
   loop.stop(); input.detach(); lifecycle.detach(); level.dispose();
-  pauseButton.removeEventListener('click', togglePause); replay.removeEventListener('click', replayRun);
-  replay.remove();
+  resumeBtn.removeEventListener('click', onResume);
 });

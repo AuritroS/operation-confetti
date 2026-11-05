@@ -1,12 +1,13 @@
 import {
-  BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CatmullRomCurve3,
+  BoxGeometry, BufferAttribute, BufferGeometry, CatmullRomCurve3,
   Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, LineSegments,
   Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry,
   SphereGeometry, TorusGeometry, TubeGeometry, Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
-import { buildCake } from '../custom';
+import { buildCake, buildMoon } from '../custom';
+import { MOON } from '../look';
 import {
   citySlab, cream, deckStone, gold, lampGlow, luminous, midnight,
   paleGold, plumDeep, satin, velvet, wine,
@@ -202,29 +203,15 @@ function makeArchitecture(parent: Group): void {
  */
 
 function makeMoonAndSkyline(parent: Group): void {
-  // A soft, painted moon sets the same city-at-night silhouette as the references.
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const sky = ctx.createRadialGradient(128, 128, 0, 128, 128, 126);
-    sky.addColorStop(0, '#fcf9da'); sky.addColorStop(0.72, '#d7e9ff'); sky.addColorStop(0.9, '#91b8ec'); sky.addColorStop(1, '#91b8ec00');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 28; i++) {
-      const a = i * 2.39996;
-      const r = Math.sqrt((i * 37 % 97) / 97) * 89;
-      ctx.beginPath();
-      ctx.fillStyle = i % 3 ? '#9ab9d121' : '#819fc02c';
-      ctx.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 4 + i % 9, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    const tex = new CanvasTexture(canvas);
-    tex.colorSpace = 'srgb';
-    const moon = new Mesh(new PlaneGeometry(3.25, 3.25), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide }));
-    moon.position.set(2.35, 8.0, -22);
-    moon.lookAt(0, 7, 13);
-    parent.add(moon);
-  }
+  // One moon implementation for the whole game. This was a verbatim copy of
+  // `buildMoon`'s canvas, placed at z -22 directly behind the tower shaft,
+  // where nothing could see it. `look.ts` now owns the position and keeps it
+  // clear of both the tower and the HUD corners.
+  const moon = buildMoon(MOON.boss.size);
+  moon.position.set(MOON.boss.x, MOON.boss.y, MOON.boss.z);
+  moon.lookAt(0, 7, 13);
+  parent.add(moon);
+
   const buildings = [
     [-14, 4.1, 2.4], [-12, 6.0, 2.1], [-9.8, 4.4, 2.6], [-7.3, 7.3, 2.7],
     [-4.8, 5.5, 1.9], [-2.4, 4.2, 2.4], [0, 5.0, 2.1], [2.7, 4.7, 2.5],

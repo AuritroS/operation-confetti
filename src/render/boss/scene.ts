@@ -1,9 +1,10 @@
 import {
   AmbientLight, Color, DirectionalLight, Group, HemisphereLight,
   InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PointLight, Scene,
-  BoxGeometry, DoubleSide, ACESFilmicToneMapping, NoToneMapping,
+  BoxGeometry, DoubleSide,
 } from 'three';
 import type { RendererHost } from '../renderer-host';
+import { LOOK } from '../look';
 import type { BossPractice } from '../../levels/boss/practice';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 import { BossCamera } from './camera';
@@ -36,11 +37,7 @@ export class BossScene {
   private unobserve: (() => void) | null = null;
 
   constructor(private readonly host: RendererHost) {
-    // Tone mapping is renderer state, not scene state, and levels 1 and 2 do
-    // not want it. Applied on mount and undone in dispose, so the shared
-    // renderer goes back the way it was found.
-    this.host.renderer.toneMapping = ACESFilmicToneMapping;
-    this.host.renderer.toneMappingExposure = 1.25;
+    this.host.setExposure(LOOK.boss.exposure);
     this.world.background = new Color(0x081329);
     this.world.add(new HemisphereLight(0x8aa7ef, 0x271435, 1.5));
     this.world.add(new AmbientLight(0xffffff, 0.35));
@@ -184,9 +181,6 @@ export class BossScene {
   dispose(): void {
     this.unobserve?.();
     this.unobserve = null;
-    // Hand the shared renderer back in the state levels 1 and 2 expect.
-    this.host.renderer.toneMapping = NoToneMapping;
-    this.host.renderer.toneMappingExposure = 1;
     this.celebration.dispose();
     this.effects.dispose();
     this.actors.dispose();
