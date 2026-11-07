@@ -30,6 +30,7 @@ import {
   Vector3,
   Color,
   ConeGeometry,
+  CircleGeometry,
 } from 'three';
 import { PALETTE, ROLE } from './palette';
 import { Sparkle } from './effects';
@@ -598,16 +599,20 @@ export function buildGiftEmblem(width = 1): Group {
  * proud of the frame — the first version buried the dial halfway into the wall
  * and put a postage-stamp emblem on a large blank slab.
  */
-export function buildVaultDoor(width = 4.8, height = 3.4): Group {
+/** The square opening a vault door of this size swings in. */
+export function vaultOpening(width: number, height: number): number {
+  return Math.min(width, height) * 0.38 * 2.1;
+}
+
+export function buildVaultDoor(width = 4.8, height = 3.4, wall: MeshStandardMaterial = matte(PALETTE.slate, 0.85)): Group {
   const vault = new Group();
 
-  const wall = matte(PALETTE.slate, 0.85);
   const steel = matte(PALETTE.steel, 0.5);
 
   // Surrounding wall, recessed behind the door, with an opening the size of
   // the door behind the leaf. A solid slab meant opening the door revealed
   // a wall; this reveals whatever is beyond, which is the point of a door.
-  const opening = Math.min(width, height) * 0.38 * 2.1;
+  const opening = vaultOpening(width, height);
   const pillarW = (width - opening) / 2;
   const bandH = (height - opening) / 2;
   for (const [w, h, x, y] of [
@@ -679,7 +684,7 @@ function buildLantern(): Group {
   cap.position.y = 0.42;
   cap.rotation.y = Math.PI / 4;
   lantern.add(cap);
-  const halo = new Mesh(new PlaneGeometry(2.6, 2.6), glow(0xffb85a, 0.16));
+  const halo = new Mesh(new CircleGeometry(1.25, 24), glow(0xffb85a, 0.13));
   halo.position.z = 0.24;
   lantern.add(halo);
   return lantern;
@@ -759,8 +764,8 @@ export function buildGateInterior(width: number, height: number, kind: 'vault' |
       room.add(step);
     }
     // Light from the top of the stair, where the roof door would be.
-    const top = new Mesh(new PlaneGeometry(width * 0.4, height * 0.3), glow(0xfff0c0, 0.45));
-    top.position.set(0, height * 0.72, -depth + 0.05);
+    const top = new Mesh(new PlaneGeometry(width * 0.22, height * 0.34), glow(0xfff0c0, 0.5));
+    top.position.set(0, height * 0.55 + height * 0.17, -depth + 0.05);
     room.add(top);
   }
   return room;
@@ -782,10 +787,12 @@ export function buildGatehouse(doorWidth: number, doorHeight: number, spanX: num
   const stone = matte(0x6e6a72, 0.85);
   const trim = matte(PALETTE.gold, 0.4);
 
-  const door = buildVaultDoor(doorWidth, doorHeight);
+  const door = buildVaultDoor(doorWidth, doorHeight, brick);
   house.add(door);
-  const interior = buildGateInterior(doorWidth * 0.76, doorHeight * 0.8, 'stairs');
-  interior.position.z = -0.4;
+  // The room fills the opening exactly, so nothing beyond shows over it.
+  const opening = vaultOpening(doorWidth, doorHeight);
+  const interior = buildGateInterior(opening, opening, 'stairs');
+  interior.position.set(0, (doorHeight - opening) / 2, -0.4);
   house.add(interior);
 
   // Façade either side of the door, up to the flanking buildings.
@@ -833,7 +840,7 @@ export function buildGatehouse(doorWidth: number, doorHeight: number, spanX: num
   // Raise the door and everything on it onto the top step.
   const lift = steps * 0.28;
   door.position.y = lift;
-  interior.position.y = lift;
+  interior.position.y += lift;
   return house;
 }
 
@@ -855,10 +862,11 @@ export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWid
   const h = doorHeight + 1.6;
   const depth = 6;
 
-  const door = buildVaultDoor(doorWidth, doorHeight);
+  const door = buildVaultDoor(doorWidth, doorHeight, render);
   block.add(door);
-  const interior = buildGateInterior(doorWidth * 0.76, doorHeight * 0.8, 'vault');
-  interior.position.z = -0.4;
+  const opening = vaultOpening(doorWidth, doorHeight);
+  const interior = buildGateInterior(opening, opening, 'vault');
+  interior.position.set(0, (doorHeight - opening) / 2, -0.4);
   block.add(interior);
 
   // The block: a wall either side of the door, a lintel over it, and a
@@ -872,11 +880,17 @@ export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWid
   const lintel = new Mesh(new BoxGeometry(doorWidth, h - doorHeight, depth), render);
   lintel.position.set(0, doorHeight + (h - doorHeight) / 2, -depth / 2);
   block.add(lintel);
-  // A dim window in each wing, so it reads as a room and not a wall.
-  for (const sign of [-1, 1] as const) {
-    const pane = new Mesh(new PlaneGeometry(0.7, 0.9), glow(0xffc784, 0.5));
-    pane.position.set(sign * (doorWidth / 2 + wingW / 2), doorHeight * 0.62, 0.02);
-    block.add(pane);
+  // A stone architrave around the opening, proud of the face, so the door
+  // sits in a frame rather than a hole.
+  const arch = 0.45;
+  for (const [bw, bh, bx, by] of [
+    [arch, opening + arch * 2, -(opening / 2 + arch / 2), doorHeight / 2],
+    [arch, opening + arch * 2, opening / 2 + arch / 2, doorHeight / 2],
+    [opening + arch * 2, arch, 0, (doorHeight + opening) / 2 + arch / 2],
+  ] as const) {
+    const bar = new Mesh(new BoxGeometry(bw, bh, 0.35), stone);
+    bar.position.set(bx, by, 0.1);
+    block.add(bar);
   }
   // A coping along the top edge, like the parapets' own.
   const coping = new Mesh(new BoxGeometry(w + 0.3, 0.16, depth + 0.3), stone);
