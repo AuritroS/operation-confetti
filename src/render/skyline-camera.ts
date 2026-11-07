@@ -31,6 +31,8 @@ const ARRIVAL_BACK = 12;
 const ARRIVAL_RISE = 3.5;
 const ARRIVAL_LOOK_Y = 3.6;
 const ARRIVAL_LOOK_Z = -5;
+/** How far the camera drops on a hard landing, at full dip. */
+const LAND_DIP = 0.45;
 
 /**
  * `?inspect` framing: high, back, and looking down the contact sheet.
@@ -77,6 +79,7 @@ export class SkylineCamera {
   private focusY = FOCUS_START;
   private distanceSurge = 0;
   private arrivalK = 0;
+  private dip = 0;
   private initialized = false;
   private readonly closeup: boolean;
 
@@ -126,7 +129,7 @@ export class SkylineCamera {
     // both instead of a door face filling the screen.
     this.camera.position.set(
       CAMERA_SIDE,
-      this.focusY + (this.closeup ? CAMERA_HEIGHT * 0.5 : CAMERA_HEIGHT) + ARRIVAL_RISE * k,
+      this.focusY + (this.closeup ? CAMERA_HEIGHT * 0.5 : CAMERA_HEIGHT) + ARRIVAL_RISE * k - LAND_DIP * this.dip,
       distance + ARRIVAL_BACK * k,
     );
     const lx = CAMERA_SIDE + Math.sin(CAMERA_YAW) * CAMERA_LOOK_AHEAD;
@@ -144,8 +147,12 @@ export class SkylineCamera {
   /** 0 during play; eased to 1 across the arrival celebration. */
   setArrival(k: number): void { this.arrivalK = Math.max(0, Math.min(1, k)); }
 
+  /** A landing's dip, 0..1, applied as a short drop in camera height. */
+  setDip(d: number): void { this.dip = Math.max(0, Math.min(1, d)); }
+
   reset(): void {
     this.arrivalK = 0;
+    this.dip = 0;
     this.focusY = FOCUS_START;
     this.distanceSurge = 0;
     this.initialized = false;

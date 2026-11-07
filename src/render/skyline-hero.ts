@@ -146,6 +146,8 @@ export interface SkylineHero {
   update(s: Snapshot, dt: number, reduced: boolean): void;
   /** Arrival celebration at the gate. Level 1's hero has the same beat. */
   celebrate?(): void;
+  /** An airborne finish touching down: landing clip, then the cheer. */
+  land?(): void;
   /** Clear the celebration so a replay chooses clips from the phase again. */
   reset?(): void;
   /**
@@ -279,6 +281,8 @@ class RiggedHero implements SkylineHero {
   private settleTo: string | null = null;
   /** Set once the run is over, so phase changes stop choosing the clip. */
   private celebrating = false;
+  /** When the cheer follows a landing; 0 when it is not pending. */
+  private cheerAt = 0;
   /**
    * The chest lean applied last frame, and the value it left the bone at.
    *
@@ -350,12 +354,26 @@ class RiggedHero implements SkylineHero {
   celebrate(): void {
     this.celebrating = true;
     this.settleTo = null;
+    this.cheerAt = 0;
     this.actor.play(CLIPS.matthew.cheer, { loop: false, clampWhenFinished: true, fade: 0.2 });
+  }
+
+  /**
+   * Feet hit the ground after an airborne finish: the landing clip, then the
+   * cheer once it has played. `celebrating` is set now so nothing procedural
+   * poses him over the landing either.
+   */
+  land(): void {
+    this.celebrating = true;
+    this.settleTo = null;
+    this.actor.play('Jump_Land', { loop: false, clampWhenFinished: true, fade: 0.06 });
+    this.cheerAt = this.clock + Math.max(0.2, this.actor.duration('Jump_Land') * 0.7);
   }
 
   /** Back to the start line: the cheer is over and the phase picks clips again. */
   reset(): void {
     this.celebrating = false;
+    this.cheerAt = 0;
     this.lastPhase = '';
     this.settleTo = null;
     this.appliedLean = 0;
@@ -386,6 +404,9 @@ class RiggedHero implements SkylineHero {
         material.emissive.setHex(original);
       }
     }
+
+    // The cheer after a landing, once the landing has played.
+    if (this.cheerAt > 0 && this.clock >= this.cheerAt) this.celebrate();
 
     // Hand a finished one-shot over to the clip that should follow it,
     // rather than letting `clampWhenFinished` freeze the last frame.

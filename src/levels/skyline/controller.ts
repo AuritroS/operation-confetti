@@ -4,7 +4,7 @@ import { SKYLINE } from './course';
 /** How much of the opening the rehearsal loops, in seconds. */
 const PRACTICE_SECONDS = 9;
 /** How long the arrival celebration holds before the level reports done. */
-const ARRIVAL_SECONDS = 2.4;
+const ARRIVAL_SECONDS = 3.0;
 import { SkylineRunner } from './runner';
 import type { Course, Direction } from './types';
 import { SkylineScene } from '../../render/skyline-scene';

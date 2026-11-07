@@ -54,6 +54,7 @@ const canvas = byId<HTMLCanvasElement>('stage');
 const surface = byId('surface');
 const rotatePrompt = byId('rotate');
 const pauseOverlay = byId('pause');
+const pauseChapter = byId('pause-chapter');
 const resumeBtn = byId<HTMLButtonElement>('btn-resume');
 const stageLabel = byId('hud-stage');
 const levelHud = byId('level-hud');
@@ -223,7 +224,11 @@ const ctx: LevelContext = {
 
 function stage(): StageSpec { return STAGES[index]!; }
 
-function showPause(visible: boolean): void { pauseOverlay.hidden = !visible; }
+function showPause(visible: boolean): void {
+  // The card only ever appears mid-level, so it says which one.
+  if (visible) pauseChapter.textContent = stage().copy.chapter;
+  pauseOverlay.hidden = !visible;
+}
 
 // ---- input -------------------------------------------------------------
 

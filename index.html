@@ -49,9 +49,9 @@
     -->
     <div id="pause" class="overlay" hidden>
       <div class="overlay__card frame">
-        <p class="eyebrow">Intermission</p>
+        <!-- Which chapter they are in; the shell fills it when it pauses. -->
+        <p class="eyebrow" id="pause-chapter"></p>
         <strong>Paused</strong>
-        <p class="overlay__note">The page turns when you are ready.</p>
         <button id="btn-resume" type="button" class="btn btn--primary">Resume</button>
       </div>
     </div>

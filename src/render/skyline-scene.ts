@@ -11,6 +11,8 @@ import { SkylineCamera } from './skyline-camera';
 
 /** How long the arrival shot takes to settle. The level holds at least this long. */
 export const ARRIVAL_SHOT_S = 2.0;
+/** Fall rate after the line, in u/s². Brisk: a drop, not a float. */
+const FALL_GRAVITY = 34;
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
@@ -135,6 +137,16 @@ export class SkylineScene {
   private gameplayVisible = true;
   /** Seconds into the arrival shot, or -1 while the chase is still on. */
   private arrival = -1;
+  /**
+   * A finish crossed in the air: he lets go and falls under the chase's own
+   * gravity, lands with the landing clip and a camera dip, and the arrival
+   * shot starts from the landing. On the ground at the line, none of this
+   * runs and the shot starts at once.
+   */
+  private falling = false;
+  private fallY = 0;
+  private fallV = 0;
+  private dip = 0;
   private playerShadow: Mesh;
 
   setGameplayVisible(visible: boolean): void {
@@ -296,8 +308,21 @@ export class SkylineScene {
    * at least that long.
    */
   celebrate(): void {
-    this.arrival = 0;
+    const s = this.latest;
+    if (s && s.p.y > this.course.groundY + 0.05) {
+      this.falling = true;
+      this.fallY = s.p.y;
+      this.fallV = Math.min(0, s.v.y);
+      return;
+    }
     this.rigged?.celebrate?.();
+    this.land();
+  }
+
+  /** Feet on the ground: the shot begins. The hero's own clip is already chosen. */
+  private land(): void {
+    this.falling = false;
+    this.arrival = 0;
   }
 
   useHero(hero: SkylineHero): void {
@@ -369,18 +394,34 @@ export class SkylineScene {
     const crouch = landing ? 0.14 * Math.sin(Math.PI * Math.min(1, s.landingAge / LAND_TIME)) : 0;
     this.hero.position.set(s.p.x, s.p.y - crouch, 0);
 
-    // The arrival shot's progress. He may have crossed the line mid-swing,
-    // so the pose is brought down to the ground rather than left hanging.
+    // A finish crossed in the air: fall, then land with impact.
+    if (this.falling) {
+      this.fallV -= FALL_GRAVITY * dt;
+      this.fallY += this.fallV * dt;
+      if (this.fallY <= this.course.groundY) {
+        this.fallY = this.course.groundY;
+        this.dip = 1;
+        this.rigged?.land?.();
+        this.land();
+      }
+      this.hero.position.y = this.fallY - crouch;
+    }
+    this.dip = Math.max(0, this.dip - dt / 0.35);
+    this.camera.setDip(this.dip * (1 - this.dip) * 4);
+
+    // The arrival shot's progress.
     let arrive = 0;
     if (this.arrival >= 0) {
       this.arrival += dt;
       const t = Math.min(1, this.arrival / ARRIVAL_SHOT_S);
       arrive = 1 - (1 - t) * (1 - t);
-      this.hero.position.y += (this.course.groundY - this.hero.position.y) * arrive;
+      this.hero.position.y = this.course.groundY - crouch;
       const leaf = this.finishDoor.getObjectByName('leaf');
       if (leaf) leaf.rotation.y = 1.35 * arrive;
     }
     this.camera.setArrival(arrive);
+    // Past the line the snapshot is frozen; the body settles upright.
+    const settled = this.falling || this.arrival >= 0;
 
     // Target pitch:
     // Diving forward into the ground when descending (v.y < 0): negative rotation around X (nose-down dive)
@@ -399,9 +440,9 @@ export class SkylineScene {
 
     // Smooth rotational changes across frames to eliminate twitch
     const rotSmooth = 1 - Math.exp(-dt / 0.08);
-    this.hero.rotation.x += ((1 - arrive) * targetPitch - this.hero.rotation.x) * rotSmooth;
-    this.hero.rotation.y += ((1 - arrive) * targetYaw - this.hero.rotation.y) * rotSmooth;
-    this.hero.rotation.z += ((1 - arrive) * targetRoll - this.hero.rotation.z) * rotSmooth;
+    this.hero.rotation.x += ((settled ? 0 : targetPitch) - this.hero.rotation.x) * rotSmooth;
+    this.hero.rotation.y += ((settled ? 0 : targetYaw) - this.hero.rotation.y) * rotSmooth;
+    this.hero.rotation.z += ((settled ? 0 : targetRoll) - this.hero.rotation.z) * rotSmooth;
     this.hero.visible = this.gameplayVisible && !this.rigged;
     if (this.rigged) {
       this.rigged.object.visible = this.gameplayVisible;
@@ -454,7 +495,7 @@ export class SkylineScene {
     const live = s.anchor && !s.complete;
     if (live) this.anchorAt.set(s.anchor!.x, s.anchor!.y, scrollZ - s.anchor!.z);
     this.rope.update(this.grip, live ? this.anchorAt : null, dt);
-    if (!this.gameplayVisible || arrive > 0) this.rope.object.visible = false;
+    if (!this.gameplayVisible || settled) this.rope.object.visible = false;
     let b = 0, w = 0;
     if (this.street) {
       this.street.update(scrollZ);
@@ -581,6 +622,8 @@ export class SkylineScene {
   }
   reset(): void {
     this.arrival = -1;
+    this.falling = false;
+    this.dip = 0;
     this.rigged?.reset?.();
     const leaf = this.finishDoor.getObjectByName('leaf');
     if (leaf) leaf.rotation.y = 0;

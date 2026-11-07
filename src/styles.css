@@ -258,7 +258,6 @@ html, body {
   text-transform: uppercase;
   line-height: 1;
 }
-.overlay__note { margin: 0; font-size: 13px; color: var(--ink-dim); }
 
 /* A result line, never an instruction. */
 .banner {
