@@ -50,7 +50,7 @@ export class NameEntry implements StorySlot {
     label.htmlFor = 'name-input';
 
     this.input.id = 'name-input';
-    this.input.className = 'name__input';
+    this.input.className = 'name__input field';
     this.input.type = 'text';
     this.input.placeholder = 'Your name';
     this.input.maxLength = 20;

@@ -1,12 +1,13 @@
-@import './theme.css';
+@import './chrome.css';
 
 /*
  * A comic panel, full bleed.
  *
- * The artwork fills the frame and the dialogue sits over its lower third,
- * which on all three images is the quiet part — faces and the cake are in
- * the upper two-thirds, and a balloon over a face is the one thing the
- * storyboard rules out.
+ * The artwork takes the frame above the caption area, which is where the
+ * storyboard puts it: picture in the main panel, words beneath. Confining
+ * the art to that row rather than the whole screen keeps far more of each
+ * composition on a tall phone, and leaves the dialogue on its own ground
+ * where a balloon can never land on a face.
  */
 .story {
   position: absolute;
@@ -14,34 +15,41 @@
   inset: 0;
   display: grid;
   grid-template-rows: 1fr auto;
-  background: var(--ink);
+  background: var(--frame-ink);
 }
-/*
- * The art takes the frame above the caption, not the whole screen.
- *
- * Full bleed on a 390x844 phone means cropping a portrait illustration from
- * an aspect of 0.83 down to 0.46, which cut half the cake out of Aurora's
- * panel — the plot object, lost to the crop. Confining it to the row above
- * the dialogue leaves an aspect near 0.7, so far more of each composition
- * survives, and it is the layout the storyboard asks for: artwork in the
- * main frame, caption area beneath it.
- */
+
 .story__frame {
   grid-row: 1;
   position: relative;
   min-height: 0;
   overflow: hidden;
+  background: #06040a;
+  /* The panel's inked edge, drawn inside so the art has a gutter. */
+  margin: calc(var(--safe-t) + 10px) 10px 0;
+  border: 2px solid var(--frame-line);
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px var(--frame-ink), 0 10px 30px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+.story__drift, .story__cam, .story__tilt {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.story__drift { transform-origin: 50% 50%; }
+.story__tilt { transition: transform 260ms ease-out; }
 .story__art {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Enlarge, then let the origin decide what survives. Positioning alone had
-     almost no overflow to work with at this frame's aspect. */
-  transform: scale(var(--zoom, 1));
-  transform-origin: var(--origin, 50% 50%);
+  user-select: none;
+  -webkit-user-drag: none;
 }
-.story__art--fit { object-fit: contain; transform: none; }
+.story__art--chars { transition: transform 260ms ease-out; }
+
 /*
  * The cover is shown whole.
  *
@@ -50,8 +58,41 @@
  * afford to letterbox; a story panel cannot, which is why only the cover
  * does.
  */
-.story__art--fit { object-fit: contain; }
+.story__frame--cover .story__art { object-fit: contain; }
+.story__frame--cover { cursor: default; }
 
+/* The page turn. Scales across the frame in the next beat's colour. */
+.story__wipe {
+  position: absolute;
+  inset: -2px;
+  z-index: 3;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+.story__wipe--matthew { background: linear-gradient(90deg, var(--gold) 0%, #ffe7b0 100%); }
+.story__wipe--aurora { background: linear-gradient(90deg, var(--purple-deep) 0%, var(--magenta) 100%); }
+
+/* "tap": there is more to read. Sits in the frame's corner, small. */
+.story__hint {
+  position: absolute;
+  z-index: 2;
+  right: 10px;
+  bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(11, 7, 16, 0.72);
+  border: 1px solid rgba(241, 209, 138, 0.5);
+  color: var(--gold-text);
+  font: 700 10px/1.4 var(--font-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  pointer-events: none;
+  animation: story-hint 1.4s ease-in-out infinite;
+}
+@keyframes story-hint {
+  0%, 100% { opacity: 0.55; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
 
 .story__foot {
   position: relative;
@@ -59,48 +100,47 @@
   display: grid;
   gap: 12px;
   justify-items: center;
-  padding: 18px 20px calc(20px + env(safe-area-inset-bottom, 0px));
-  background: var(--ink);
+  padding: 16px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: var(--frame-ink);
 }
 
-.story__lines { display: grid; gap: 9px; width: 100%; max-width: 430px; margin: 0; }
-.story__line { margin: 0; font-size: 15px; line-height: 1.4; color: #f2f5ff; }
+.story__lines {
+  display: grid;
+  gap: 9px;
+  width: 100%;
+  max-width: 430px;
+  margin: 0;
+  /* Three lines' worth, so Next does not jump as lines arrive. */
+  min-height: 112px;
+  align-content: start;
+  cursor: pointer;
+}
+.story__line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #f2f5ff;
+}
+.story__line--caption { justify-self: start; font-size: 13px; }
 .story__who {
   display: block;
-  font-size: 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: .16em;
-  margin-bottom: 2px;
+  letter-spacing: 0.18em;
+  margin-bottom: 1px;
 }
 .story__who--MATTHEW { color: var(--gold-text); }
 .story__who--AURORA { color: #e6a8ff; }
 
-.story__next {
-  border: 1px solid #ffdf9a;
-  border-radius: 999px;
-  background: #6b2c70;
-  color: inherit;
-  font: inherit;
-  font-weight: 800;
-  padding: 12px 36px;
-  cursor: pointer;
-}
+.story__next { min-width: 150px; }
 
 /* Skip sits apart from Next so neither is hit by accident. */
 .story__skip {
   position: absolute;
   z-index: 61;
-  top: max(14px, env(safe-area-inset-top, 0px));
-  right: 16px;
-  border: 0;
-  background: #0b1120a6;
-  border-radius: 999px;
-  color: #b9c6e4;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 7px 14px;
-  cursor: pointer;
+  top: calc(var(--safe-t) + 18px);
+  right: 18px;
 }
 
 /*
@@ -109,7 +149,9 @@
  * Dimmed rather than hidden: a missing button reads as a broken screen,
  * where a greyed one reads as "finish the field above me".
  */
-.story__next:disabled {
-  opacity: .45;
-  cursor: default;
+.story__next:disabled { opacity: 0.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .story__hint { animation: none; }
+  .story__tilt, .story__art--chars { transition: none; }
 }

@@ -1,4 +1,5 @@
 @import './ui/theme.css';
+@import './ui/chrome.css';
 /* ---- reset ----------------------------------------------------------- */
 * { box-sizing: border-box; }
 
@@ -157,18 +158,19 @@ html, body {
   display: none;
   place-items: center;
   padding: 24px;
-  background: rgba(6, 10, 18, 0.88);
+  background: rgba(11, 7, 16, 0.9);
 }
 
 .rotate__card {
-  background: var(--panel);
-  border: 1px solid var(--edge);
-  border-radius: 18px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
   padding: 24px;
   max-width: 340px;
   width: 100%;
   text-align: center;
 }
+.rotate__card p { margin: 0; font-size: 15px; }
 
 @media (orientation: landscape) and (max-height: 540px) {
   .rotate:not([hidden]) { display: grid; }
@@ -219,7 +221,9 @@ html, body {
  * The pause overlay.
  *
  * Blocking by design: the simulation is frozen, so the screen should say so
- * rather than leaving a live-looking frame the player might swipe at.
+ * rather than leaving a live-looking frame the player might swipe at. It is
+ * an intermission card in the comic's frame, so a pause reads as part of
+ * the book rather than a browser dialog.
  */
 .overlay {
   position: absolute;
@@ -230,20 +234,27 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 24px;
+  background: rgba(11, 7, 16, 0.78);
+  backdrop-filter: blur(3px);
+}
+.overlay__card {
+  display: grid;
+  justify-items: center;
   gap: 14px;
-  background: #0b1120dc;
+  width: min(84vw, 320px);
+  padding: 24px 22px 22px;
+  text-align: center;
 }
-.overlay strong { font-size: 28px; }
-.overlay button {
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  border: 1px solid #ffdf9a;
-  border-radius: 999px;
-  background: #6b2c70;
-  padding: 10px 26px;
+.overlay strong {
+  font-family: var(--font-display);
+  font-size: 34px;
   font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1;
 }
+.overlay__note { margin: 0; font-size: 13px; color: var(--ink-dim); }
 
 /* A result line, never an instruction. */
 .banner {
@@ -259,3 +270,23 @@ html, body {
   text-shadow: 0 2px 10px #050b16;
   pointer-events: none;
 }
+
+/*
+ * The level stand-in used by `?review=story`.
+ *
+ * A card on the empty stage where a level would play, so the comic's seams
+ * can be judged with the real transitions and none of the waiting.
+ */
+.seam {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  background: radial-gradient(120% 80% at 50% 30%, #1b275c 0%, #0a0a0f 70%);
+}
+.seam__title { font-size: 36px; }
+.seam__note { margin: 4px 0 0; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }

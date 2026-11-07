@@ -50,8 +50,8 @@ export class ResultsScreen {
     this.root.className = 'results';
     this.root.hidden = true;
 
-    this.result.className = 'results__pane';
-    this.board.className = 'results__pane';
+    this.result.className = 'results__pane frame';
+    this.board.className = 'results__pane frame';
     this.board.hidden = true;
 
     this.buildResultPane();
@@ -62,7 +62,11 @@ export class ResultsScreen {
   }
 
   private buildResultPane(): void {
-    this.outcomeEl.className = 'results__outcome';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow results__eyebrow';
+    eyebrow.textContent = 'Issue #27 · Final page';
+
+    this.outcomeEl.className = 'results__outcome caption';
 
     const total = document.createElement('div');
     total.className = 'results__total';
@@ -82,13 +86,16 @@ export class ResultsScreen {
       this.button('Play again', true, () => this.onReplay?.()),
     );
 
-    this.result.append(this.outcomeEl, total, this.levelsEl, this.rankEl, actions);
+    this.result.append(eyebrow, this.outcomeEl, total, this.levelsEl, this.rankEl, actions);
   }
 
   private buildBoardPane(): void {
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'Leaderboard';
     const heading = document.createElement('h2');
-    heading.className = 'results__heading';
-    heading.textContent = 'Leaderboard';
+    heading.className = 'results__heading headline';
+    heading.textContent = 'Hall of Heroes';
 
     this.listEl.className = 'results__board';
     // Rebuilt per use: the way out of the board depends on how it was
@@ -96,13 +103,13 @@ export class ResultsScreen {
     // is no score to go back to, only the game to start.
     this.boardActions.className = 'results__actions';
 
-    this.board.append(heading, this.listEl, this.boardActions);
+    this.board.append(eyebrow, heading, this.listEl, this.boardActions);
   }
 
   private button(label: string, primary: boolean, onClick: () => void): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = primary ? 'results__btn results__btn--primary' : 'results__btn';
+    b.className = primary ? 'results__btn btn btn--primary' : 'results__btn btn btn--ghost';
     b.textContent = label;
     b.addEventListener('click', () => { b.blur(); onClick(); });
     return b;
@@ -117,8 +124,10 @@ export class ResultsScreen {
     this.onReplay = onReplay;
 
     const won = result.outcome === 'win';
-    this.outcomeEl.className = `results__outcome results__outcome--${won ? 'win' : 'loss'}`;
-    this.outcomeEl.textContent = won ? 'Cake recovered!' : 'Aurora escaped';
+    this.outcomeEl.className = `results__outcome caption results__outcome--${won ? 'win' : 'loss'}`;
+    // The same captions the comic's last panel uses, so the page agrees
+    // with the picture before it.
+    this.outcomeEl.textContent = won ? 'Cake recovered!' : 'The cake remains at large.';
     this.scoreEl.textContent = String(result.total);
 
     this.levelsEl.replaceChildren(...result.levelScores.map((score, i) => {

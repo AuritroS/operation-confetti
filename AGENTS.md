@@ -40,7 +40,9 @@ build order, decisions and evidence.
 | --- | --- |
 | `/` | The campaign: all three levels in sequence |
 | `/?tutorial=N` | The campaign opened at level N with its tutorial sheet up — the only way to review a sheet without playing the levels before it |
-| `/?story=<id>` | One comic panel, held up for review. Ids: `title`, `intro`, `chase`, `rooftop`, `win`, `loss` |
+| `/?story=<id>` | One comic panel, held up for review. Ids: `title`, `intro`, `vault`, `chase`, `rooftop`, `win`, `loss` |
+| `/?review=story` | The whole comic in order with the real page turns and iris, a stand-in card where each level would play, then the results card. Skip is ignored |
+| `/?review=chrome` | Every non-level screen in order: loader, cover and name, tutorial sheet, pause, results (win, loss), board, rotate prompt. Each is left by its own button |
 | `/?results=win`, `/?results=loss` | The end-of-run card with a sample score, and the leaderboard behind it. Presentational only: no level is mounted and nothing is submitted |
 | `/?level=1`, `/?level=2` | A single level's standalone review page, skipping the rehearsal |
 | `/level3.html` | The boss fight alone, with `?debug` for the cue harness |
@@ -48,7 +50,13 @@ build order, decisions and evidence.
 | `/?start=400` | Fast-forward level 1's standalone page, for looking at its ending |
 
 Captures: `tools/shots/campaign/` for gameplay framing, `story-reference/` for
-asset plates.
+asset plates. `node tools/shoot-story-pass.mjs` photographs both review routes
+at two phone widths into `tools/shots/story-pass/` (ignored; regenerate it)
+and records the story route as `story-review.mp4`.
+
+The comic's script, storyboard, image prompts and budget are in
+`docs/STORY_PASS.md`. `src/story/script.ts` maps each panel to its image and
+marks which are still placeholders.
 
 ## Habits
 

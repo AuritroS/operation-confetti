@@ -48,15 +48,20 @@
       target to hit by accident during play.
     -->
     <div id="pause" class="overlay" hidden>
-      <strong>Paused</strong>
-      <button id="btn-resume" type="button">Resume</button>
+      <div class="overlay__card frame">
+        <p class="eyebrow">Intermission</p>
+        <strong>Paused</strong>
+        <p class="overlay__note">The page turns when you are ready.</p>
+        <button id="btn-resume" type="button" class="btn btn--primary">Resume</button>
+      </div>
     </div>
 
     <!-- Non-blocking line for a result. Story panels replace this in phase C. -->
     <div id="banner" class="banner" hidden></div>
 
     <div id="rotate" class="rotate" hidden>
-      <div class="rotate__card">
+      <div class="rotate__card frame">
+        <p class="eyebrow">Portrait only</p>
         <p>Please turn your phone upright.</p>
       </div>
     </div>

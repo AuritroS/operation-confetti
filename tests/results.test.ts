@@ -75,7 +75,7 @@ describe('ResultsScreen', () => {
   it('names a loss as a loss', () => {
     const { screen, replay } = mount();
     screen.show({ outcome: 'loss', total: 300, levelScores: [300, 0, 0] }, 'p1', replay);
-    expect(document.querySelector('.results__outcome')?.textContent).toBe('Aurora escaped');
+    expect(document.querySelector('.results__outcome')?.textContent).toBe('The cake remains at large.');
   });
 
   it('fetches the board only when it is opened', async () => {

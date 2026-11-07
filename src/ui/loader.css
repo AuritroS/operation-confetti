@@ -1,4 +1,4 @@
-@import './theme.css';
+@import './chrome.css';
 
 /*
  * The boot screen.
@@ -13,31 +13,36 @@
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 22px;
   padding: 24px;
-  background: radial-gradient(120% 80% at 50% 18%, #2a1733 0%, var(--ink) 62%);
   color: var(--ink-fg);
   text-align: center;
+  /* The cover, dimmed and pushed back, under a dark wash. */
+  background:
+    radial-gradient(120% 80% at 50% 18%, rgba(42, 23, 51, 0.55) 0%, rgba(11, 7, 16, 0.92) 70%),
+    var(--cover, none) center 30% / cover no-repeat,
+    var(--frame-ink);
 }
 
-.loading__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: .3em;
-  text-transform: uppercase;
-  color: var(--gold-text);
+.loading__card {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: min(84vw, 340px);
+  padding: 26px 22px 22px;
 }
+
+.loading__title { font-size: 40px; }
 
 /* A fixed track, so the bar grows into a known length rather than the bar
    itself defining the width and the layout shifting as it fills. */
 .loading__track {
-  width: min(78vw, 320px);
-  height: 8px;
-  border: 1px solid var(--edge);
+  width: 100%;
+  height: 12px;
+  border: 2px solid var(--frame-ink);
   border-radius: 999px;
-  background: #0b1120;
+  background: #2a1733;
   overflow: hidden;
+  box-shadow: 0 2px 0 var(--frame-ink);
 }
 
 .loading__bar {
@@ -47,13 +52,16 @@
   background: linear-gradient(90deg, var(--gold) 0%, #ffe3a6 100%);
   /* Matches the step between progress ticks, so the bar reads as moving
      rather than as a series of jumps. */
-  transition: width .18s ease-out;
+  transition: width 0.18s ease-out;
 }
 
 .loading__note {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 12px;
-  letter-spacing: .08em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--ink-dim);
   /* Reserved, so the line appearing does not nudge the bar upward. */
   min-height: 1.2em;

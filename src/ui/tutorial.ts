@@ -48,11 +48,11 @@ export class Tutorial {
 
   constructor(container: HTMLElement) {
     this.root.className = 'tutorial';
-    this.chapter.className = 'tutorial__chapter';
+    this.chapter.className = 'tutorial__chapter eyebrow';
     this.controls.className = 'tutorial__controls';
 
     this.start.type = 'button';
-    this.start.className = 'tutorial__start';
+    this.start.className = 'tutorial__start btn btn--primary';
     this.start.textContent = "Let's go";
     this.start.addEventListener('click', () => {
       this.start.blur();

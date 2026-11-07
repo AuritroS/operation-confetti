@@ -54,6 +54,10 @@ async function dismissStory(target) {
   for (let i = 0; i < 4; i++) {
     const panel = target.locator('.story:not([hidden])');
     if (!(await panel.count())) return;
+    // The cover's Start stays disabled until a name is in; fill it like a
+    // player would.
+    const name = target.locator('.name__input:visible');
+    if (await name.count()) await name.fill('Reviewer');
     const skip = target.locator('.story__skip:visible');
     if (await skip.count()) await skip.click();
     else await target.locator('.story__next').click();
@@ -90,6 +94,7 @@ for (const viewport of VIEWPORTS) {
 
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
   await page.screenshot({ path: join(SHOTS, `story-title-${viewport.name}.png`) });
+  await page.locator('.name__input').fill('Reviewer');
   await page.locator('.story__next').click();
   await page.waitForTimeout(600);
   await page.screenshot({ path: join(SHOTS, `story-intro-${viewport.name}.png`) });

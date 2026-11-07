@@ -1,4 +1,4 @@
-@import './theme.css';
+@import './chrome.css';
 
 /*
  * The tutorial sheet.
@@ -6,6 +6,10 @@
  * Bottom third, over the live scene, so the player can see the level they are
  * about to play while they learn to play it. Gestures are drawn rather than
  * described: an arrow reads faster than a sentence about an arrow.
+ *
+ * It is the comic's caption area carried into the level: the same ink
+ * ground, the same gold rule, the same button, so the hand-off from a panel
+ * to play reads as the next page rather than a different app.
  */
 .tutorial {
   position: absolute;
@@ -13,31 +17,45 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 22px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  padding: 18px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   display: grid;
-  gap: 16px;
+  gap: 14px;
   justify-items: center;
-  background: linear-gradient(180deg, #0b112000 0%, #0b1120e0 24%, #0b1120f5 100%);
+  background: linear-gradient(180deg, rgba(11, 7, 16, 0) 0%, rgba(11, 7, 16, 0.86) 22%, rgba(11, 7, 16, 0.97) 100%);
   pointer-events: auto;
 }
-.tutorial__chapter {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .18em;
-  color: var(--gold-text);
+/* The gold rule where the panel meets the scene. */
+.tutorial::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 22%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--frame-line) 20%, var(--frame-line) 80%, transparent);
+  opacity: 0.8;
 }
 
-.tutorial__controls { display: flex; gap: 22px; align-items: flex-start; }
+.tutorial__chapter { position: relative; }
+
+.tutorial__controls { display: flex; gap: 26px; align-items: flex-start; }
 .tutorial__control { display: grid; gap: 6px; justify-items: center; }
-.tutorial__icons { display: flex; gap: 2px; }
+.tutorial__icons {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(19, 12, 24, 0.9);
+  border: 2px solid var(--frame-ink);
+  box-shadow: 0 0 0 1px rgba(241, 209, 138, 0.35), 0 3px 0 var(--frame-ink);
+}
 
 .tutorial__icon {
   width: 28px;
   height: 28px;
   fill: none;
-  stroke: #dbe4f7;
-  stroke-width: 2.2;
+  stroke: #f3e6c8;
+  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -47,24 +65,16 @@
 
 /* The tap glyph is filled and ringed, so it cannot be read as an arrow. */
 .tutorial__icon--tap { stroke: none; }
-.tutorial__tap-dot { fill: #dbe4f7; }
-.tutorial__tap-ring { fill: none; stroke: #dbe4f7; stroke-width: 1.5; opacity: .45; }
+.tutorial__tap-dot { fill: #f3e6c8; }
+.tutorial__tap-ring { fill: none; stroke: #f3e6c8; stroke-width: 1.5; opacity: 0.45; }
 
 .tutorial__label {
-  font-size: 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #93a3c4;
+  color: #b9c6e4;
 }
 
-.tutorial__start {
-  border: 1px solid #ffdf9a;
-  border-radius: 999px;
-  background: #6b2c70;
-  color: inherit;
-  font: inherit;
-  font-weight: 800;
-  padding: 11px 34px;
-  cursor: pointer;
-}
+.tutorial__start { min-width: 170px; }

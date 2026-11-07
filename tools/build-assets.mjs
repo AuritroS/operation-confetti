@@ -169,7 +169,14 @@ const PRUNE = [
  * so it is the cover and nothing else; the other two are reframed by CSS and
  * recaptioned to serve several moments each.
  */
-const STORY = ['assets/matthew.png', 'assets/aurora.png', 'assets/matthew-aurora.png'];
+const STORY = [
+  'assets/matthew.png',
+  'assets/aurora.png',
+  'assets/matthew-aurora.png',
+  // Generated panels (docs/STORY_PASS.md). `chase.webp` is the 7 Nov probe
+  // standing in until its final is chosen; the rest arrive with stage 4.
+  'assets/chase.webp',
+];
 
 const warnings = [];
 
@@ -351,7 +358,7 @@ for (const src of STORY) {
     continue;
   }
   ensure(STORY_OUT);
-  const name = basename(src, '.png');
+  const name = basename(src).replace(/\.(png|webp|jpe?g)$/i, '');
 
   if (!sharp) {
     const dest = copy(src, STORY_OUT);

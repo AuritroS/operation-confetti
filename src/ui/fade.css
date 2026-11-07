@@ -1,26 +1,28 @@
 @import './theme.css';
 
 /*
- * The curtain between levels.
+ * The iris between levels.
  *
- * Above everything except the portrait request, because it has to cover a
- * level being torn down and another being built — which is the moment the
- * scene is genuinely inconsistent, and the moment a slow load happens.
+ * Above everything except the comic, the results and the portrait request,
+ * because it has to cover a level being torn down and another being built —
+ * which is the moment the scene is genuinely inconsistent, and the moment a
+ * slow load happens.
+ *
+ * `--iris` is the radius of the clear circle, set by `fade.ts`. At its
+ * maximum the element is fully transparent; at zero it is solid ink.
  */
 .fade {
   position: absolute;
   z-index: 48;
   inset: 0;
-  background: var(--ink);
-  opacity: 0;
+  --iris: 2000px;
+  background: radial-gradient(
+    circle at 50% 52%,
+    transparent calc(var(--iris) - 2px),
+    rgba(11, 7, 16, 0.85) calc(var(--iris) - 1px),
+    var(--frame-ink, #0b0710) var(--iris)
+  );
   pointer-events: none;
-  transition: opacity 350ms ease;
 }
-.fade--on {
-  opacity: 1;
-  /* Block input while covered: taps would land on a level nobody can see. */
-  pointer-events: auto;
-}
-@media (prefers-reduced-motion: reduce) {
-  .fade { transition-duration: 1ms; }
-}
+/* Block input while covered: taps would land on a level nobody can see. */
+.fade--on { pointer-events: auto; }

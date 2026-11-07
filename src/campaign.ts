@@ -5,7 +5,7 @@
  * everything a level deliberately does not: the loop, the renderer, pause and
  * orientation, the HUD, and the run's event list. A level is mounted, played
  * until it reports a result, then disposed before the next is mounted — which
- * is the seam story panels and transitions drop into later.
+ * is the seam story panels and transitions drop into.
  *
  * Score is reduced from the event stream with `scoreRun`, the same function
  * the Worker recomputes with, so the number on screen is the number the server
@@ -88,10 +88,12 @@ const nameEntry = new NameEntry({
  */
 let storySkipped = false;
 
-/** Show a beat unless the player has opted out of the comic. */
-async function tell(beat: StoryBeat | undefined): Promise<void> {
-  if (!beat || storySkipped) return;
-  if (await story.show(beat)) storySkipped = true;
+/** Show a seam's beats in order, unless the player has opted out of the comic. */
+async function tell(beats: readonly StoryBeat[]): Promise<void> {
+  for (const beat of beats) {
+    if (storySkipped) return;
+    if (await story.show(beat)) storySkipped = true;
+  }
 }
 
 const params = new URLSearchParams(location.search);
@@ -113,8 +115,8 @@ interface StageSpec {
   readonly make: () => LevelController;
   /** What the tutorial sheet says before this level is played. */
   readonly copy: TutorialCopy;
-  /** The comic beat shown before this level, if it has one. */
-  readonly beat?: StoryBeat;
+  /** The comic beats shown before this level, in order. */
+  readonly beats: readonly StoryBeat[];
 }
 
 const STAGES: readonly StageSpec[] = [
@@ -122,9 +124,9 @@ const STAGES: readonly StageSpec[] = [
     id: 1,
     title: 'The Gift Vault',
     make: () => new RouteLevel(host),
-    beat: BEATS.intro,
+    beats: [BEATS.intro],
     copy: {
-      chapter: '1 · THE GIFT HEIST',
+      chapter: 'Chapter 1 · The Gift Vault',
       controls: [{ icons: ['left', 'right'], label: 'Change lane' }],
     },
   },
@@ -132,9 +134,12 @@ const STAGES: readonly StageSpec[] = [
     id: 2,
     title: 'Skyline Chase',
     make: () => new SkylineLevel(host),
-    beat: BEATS.chase,
+    // Two pages at this seam: the vault opening on the city, then the chase.
+    // It is the story's midpoint and the only place he picks up the blaster
+    // the next sheet teaches.
+    beats: [BEATS.vault, BEATS.chase],
     copy: {
-      chapter: '2 · THE SKYLINE CHASE',
+      chapter: 'Chapter 2 · Skyline Chase',
       controls: [
         { icons: ['up'], label: 'Grapple' },
         { icons: ['left', 'right'], label: 'Steer' },
@@ -144,11 +149,11 @@ const STAGES: readonly StageSpec[] = [
   },
   {
     id: 3,
-    title: 'One Last Party Trick',
+    title: 'Cake Showdown',
     make: () => new BossLevel(),
-    beat: BEATS.rooftop,
+    beats: [BEATS.rooftop],
     copy: {
-      chapter: '3 · CAKE SHOWDOWN',
+      chapter: 'Chapter 3 · Cake Showdown',
       controls: [
         { icons: ['left', 'right'], label: 'Dodge' },
         { icons: ['tap'], label: 'Fire' },
@@ -177,15 +182,16 @@ let identity: Identity | null = null;
 /**
  * Why this run is not a leaderboard result, or null if it is one.
  *
- * `?level` and `?tutorial` start mid-stream, `?story` never plays, and
- * `?debug` hands out a fast-forward. All four produce a stream that is
- * honestly scored but not comparable, so they are stored with `is_test` set
- * and kept off the board — the column exists precisely so a dev run does not
- * have to be silently dropped.
+ * `?level` and `?tutorial` start mid-stream, `?story`, `?results` and
+ * `?review` never play, and `?debug` hands out a fast-forward. All of them
+ * produce a stream that is honestly scored but not comparable, so they are
+ * stored with `is_test` set and kept off the board — the column exists
+ * precisely so a dev run does not have to be silently dropped.
  */
 const testRunReason: string | null =
   jumpTo >= 1 && jumpTo <= 3 ? `Level ${jumpTo} jump — not submitted to the leaderboard.`
-    : params.has('story') || params.has('results') ? 'Review screen — not submitted to the leaderboard.'
+    : params.has('story') || params.has('results') || params.has('review')
+      ? 'Review screen — not submitted to the leaderboard.'
       : debug ? 'Debug run — not submitted to the leaderboard.'
         : null;
 
@@ -310,9 +316,9 @@ async function mountStage(): Promise<void> {
   hud.setVisible(true);
   bossHud.setVisible(false);
 
-  // The panel goes up before the level is built, so the comic is what the
+  // The panels go up before the level is built, so the comic is what the
   // player looks at while it loads rather than a black screen.
-  const telling = tell(spec.beat);
+  const telling = tell(spec.beats);
   const level = spec.make();
   await Promise.all([level.mount(ctx), telling]);
   current = level;
@@ -326,21 +332,28 @@ async function mountStage(): Promise<void> {
   useInputFor(spec.id);
   switching = false;
   if (!lifecycle.isPaused) loop.start();
+  // The iris opens on the rehearsal with the sheet already up, so the first
+  // thing seen of a level is the level and how to play it, together.
   await fade.reveal();
 }
 
 async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
   if (switching) return;
   switching = true;
-  loop.stop();
 
   const beaten = result === 'defeated';
   const last = index >= STAGES.length - 1;
+
+  // Iris down before the swap: a level being torn down while another is
+  // built is the one moment the scene is genuinely inconsistent. The loop
+  // keeps drawing until the iris is shut, so the level's own ending — the
+  // celebration at the gate, the confetti — plays out underneath it rather
+  // than freezing on the frame the result arrived in.
+  await fade.cover();
+  loop.stop();
+
   if (beaten || last) { await endCampaign(result); return; }
 
-  // Curtain down before the swap: a level being torn down while another is
-  // built is the one moment the scene is genuinely inconsistent.
-  await fade.cover();
   current?.dispose();
   current = null;
   index++;
@@ -352,13 +365,14 @@ async function endCampaign(result: 'complete' | 'defeated'): Promise<void> {
   switching = false;
   laneInput.detach();
   swingInput.detach();
-  // Let the level's own ending play out, then close on the comic.
-  await tell(result === 'complete' ? BEATS.win : BEATS.loss);
-  loop.stop();
 
   // The live readout is about a run in progress; the results card is now the
   // only true statement about the score.
   hud.setVisible(false);
+  bossHud.setVisible(false);
+
+  // Close on the comic, then the last page.
+  await tell([result === 'complete' ? BEATS.win : BEATS.loss]);
 
   const score = scoreRun(events);
   results.show(
@@ -371,8 +385,8 @@ async function endCampaign(result: 'complete' | 'defeated'): Promise<void> {
   // answers. A slow network must never hold the result back.
   void submitScore(result === 'complete' ? 'win' : 'loss', score.levelScores);
 
-  // Keep drawing the ending; the simulation is finished but the scene is not.
-  loop.start();
+  // The finished level stays mounted under the results, so a replay disposes
+  // it the same way a seam would. Nothing draws: the iris is shut.
 }
 
 /**
@@ -420,7 +434,9 @@ async function submitScore(outcome: 'win' | 'loss', levelScores: [number, number
 }
 
 async function restartCampaign(): Promise<void> {
-  await fade.cover();
+  // The results card is opaque, so the iris is already out of sight.
+  fade.shut();
+  loop.stop();
   results.hide();
   tutorial.hide();
   current?.dispose();
@@ -468,6 +484,140 @@ if (debug) {
   } });
 }
 
+// ---- review routes -----------------------------------------------------
+
+/**
+ * A label for the review routes: which screen this is, and how many.
+ *
+ * Never shown to a player. It lets a reviewer tapping through on a phone
+ * know where they are in the sequence without a second screen open.
+ */
+const chip = document.createElement('div');
+chip.className = 'review-chip';
+chip.hidden = true;
+app.append(chip);
+function mark(text: string): void { chip.hidden = false; chip.textContent = text; }
+
+/**
+ * Where a level would be, in the story review.
+ *
+ * A card on the empty stage, between the iris closing on one panel and
+ * opening on the next, so the seams can be judged with the real transitions
+ * and none of the waiting.
+ */
+const seam = document.createElement('div');
+seam.className = 'seam';
+seam.hidden = true;
+app.append(seam);
+
+const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+async function showSeam(spec: StageSpec): Promise<void> {
+  seam.replaceChildren();
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = `Level ${spec.id}`;
+  const title = document.createElement('p');
+  title.className = 'headline seam__title';
+  title.textContent = spec.title;
+  const note = document.createElement('p');
+  note.className = 'seam__note';
+  note.textContent = 'plays here';
+  seam.append(eyebrow, title, note);
+  seam.hidden = false;
+  await fade.reveal();
+  await wait(1400);
+  await fade.cover();
+  seam.hidden = true;
+}
+
+/**
+ * `?review=story`: the whole comic, in order, with the real seams.
+ *
+ * Cover, every panel, and the two endings back to back, with the iris and a
+ * placeholder card standing in for each level. Skip is ignored here, since
+ * the point is to see every page.
+ */
+async function reviewStory(): Promise<void> {
+  loading.hide();
+  hud.setVisible(false);
+  const pages: Array<{ beat: StoryBeat; slot?: NameEntry; then?: StageSpec | undefined }> = [
+    { beat: BEATS.title, slot: nameEntry },
+    { beat: BEATS.intro, then: STAGES[0] },
+    { beat: BEATS.vault },
+    { beat: BEATS.chase, then: STAGES[1] },
+    { beat: BEATS.rooftop, then: STAGES[2] },
+    { beat: BEATS.win },
+    { beat: BEATS.loss },
+  ];
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i]!;
+    mark(`story ${i + 1}/${pages.length} · ${page.beat.id}`);
+    await story.show(page.beat, page.slot);
+    if (page.then) {
+      await fade.cover();
+      await showSeam(page.then);
+    }
+  }
+  mark('story · results');
+  await fade.reveal();
+  results.show({ outcome: 'win', total: 1750, levelScores: [600, 450, 700] }, null,
+    () => { location.search = ''; });
+  results.setSaveState({ kind: 'skipped', why: 'Review sample — nothing was submitted.' });
+}
+
+/**
+ * `?review=chrome`: every screen that is not a level or a panel, in order.
+ *
+ * Each screen is left by its own control, so what is reviewed is the real
+ * button in the real place. Nothing is mounted and nothing is submitted.
+ */
+async function reviewChrome(): Promise<void> {
+  const total = 7;
+  campaignOver = true;
+  mark(`chrome 1/${total} · loader`);
+  for (let i = 0; i <= 20; i++) { loading.set(i / 20); await wait(70); }
+  await wait(500);
+  loading.hide();
+  hud.setVisible(false);
+
+  mark(`chrome 2/${total} · cover + name`);
+  await story.show(BEATS.title, nameEntry);
+  await wait(10);
+
+  mark(`chrome 3/${total} · tutorial sheet`);
+  await new Promise<void>((done) => tutorial.show(STAGES[0]!.copy, () => { tutorial.hide(); done(); }));
+
+  mark(`chrome 4/${total} · pause`);
+  await new Promise<void>((done) => {
+    showPause(true);
+    resumeBtn.addEventListener('click', () => done(), { once: true });
+  });
+  showPause(false);
+
+  mark(`chrome 5/${total} · results, win`);
+  await new Promise<void>((done) => {
+    results.show({ outcome: 'win', total: 1750, levelScores: [600, 450, 700] }, null, done);
+    results.setSaveState({ kind: 'saved', rank: 3 });
+  });
+
+  mark(`chrome 6/${total} · results, loss`);
+  await new Promise<void>((done) => {
+    results.show({ outcome: 'loss', total: 850, levelScores: [500, 250, 100] }, null, done);
+    results.setSaveState({ kind: 'offline' });
+  });
+  results.hide();
+
+  mark(`chrome 7/${total} · rotate prompt (tap to finish)`);
+  rotatePrompt.hidden = false;
+  rotatePrompt.style.display = 'grid';
+  await new Promise<void>((done) => rotatePrompt.addEventListener('click', () => done(), { once: true }));
+  rotatePrompt.style.display = '';
+  rotatePrompt.hidden = true;
+
+  mark('chrome · done — reload to run again');
+}
+
 // ---- boot --------------------------------------------------------------
 
 hud.reset();
@@ -498,6 +648,17 @@ void (async () => {
     results.setSaveState({ kind: 'skipped', why: 'Review sample — nothing was submitted.' });
     return;
   }
+
+  /*
+   * `?review=story|chrome` walk the glue without the levels.
+   *
+   * Neither mounts anything, so neither waits for the preload: the comic's
+   * images load as ordinary `<img>` requests, and the chrome needs no files
+   * at all.
+   */
+  const review = params.get('review');
+  if (review === 'story') { await reviewStory(); return; }
+  if (review === 'chrome') { await reviewChrome(); return; }
 
   /*
    * Everything, before anything.
@@ -543,5 +704,8 @@ void (async () => {
   } else {
     identity = nameEntry.identity();
   }
+  // The first level opens through the iris like every later one. The cover
+  // panel is opaque, so there is nothing to watch close: shut it outright.
+  fade.shut();
   await mountStage();
 })();

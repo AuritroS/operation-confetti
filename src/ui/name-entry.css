@@ -1,4 +1,4 @@
-@import './theme.css';
+@import './chrome.css';
 
 /*
  * Name entry, as a widget inside the cover panel's caption area.
@@ -9,43 +9,26 @@
  */
 .name {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
   max-width: 430px;
   justify-items: stretch;
 }
 
 .name__label {
-  font-size: 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: .16em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--gold-text);
-}
-
-.name__input {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--edge);
-  border-radius: 10px;
-  background: #0b1120;
-  color: var(--ink-fg);
-  font: inherit;
-  /* 16px or larger, or iOS Safari zooms the page on focus and the player
-     lands in a scrolled, half-cropped panel. */
-  font-size: 16px;
-  padding: 11px 13px;
-}
-.name__input:focus {
-  outline: none;
-  border-color: var(--gold);
 }
 
 .name__hint {
   min-height: 1.1em;
   margin: 0;
   font-size: 11px;
-  letter-spacing: .04em;
+  letter-spacing: 0.04em;
   color: var(--ink-dim);
 }
 /* Only after they have typed something unusable — an empty field is not an
@@ -62,12 +45,16 @@
   justify-self: center;
   border: 0;
   background: none;
-  color: var(--ink-dim);
-  font: inherit;
+  color: var(--gold-text);
+  font-family: var(--font-display);
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   text-decoration: underline;
-  text-underline-offset: 3px;
-  padding: 4px 6px;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(247, 211, 128, 0.5);
+  padding: 6px 8px;
   cursor: pointer;
 }
-.name__secondary:hover { color: var(--gold-text); }
+.name__secondary:hover { text-decoration-color: var(--gold-text); }
