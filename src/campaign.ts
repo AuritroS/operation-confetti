@@ -318,9 +318,14 @@ async function mountStage(): Promise<void> {
 
   // The panels go up before the level is built, so the comic is what the
   // player looks at while it loads rather than a black screen.
-  const telling = tell(spec.beats);
   const level = spec.make();
-  await Promise.all([level.mount(ctx), telling]);
+  const mounting = level.mount(ctx);
+  await tell(spec.beats);
+
+  // Then the chapter card, which is where any load still outstanding hides:
+  // it holds for a reading beat, or until the level is ready if that is
+  // longer, and the iris closes on it before opening on the rehearsal.
+  await showChapter(spec, mounting);
   current = level;
 
   // Every level opens in a rehearsal. The sheet explains the verbs, the
@@ -484,8 +489,6 @@ if (debug) {
   } });
 }
 
-// ---- review routes -----------------------------------------------------
-
 /**
  * A label for the review routes: which screen this is, and how many.
  *
@@ -498,38 +501,43 @@ chip.hidden = true;
 app.append(chip);
 function mark(text: string): void { chip.hidden = false; chip.textContent = text; }
 
+// ---- chapter card --------------------------------------------------------
+
 /**
- * Where a level would be, in the story review.
+ * The title card between the comic and a level.
  *
- * A card on the empty stage, between the iris closing on one panel and
- * opening on the next, so the seams can be judged with the real transitions
- * and none of the waiting.
+ * A reading beat on an otherwise empty stage: the iris opens on it, holds,
+ * and closes before opening on the level. In the campaign it also covers
+ * whatever part of the level's build is still outstanding; in the story
+ * review it stands in for the level entirely.
  */
-const seam = document.createElement('div');
-seam.className = 'seam';
-seam.hidden = true;
-app.append(seam);
+const chapter = document.createElement('div');
+chapter.className = 'chapter';
+chapter.hidden = true;
+app.append(chapter);
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-async function showSeam(spec: StageSpec): Promise<void> {
-  seam.replaceChildren();
+/** How long the card is held, at least. */
+const CHAPTER_MS = 2400;
+
+async function showChapter(spec: StageSpec, until: Promise<unknown> = Promise.resolve()): Promise<void> {
+  chapter.replaceChildren();
   const eyebrow = document.createElement('p');
   eyebrow.className = 'eyebrow';
   eyebrow.textContent = `Level ${spec.id}`;
   const title = document.createElement('p');
-  title.className = 'headline seam__title';
+  title.className = 'headline chapter__title';
   title.textContent = spec.title;
-  const note = document.createElement('p');
-  note.className = 'seam__note';
-  note.textContent = 'plays here';
-  seam.append(eyebrow, title, note);
-  seam.hidden = false;
+  chapter.append(eyebrow, title);
+  chapter.hidden = false;
   await fade.reveal();
-  await wait(1400);
+  await Promise.all([wait(CHAPTER_MS), until]);
   await fade.cover();
-  seam.hidden = true;
+  chapter.hidden = true;
 }
+
+// ---- review routes -----------------------------------------------------
 
 /**
  * `?review=story`: the whole comic, in order, with the real seams.
@@ -555,8 +563,9 @@ async function reviewStory(): Promise<void> {
     mark(`story ${i + 1}/${pages.length} · ${page.beat.id}`);
     await story.show(page.beat, page.slot);
     if (page.then) {
-      await fade.cover();
-      await showSeam(page.then);
+      // The panel is opaque, so the iris under it is already shut.
+      fade.shut();
+      await showChapter(page.then);
     }
   }
   mark('story · results');

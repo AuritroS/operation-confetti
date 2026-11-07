@@ -41,8 +41,12 @@
 .results__eyebrow { text-align: center; }
 
 .results__outcome {
-  font-size: 15px;
-  font-style: italic;
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   text-align: center;
 }
 /* The caption keeps its paper either way; only the eyebrow takes a side. */

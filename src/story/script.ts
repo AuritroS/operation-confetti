@@ -61,6 +61,13 @@ export interface Framing {
   readonly zoom: number;
   /** CSS transform-origin: what the zoom closes in on. */
   readonly origin: string;
+  /**
+   * CSS object-position: which part of the picture sits in the window.
+   *
+   * A phone shows only about half of these images' width even at zoom 1,
+   * so this is how a panel chooses the half. Omitted means centred.
+   */
+  readonly pan?: string;
 }
 
 export interface StoryLine {
@@ -111,9 +118,11 @@ export const BEATS = {
   intro: {
     id: 'intro',
     image: 'aurora',
-    // Her whole taunt first, then in on her and the cake.
-    from: WHOLE,
-    to: { zoom: 1.25, origin: '62% 30%' },
+    // Open on her face, then ease right until her and the cake share the
+    // window. The cake sits in the picture's right fifth, which a phone's
+    // narrow window never reaches from the centre.
+    from: { zoom: 1.15, origin: '45% 32%', pan: '45% 40%' },
+    to: { zoom: 1, origin: '50% 50%', pan: '74% 40%' },
     owner: 'aurora',
     lines: [
       { who: 'AURORA', text: 'Looking for your cake?' },
@@ -131,7 +140,7 @@ export const BEATS = {
     to: { zoom: 1.45, origin: '30% 45%' },
     owner: 'matthew',
     lines: [
-      { text: 'The vault opens on the whole city.' },
+      { text: 'The vault opens on the city' },
       { who: 'MATTHEW', text: "Presents, check. She's already across town." },
       { who: 'AURORA', text: 'Keep up.' },
     ],
@@ -145,7 +154,7 @@ export const BEATS = {
     to: { zoom: 1.35, origin: '45% 28%' },
     owner: 'aurora',
     lines: [
-      { text: 'She is dropping presents as she runs.' },
+      { text: 'A trail of presents' },
       { who: 'MATTHEW', text: "Fine. I'll take those too." },
     ],
     next: 'Next',
@@ -171,7 +180,7 @@ export const BEATS = {
     to: { zoom: 1.1, origin: '50% 40%' },
     owner: 'matthew',
     lines: [
-      { text: 'Cake recovered.' },
+      { text: 'Cake recovered' },
       { who: 'AURORA', text: 'Save me a slice?' },
       { who: 'MATTHEW', text: "You're on cleanup." },
     ],
@@ -181,11 +190,11 @@ export const BEATS = {
     id: 'loss',
     image: 'loss',
     // Follow her off the edge: wide, then in on her and the cake.
-    from: WHOLE,
-    to: { zoom: 1.38, origin: '66% 36%' },
+    from: { zoom: 1, origin: '50% 50%', pan: '50% 40%' },
+    to: { zoom: 1.3, origin: '60% 36%', pan: '68% 40%' },
     owner: 'aurora',
     lines: [
-      { text: 'The cake remains at large.' },
+      { text: 'The cake remains at large' },
       { who: 'AURORA', text: "I'll save you a slice." },
       { who: 'MATTHEW', text: "You'd better." },
     ],

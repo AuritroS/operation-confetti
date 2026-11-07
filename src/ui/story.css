@@ -63,12 +63,15 @@
 }
 .story__art--chars { transition: transform 260ms ease-out; }
 .story--cover .story__art {
+  /* Whole and edge to edge, pinned under the status bar; the blurred copy
+     fills whatever the poster's aspect leaves below it. */
   object-fit: contain;
-  object-position: 50% 55%;
-  /* The poster is framed like a page: an inked edge inside the blur. */
-  padding: calc(var(--safe-t) + 14px) 14px 8px;
-  box-sizing: border-box;
+  object-position: 50% 0;
+  top: var(--safe-t);
+  height: calc(100% - var(--safe-t));
 }
+/* The cover sits still: it is shown whole, so a shift would show its edge. */
+.story--cover .story__tilt { transform: none; }
 
 /* The page turn. Scales across the whole screen in the next beat's colour. */
 .story__wipe {
@@ -138,7 +141,17 @@
   color: #f2f5ff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.6);
 }
-.story__line--caption { justify-self: start; font-size: 13px; text-shadow: none; }
+/* Narration is set like a printed caption: small caps, no punctuation. */
+.story__line--caption {
+  justify-self: start;
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: none;
+}
 .story__who {
   display: block;
   font-family: var(--font-display);

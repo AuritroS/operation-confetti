@@ -272,21 +272,20 @@ html, body {
 }
 
 /*
- * The level stand-in used by `?review=story`.
+ * The chapter card between the comic and a level.
  *
- * A card on the empty stage where a level would play, so the comic's seams
- * can be judged with the real transitions and none of the waiting.
+ * Opaque, because it sits over a level that may still be building, and
+ * centred in the frame like a title page.
  */
-.seam {
+.chapter {
   position: absolute;
   z-index: 30;
   inset: 0;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 6px;
+  gap: 8px;
   text-align: center;
   background: radial-gradient(120% 80% at 50% 30%, #1b275c 0%, #0a0a0f 70%);
 }
-.seam__title { font-size: 36px; }
-.seam__note { margin: 4px 0 0; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+.chapter__title { font-size: 38px; }

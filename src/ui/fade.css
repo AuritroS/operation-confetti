@@ -16,10 +16,11 @@
   z-index: 48;
   inset: 0;
   --iris: 2000px;
+  /* A 48px feather, matching `FEATHER` in fade.ts. */
   background: radial-gradient(
     circle at 50% 52%,
-    transparent calc(var(--iris) - 2px),
-    rgba(11, 7, 16, 0.85) calc(var(--iris) - 1px),
+    transparent calc(var(--iris) - 48px),
+    rgba(11, 7, 16, 0.6) calc(var(--iris) - 20px),
     var(--frame-ink, #0b0710) var(--iris)
   );
   pointer-events: none;

@@ -65,7 +65,7 @@ describe('ResultsScreen', () => {
     const { screen, replay } = mount();
     screen.show({ outcome: 'win', total: 1750, levelScores: [600, 450, 700] }, 'p1', replay);
 
-    expect(document.querySelector('.results__outcome')?.textContent).toBe('Cake recovered!');
+    expect(document.querySelector('.results__outcome')?.textContent).toBe('Cake recovered');
     expect(document.querySelector('.results__score')?.textContent).toBe('1750');
     expect(document.querySelector('.results__of')?.textContent).toBe(`of ${MAX_TOTAL}`);
     expect([...document.querySelectorAll('.results__level-score')].map((e) => e.textContent))
@@ -75,7 +75,7 @@ describe('ResultsScreen', () => {
   it('names a loss as a loss', () => {
     const { screen, replay } = mount();
     screen.show({ outcome: 'loss', total: 300, levelScores: [300, 0, 0] }, 'p1', replay);
-    expect(document.querySelector('.results__outcome')?.textContent).toBe('The cake remains at large.');
+    expect(document.querySelector('.results__outcome')?.textContent).toBe('The cake remains at large');
   });
 
   it('fetches the board only when it is opened', async () => {

@@ -127,7 +127,7 @@ export class ResultsScreen {
     this.outcomeEl.className = `results__outcome caption results__outcome--${won ? 'win' : 'loss'}`;
     // The same captions the comic's last panel uses, so the page agrees
     // with the picture before it.
-    this.outcomeEl.textContent = won ? 'Cake recovered!' : 'The cake remains at large.';
+    this.outcomeEl.textContent = won ? 'Cake recovered' : 'The cake remains at large';
     this.scoreEl.textContent = String(result.total);
 
     this.levelsEl.replaceChildren(...result.levelScores.map((score, i) => {

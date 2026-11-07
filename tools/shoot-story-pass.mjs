@@ -67,11 +67,21 @@ const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`) 
 /** Reveal every line on the open panel, one tap at a time. */
 async function readLines(page) {
   for (let i = 0; i < 6; i++) {
-    const hint = page.locator('.story__hint');
-    if (!(await hint.count()) || await hint.isHidden()) return;
+    const more = await page.evaluate(() => {
+      const hint = document.querySelector('.story__hint');
+      return hint && !hint.hidden && hint.textContent === 'tap';
+    });
+    if (!more) return;
     await page.locator('.story__frame').click({ position: { x: 40, y: 40 } });
-    await page.waitForTimeout(280);
+    await page.waitForTimeout(420);
   }
+}
+
+/** Turn the page: Start on the cover, a tap anywhere else. */
+async function turnPage(page, isCover) {
+  if (isCover) { await page.locator('.story__next').click(); return; }
+  await page.waitForTimeout(400);
+  await page.locator('.story__frame').click({ position: { x: 40, y: 40 } });
 }
 
 // ---- the comic ---------------------------------------------------------
@@ -107,11 +117,11 @@ for (const vp of VIEWPORTS) {
     await readLines(page);
     await shot(page, `${vp.name}-story-${i + 1}-${id}-read`);
     await page.waitForTimeout(record ? 900 : 200);
-    await page.locator('.story__next').click();
-    // A level stand-in follows some pages; catch it mid-hold.
+    await turnPage(page, id === 'title');
+    // A chapter card follows some pages; catch it mid-hold.
     if (['intro', 'chase', 'rooftop'].includes(id)) {
-      await page.waitForTimeout(1100);
-      await shot(page, `${vp.name}-story-${i + 1}-${id}-seam`);
+      await page.waitForTimeout(1500);
+      await shot(page, `${vp.name}-story-${i + 1}-${id}-chapter`);
     }
   }
   await page.waitForFunction(() => document.querySelector('.results') && !document.querySelector('.results').hidden,

@@ -1,7 +1,11 @@
 import './fade.css';
 
 /** How long a close or an open takes. */
-const DURATION = 480;
+const DURATION = 800;
+/** Dark held after a close, so the next thing does not land on the cut. */
+const HOLD = 220;
+/** The soft edge of the circle, kept in step with `fade.css`. */
+const FEATHER = 48;
 
 const reduced = (): boolean =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -32,7 +36,7 @@ export class Fade {
 
   cover(): Promise<void> {
     this.root.classList.add('fade--on');
-    return this.run(1, 0);
+    return this.run(1, 0).then(() => new Promise((r) => setTimeout(r, HOLD)));
   }
 
   /**
@@ -56,7 +60,8 @@ export class Fade {
   private setRadius(open: number): void {
     const w = this.root.clientWidth || 390;
     const h = this.root.clientHeight || 844;
-    const max = Math.hypot(w, h) * 0.52;
+    // Past the corners plus the feather, so fully open is fully clear.
+    const max = Math.hypot(w, h) * 0.52 + FEATHER;
     this.root.style.setProperty('--iris', `${(max * open).toFixed(1)}px`);
   }
 
@@ -73,7 +78,8 @@ export class Fade {
     const instant = reduced();
     const ms = instant ? 1 : DURATION;
     const start = performance.now();
-    const ease = (t: number): number => (to < from ? 1 - (1 - t) * (1 - t) : t * t);
+    // In and out: the circle leaves and arrives gently at both ends.
+    const ease = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2);
     const tick = (now: number): void => {
       const t = Math.min(1, (now - start) / ms);
       this.setRadius(from + (to - from) * ease(t));

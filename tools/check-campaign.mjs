@@ -101,6 +101,11 @@ async function dismissStory(target) {
   for (let i = 0; i < 4; i++) {
     const panel = target.locator('.story:not([hidden])');
     if (!(await panel.count())) return;
+    // A page turn covers the controls for a moment; let it clear first.
+    await target.waitForFunction(() => {
+      const wipe = document.querySelector('.story__wipe');
+      return !wipe || wipe.hidden;
+    }, null, { timeout: 5000 }).catch(() => undefined);
 
     const name = target.locator('.name__input:visible');
     if (await name.count()) await name.fill('Checker');
@@ -108,7 +113,7 @@ async function dismissStory(target) {
     const skip = target.locator('.story__skip:visible');
     if (await skip.count()) await skip.click();
     else await target.locator('.story__next').click();
-    await target.waitForTimeout(250);
+    await target.waitForTimeout(400);
   }
 }
 

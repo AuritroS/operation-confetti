@@ -1,22 +1,22 @@
 import './story.css';
-import { type StoryBeat, type StoryOwner, storyImageUrl } from '../story/script';
+import { type Framing, type StoryBeat, type StoryOwner, storyImageUrl } from '../story/script';
 
 /**
  * How a panel talks back to the widget it is carrying.
  *
  * Two calls, because a gating widget needs exactly two things: to say its
- * state changed, and to act as though Next was pressed. Handing the widget
+ * state changed, and to act as though Start was pressed. Handing the widget
  * the button instead would make it depend on how the panel is built.
  */
 export interface StorySlotHost {
-  /** Re-evaluate `ready()` and enable or disable Next accordingly. */
+  /** Re-evaluate `ready()` and enable or disable Start accordingly. */
   recheck(): void;
-  /** Advance, if Next is currently enabled. */
+  /** Advance, if Start is currently enabled. */
   submit(): void;
 }
 
 /**
- * A widget a panel may carry in its caption area, which can block Next.
+ * A widget a panel may carry in its caption area, which can block Start.
  *
  * This exists so the cover can ask for a name without the comic player
  * learning what an identity is: the panel knows only that something is
@@ -24,17 +24,23 @@ export interface StorySlotHost {
  */
 export interface StorySlot {
   readonly node: HTMLElement;
-  /** Next is disabled while this returns false. */
+  /** Start is disabled while this returns false. */
   ready(): boolean;
   /** Given a host when the panel opens, null when it closes. */
   bind(host: StorySlotHost | null): void;
 }
 
-/** Seconds the opening camera move takes to settle. */
+/** How long the opening camera move takes to settle. */
 const MOVE_MS = 6000;
 /** The slow push that keeps a settled panel alive. */
 const DRIFT_MS = 22000;
 const WIPE_MS = 280;
+/** A tap this soon after the last one is the same tap, not a second page. */
+const TAP_GUARD_MS = 350;
+/** A line nobody has asked for arrives on its own after this long. */
+const AUTO_LINE_MS = 4000;
+
+const CENTRE = '50% 50%';
 
 const reduced = (): boolean =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -52,12 +58,17 @@ const canAnimate = (el: Element): boolean => typeof (el as HTMLElement).animate 
  * A panel is never static. The camera moves from the beat's opening framing
  * to its settled one over the first seconds, then keeps pushing in very
  * slowly; a two-layer panel moves its characters and its background at
- * different rates and follows the phone's tilt. Lines arrive one tap at a
- * time, and Next only advances once the last one is on screen — which is the
- * comic's own rhythm, and what makes a panel feel read rather than shown.
+ * different rates and follows the phone's tilt.
  *
- * Nothing auto-advances. A panel waits for the player, which is also what
- * makes it a safe place to finish loading the level behind it.
+ * One gesture reads it: a tap anywhere brings the next line, and once the
+ * last line is up the next tap turns the page. A line nobody taps for
+ * arrives on its own after a few seconds, so a panel never looks stuck, but
+ * the page itself only ever turns by hand. The cover is the exception: it
+ * carries the name field, so it keeps a Start button that a name has to
+ * satisfy.
+ *
+ * Nothing auto-advances the page. A panel waits for the player, which is
+ * also what makes it a safe place to finish loading the level behind it.
  */
 export class StoryPlayer {
   private readonly root = document.createElement('div');
@@ -81,6 +92,8 @@ export class StoryPlayer {
   /** Lines not yet revealed, in order. */
   private pending: HTMLElement[] = [];
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
+  private autoTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastTap = 0;
   private animations: Animation[] = [];
   private layered = false;
 
@@ -103,29 +116,21 @@ export class StoryPlayer {
     this.wipe.className = 'story__wipe';
     this.wipe.hidden = true;
     this.hint.className = 'story__hint';
-    this.hint.textContent = 'tap';
     this.hint.hidden = true;
 
     this.tilt.append(this.art, this.chars);
     this.cam.append(this.tilt);
     this.drift.append(this.cam);
     this.frame.append(this.drift);
-    // A tap on the picture turns the page's next line, never the page.
-    this.frame.addEventListener('click', () => this.reveal());
 
     this.foot.className = 'story__foot';
     this.lines.className = 'story__lines';
-    this.lines.addEventListener('click', () => this.reveal());
 
+    // Only the cover shows this. Every other panel turns on a tap.
     this.next.type = 'button';
     this.next.className = 'story__next btn btn--primary';
-    this.next.addEventListener('click', () => {
-      this.next.blur();
-      // Next while lines remain reads the next line; the player never has
-      // to learn two controls, and a hasty tap cannot skip a panel.
-      if (this.pending.length > 0) this.reveal();
-      else this.finish(false);
-    });
+    this.next.hidden = true;
+    this.next.addEventListener('click', () => { this.next.blur(); this.finish(false); });
 
     this.skip.type = 'button';
     this.skip.className = 'story__skip btn btn--quiet';
@@ -137,6 +142,14 @@ export class StoryPlayer {
     this.root.append(this.backdrop, this.frame, this.foot, this.skip, this.wipe);
     this.root.hidden = true;
     container.append(this.root);
+
+    // A tap anywhere reads. The controls that are still buttons — Skip,
+    // Start, the name field — handle themselves and are left alone here.
+    this.root.addEventListener('click', (e) => {
+      const target = e.target as Element | null;
+      if (target?.closest('.story__skip, .story__next, .name')) return;
+      this.tap();
+    });
 
     // The cover's art stops above the caption area, whose height depends on
     // what it carries (a name field, a hint, a link). Measure rather than
@@ -162,11 +175,18 @@ export class StoryPlayer {
     const consecutive = this.closeTimer !== null || !this.root.hidden;
     if (this.closeTimer !== null) { clearTimeout(this.closeTimer); this.closeTimer = null; }
 
-    const promise = new Promise<boolean>((resolve) => { this.resolve = resolve; });
+    // The resolver is installed only once the beat is actually on screen.
+    // While a wipe is still covering the previous panel, its controls are
+    // still in the DOM, and a tap on them must not close a page nobody has
+    // seen yet.
+    let settle: ((skipped: boolean) => void) | null = null;
+    const promise = new Promise<boolean>((resolve) => { settle = resolve; });
+    const open = (): void => { this.present(beat, slot); this.resolve = settle; };
     if (consecutive && !reduced() && canAnimate(this.wipe)) {
-      void this.turnPage(beat.owner, () => this.present(beat, slot));
+      this.resolve = null;
+      void this.turnPage(beat.owner, open);
     } else {
-      this.present(beat, slot);
+      open();
     }
     return promise;
   }
@@ -191,6 +211,9 @@ export class StoryPlayer {
   private present(beat: StoryBeat, slot?: StorySlot): void {
     this.beat = beat;
     this.stopMotion();
+    this.clearAuto();
+    // The tap that turned the previous page must not also read this one.
+    this.lastTap = performance.now();
 
     const layers = beat.layers;
     this.layered = layers !== undefined;
@@ -207,7 +230,8 @@ export class StoryPlayer {
     if (cover) this.backdrop.src = this.art.src;
     else this.backdrop.removeAttribute('src');
     this.next.textContent = beat.next;
-    this.skip.hidden = beat.cover === true;
+    this.next.hidden = !cover;
+    this.skip.hidden = cover;
 
     this.lines.replaceChildren(...beat.lines.map((line) => {
       const p = document.createElement('p');
@@ -240,8 +264,19 @@ export class StoryPlayer {
     this.startMotion(beat);
   }
 
-  /** Put the next line on screen, if there is one. */
+  /** One tap: the next line if there is one, otherwise the next page. */
+  private tap(): void {
+    if (!this.beat || this.beat.cover) return;
+    const now = performance.now();
+    if (now - this.lastTap < TAP_GUARD_MS) return;
+    this.lastTap = now;
+    if (this.pending.length > 0) this.reveal();
+    else this.finish(false);
+  }
+
+  /** Put the next line on screen, if there is one, and update the cue. */
   private reveal(): void {
+    this.clearAuto();
     const line = this.pending.shift();
     if (line) {
       line.hidden = false;
@@ -252,35 +287,56 @@ export class StoryPlayer {
         );
       }
     }
-    this.hint.hidden = this.pending.length === 0;
+    const cover = this.beat?.cover === true;
+    this.hint.hidden = cover;
+    if (this.pending.length > 0) {
+      this.hint.textContent = 'tap';
+      // Lines, never pages: the page only turns when they ask.
+      this.autoTimer = setTimeout(() => this.reveal(), AUTO_LINE_MS);
+    } else {
+      this.hint.textContent = this.beat?.next === 'Results' ? 'tap for results' : 'tap to continue';
+    }
+  }
+
+  private clearAuto(): void {
+    if (this.autoTimer !== null) { clearTimeout(this.autoTimer); this.autoTimer = null; }
   }
 
   // ---- motion -----------------------------------------------------------
 
   private startMotion(beat: StoryBeat): void {
-    const from = beat.cover ? { zoom: 1, origin: '50% 50%' } : beat.from;
-    const to = beat.cover ? { zoom: 1, origin: '50% 50%' } : beat.to;
+    const whole: Framing = { zoom: 1, origin: CENTRE };
+    const from = beat.cover ? whole : beat.from;
+    const to = beat.cover ? whole : beat.to;
     const still = reduced() || !canAnimate(this.cam);
 
     // Always land on the settled framing, with or without the move.
     this.cam.style.transform = `scale(${to.zoom})`;
     this.cam.style.transformOrigin = to.origin;
+    this.art.style.objectPosition = beat.cover ? '' : (to.pan ?? CENTRE);
     this.drift.style.transform = 'scale(1)';
     if (still) return;
 
+    const ease = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
     this.animations = [
       this.cam.animate(
         [
           { transform: `scale(${from.zoom})`, transformOrigin: from.origin },
           { transform: `scale(${to.zoom})`, transformOrigin: to.origin },
         ],
-        { duration: MOVE_MS, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)', fill: 'forwards' },
+        { duration: MOVE_MS, easing: ease, fill: 'forwards' },
       ),
       this.drift.animate(
         [{ transform: 'scale(1)' }, { transform: 'scale(1.045)' }],
         { duration: DRIFT_MS, easing: 'linear', fill: 'forwards' },
       ),
     ];
+    if (!beat.cover && (from.pan ?? CENTRE) !== (to.pan ?? CENTRE)) {
+      this.animations.push(this.art.animate(
+        [{ objectPosition: from.pan ?? CENTRE }, { objectPosition: to.pan ?? CENTRE }],
+        { duration: MOVE_MS, easing: ease, fill: 'forwards' },
+      ));
+    }
   }
 
   private stopMotion(): void {
@@ -292,17 +348,18 @@ export class StoryPlayer {
    * Follow the phone's tilt, or the pointer on a desktop.
    *
    * A few pixels either way, more for the character layer than the
-   * background, which is the whole of the depth effect. Listeners are cheap
-   * and only act while a panel is up. iOS asks permission for orientation
-   * events, which is not worth a prompt at a party, so there it simply does
-   * nothing.
+   * background, which is the whole of the depth effect. The art is drawn a
+   * little over size so the shift never exposes an edge; the cover is shown
+   * whole and so sits still. Listeners are cheap and only act while a panel
+   * is up. iOS asks permission for orientation events, which is not worth a
+   * prompt at a party, so there it simply does nothing.
    */
   private watchTilt(): void {
     const apply = (x: number, y: number): void => {
-      if (this.root.hidden) return;
+      if (this.root.hidden || this.beat?.cover) return;
       const dx = Math.max(-1, Math.min(1, x));
       const dy = Math.max(-1, Math.min(1, y));
-      this.tilt.style.transform = `translate(${(dx * -5).toFixed(1)}px, ${(dy * -4).toFixed(1)}px)`;
+      this.tilt.style.transform = `scale(1.03) translate(${(dx * -5).toFixed(1)}px, ${(dy * -4).toFixed(1)}px)`;
       this.chars.style.transform = this.layered
         ? `translate(${(dx * 14).toFixed(1)}px, ${(dy * 9).toFixed(1)}px)`
         : '';
@@ -326,7 +383,7 @@ export class StoryPlayer {
   /**
    * Put a gating widget in the caption area, above the dialogue.
    *
-   * Above rather than below, so the lines stay adjacent to Next and the
+   * Above rather than below, so the lines stay adjacent to Start and the
    * reading order is: artwork, question, answer, continue.
    */
   private mountSlot(slot: StorySlot | null): void {
@@ -344,6 +401,9 @@ export class StoryPlayer {
   }
 
   private finish(skipped: boolean): void {
+    // Nothing to finish: the page is already turning, or was never shown.
+    if (this.resolve === null) return;
+    this.clearAuto();
     this.mountSlot(null);
     const done = this.resolve;
     this.resolve = null;
