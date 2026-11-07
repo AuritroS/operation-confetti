@@ -169,6 +169,14 @@ materials, one lit material per band, one cloud material per opacity;
 
 ### 5. Level 2 and level 3 polish
 
+**Done 8 Nov.** Level 2: the view widens by up to five degrees up the
+ramp, and wind streaks — 44 short lines in the camera's own frame, one
+draw call — fade in from 13.5 u/s to full at 18, rushing toward the
+camera; off past the finish and under reduced motion. The ending already
+runs through the iris and the landing. Level 3: victory confetti 220 →
+320 pieces; lighting and the shield cue left as tuned. Swing review at
+90 draws, 56.4k triangles, exactly at the budget.
+
 - Level 2: camera FOV follows the new ramp, speed lines or wind streaks at
   the top of the ramp, the ending through the iris.
 - Level 3: small visual polish only (lighting, confetti density, the

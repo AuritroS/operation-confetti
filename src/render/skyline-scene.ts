@@ -8,6 +8,7 @@ import { Stage } from './stage';
 import type { RendererHost } from './renderer-host';
 import { GATE_GAP } from './look';
 import { SkylineCamera } from './skyline-camera';
+import { SpeedStreaks } from './skyline-streaks';
 
 /** How long the arrival shot takes to settle. The level holds at least this long. */
 export const ARRIVAL_SHOT_S = 2.0;
@@ -74,6 +75,9 @@ export class SkylineScene {
   private cyan = new MeshBasicMaterial({ color: 0x4aaeb8, fog: false });
   /** The level-end marker, shared with level 1. Moves with the scroll. */
   private readonly finishDoor: Group;
+  private readonly streaks = new SpeedStreaks();
+  /** How many degrees the view widens at the top of the ramp. */
+  private static readonly FOV_WIDEN = 5;
   private idle = new MeshBasicMaterial({ color: 0x3d4f66, transparent: true, opacity: 0.5 });
   private pink = new MeshBasicMaterial({ color: 0xff609f, fog: false });
   private darkPink = new MeshStandardMaterial({ color: 0x562b49, roughness: 0.85 });
@@ -208,6 +212,7 @@ export class SkylineScene {
     this.fill = fill;
     this.stage.scene.add(fill);
     this.stage.scene.add(this.root); this.stage.observe();
+    this.stage.scene.add(this.streaks.object);
     this.blocks = new InstancedMesh(this.box, this.city, 100);
     /*
      * The end of the street is a vault door, the same one level 1 finishes on.
@@ -609,6 +614,15 @@ export class SkylineScene {
     }
     for (const layer of this.backdrop) layer.update(scrollZ, dt);
     this.camera.update(s, dt, reduced);
+
+    // Speed is felt, not read: the view widens up the ramp and the air
+    // streaks past near its top. Both are keyed to the forward speed the
+    // runner reports, so a surge in the swing reads too. Off once the
+    // finish is crossed, and under reduced motion.
+    const forward = settled ? 0 : s.v.z;
+    const ramp = Math.max(0, Math.min(1, (forward - COURSE.startSpeed) / (COURSE.endSpeed - COURSE.startSpeed)));
+    this.stage.setFovOffset(reduced ? 0 : SkylineScene.FOV_WIDEN * ramp);
+    this.streaks.update(forward, dt, this.stage.camera, reduced);
   }
   framing() {
     const s = this.latest;
@@ -625,6 +639,7 @@ export class SkylineScene {
     this.stage.render();
   }
   reset(): void {
+    this.stage.setFovOffset(0);
     this.arrival = -1;
     this.falling = false;
     this.dip = 0;
@@ -635,6 +650,7 @@ export class SkylineScene {
     this.rope.reset();
   }
   dispose(): void {
+    this.streaks.dispose();
     this.root.removeFromParent(); this.box.dispose(); this.diamond.dispose();
     this.rope.dispose();
     for (const m of [this.city, this.windowMat, this.groundMat, this.blue, this.gold, this.pale, this.cyan, this.idle, this.pink, this.darkPink]) m.dispose();

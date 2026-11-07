@@ -2,7 +2,7 @@ import { BoxGeometry, Color, InstancedMesh, MeshBasicMaterial, Object3D } from '
 import type { CakeSnapshot } from '../../levels/boss/telegraph';
 import { BOSS_LAYOUT } from '../../levels/boss/layout';
 
-const COUNT = 220;
+const COUNT = 320;
 const COLUMNS = 22;
 /** Fraction of the victory timeline the shower runs for. */
 const START = 0.3;
