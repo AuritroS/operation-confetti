@@ -3,42 +3,55 @@
 /*
  * A comic panel, full bleed.
  *
- * The artwork takes the frame above the caption area, which is where the
- * storyboard puts it: picture in the main panel, words beneath. Confining
- * the art to that row rather than the whole screen keeps far more of each
- * composition on a tall phone, and leaves the dialogue on its own ground
- * where a balloon can never land on a face.
+ * The artwork fills the screen edge to edge and the dialogue sits over its
+ * lower part on a scrim, which is the most of the picture a phone can show.
+ * Every panel's prompt keeps that lower third quiet so a caption never lands
+ * on a face. The cover is the exception: its title is painted into the
+ * image, so it is shown whole over a blurred copy of itself rather than
+ * cropped to fill.
  */
 .story {
   position: absolute;
   z-index: 60;
   inset: 0;
-  display: grid;
-  grid-template-rows: 1fr auto;
+  overflow: hidden;
   background: var(--frame-ink);
+  /* Set by the player from the caption area's measured height. */
+  --foot: 240px;
+}
+
+/* The cover's fill: the same image, blurred and dimmed, behind the poster. */
+.story__backdrop {
+  position: absolute;
+  inset: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  object-fit: cover;
+  filter: blur(26px) brightness(0.62) saturate(1.2);
+  pointer-events: none;
 }
 
 .story__frame {
-  grid-row: 1;
-  position: relative;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  background: #06040a;
-  /* The panel's inked edge, drawn inside so the art has a gutter. */
-  margin: calc(var(--safe-t) + 10px) 10px 0;
-  border: 2px solid var(--frame-line);
-  border-radius: 4px;
-  box-shadow: 0 0 0 3px var(--frame-ink), 0 10px 30px rgba(0, 0, 0, 0.6);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.story--cover .story__frame {
+  /* Stop above the caption area so the poster is never under the button. */
+  bottom: var(--foot);
+  cursor: default;
+}
+
 .story__drift, .story__cam, .story__tilt {
   position: absolute;
   inset: 0;
   will-change: transform;
 }
 .story__drift { transform-origin: 50% 50%; }
-.story__tilt { transition: transform 260ms ease-out; }
+/* A touch over size, so the tilt shift never exposes an edge. */
+.story__tilt { transform: scale(1.03); transition: transform 260ms ease-out; }
 .story__art {
   position: absolute;
   inset: 0;
@@ -49,35 +62,48 @@
   -webkit-user-drag: none;
 }
 .story__art--chars { transition: transform 260ms ease-out; }
+.story--cover .story__art {
+  object-fit: contain;
+  object-position: 50% 55%;
+  /* The poster is framed like a page: an inked edge inside the blur. */
+  padding: calc(var(--safe-t) + 14px) 14px 8px;
+  box-sizing: border-box;
+}
 
-/*
- * The cover is shown whole.
- *
- * Its title is painted into the artwork, and cropping to fill cut it to
- * "MATTHE" — losing the one thing that image exists to say. A poster can
- * afford to letterbox; a story panel cannot, which is why only the cover
- * does.
- */
-.story__frame--cover .story__art { object-fit: contain; }
-.story__frame--cover { cursor: default; }
-
-/* The page turn. Scales across the frame in the next beat's colour. */
+/* The page turn. Scales across the whole screen in the next beat's colour. */
 .story__wipe {
   position: absolute;
   inset: -2px;
-  z-index: 3;
+  z-index: 63;
   transform: scaleX(0);
   pointer-events: none;
 }
 .story__wipe--matthew { background: linear-gradient(90deg, var(--gold) 0%, #ffe7b0 100%); }
 .story__wipe--aurora { background: linear-gradient(90deg, var(--purple-deep) 0%, var(--magenta) 100%); }
 
-/* "tap": there is more to read. Sits in the frame's corner, small. */
-.story__hint {
+/* The caption area, over the picture's lower part. */
+.story__foot {
   position: absolute;
   z-index: 2;
-  right: 10px;
-  bottom: 8px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 58px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(11, 7, 16, 0) 0%, rgba(11, 7, 16, 0.72) 26%, rgba(11, 7, 16, 0.94) 60%, rgba(11, 7, 16, 0.98) 100%);
+}
+.story--cover .story__foot {
+  padding-top: 20px;
+  background: linear-gradient(180deg, rgba(11, 7, 16, 0.55) 0%, rgba(11, 7, 16, 0.9) 40%, rgba(11, 7, 16, 0.96) 100%);
+}
+
+/* "tap": there is more to read. Sits at the scrim's top edge, small. */
+.story__hint {
+  position: absolute;
+  right: 16px;
+  top: 34px;
   padding: 3px 9px;
   border-radius: 999px;
   background: rgba(11, 7, 16, 0.72);
@@ -94,16 +120,6 @@
   50% { opacity: 1; transform: translateY(-2px); }
 }
 
-.story__foot {
-  position: relative;
-  grid-row: 2;
-  display: grid;
-  gap: 12px;
-  justify-items: center;
-  padding: 16px 20px calc(18px + env(safe-area-inset-bottom, 0px));
-  background: var(--frame-ink);
-}
-
 .story__lines {
   display: grid;
   gap: 9px;
@@ -112,7 +128,7 @@
   margin: 0;
   /* Three lines' worth, so Next does not jump as lines arrive. */
   min-height: 112px;
-  align-content: start;
+  align-content: end;
   cursor: pointer;
 }
 .story__line {
@@ -120,8 +136,9 @@
   font-size: 15px;
   line-height: 1.4;
   color: #f2f5ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.6);
 }
-.story__line--caption { justify-self: start; font-size: 13px; }
+.story__line--caption { justify-self: start; font-size: 13px; text-shadow: none; }
 .story__who {
   display: block;
   font-family: var(--font-display);
@@ -139,8 +156,8 @@
 .story__skip {
   position: absolute;
   z-index: 61;
-  top: calc(var(--safe-t) + 18px);
-  right: 18px;
+  top: calc(var(--safe-t) + 14px);
+  right: 14px;
 }
 
 /*

@@ -61,6 +61,7 @@ const canAnimate = (el: Element): boolean => typeof (el as HTMLElement).animate 
  */
 export class StoryPlayer {
   private readonly root = document.createElement('div');
+  private readonly backdrop = document.createElement('img');
   private readonly frame = document.createElement('div');
   private readonly drift = document.createElement('div');
   private readonly cam = document.createElement('div');
@@ -85,6 +86,9 @@ export class StoryPlayer {
 
   constructor(container: HTMLElement) {
     this.root.className = 'story';
+    this.backdrop.className = 'story__backdrop';
+    this.backdrop.alt = '';
+    this.backdrop.hidden = true;
     this.frame.className = 'story__frame';
     this.drift.className = 'story__drift';
     this.cam.className = 'story__cam';
@@ -105,7 +109,7 @@ export class StoryPlayer {
     this.tilt.append(this.art, this.chars);
     this.cam.append(this.tilt);
     this.drift.append(this.cam);
-    this.frame.append(this.drift, this.wipe, this.hint);
+    this.frame.append(this.drift);
     // A tap on the picture turns the page's next line, never the page.
     this.frame.addEventListener('click', () => this.reveal());
 
@@ -128,10 +132,20 @@ export class StoryPlayer {
     this.skip.textContent = 'Skip story';
     this.skip.addEventListener('click', () => this.finish(true));
 
-    this.foot.append(this.lines, this.next);
-    this.root.append(this.frame, this.skip, this.foot);
+    this.foot.append(this.hint, this.lines, this.next);
+    // The wipe is last so a page turn covers the caption area too.
+    this.root.append(this.backdrop, this.frame, this.foot, this.skip, this.wipe);
     this.root.hidden = true;
     container.append(this.root);
+
+    // The cover's art stops above the caption area, whose height depends on
+    // what it carries (a name field, a hint, a link). Measure rather than
+    // guess, so the poster is never hidden under its own Start button.
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => {
+        this.root.style.setProperty('--foot', `${this.foot.offsetHeight}px`);
+      }).observe(this.foot);
+    }
 
     this.watchTilt();
   }
@@ -184,9 +198,14 @@ export class StoryPlayer {
     if (layers) { this.chars.src = storyImageUrl(layers.characters); this.chars.hidden = false; }
     else { this.chars.hidden = true; this.chars.removeAttribute('src'); }
 
-    // A cover is letterboxed so its painted title survives; every other
-    // panel fills the frame and is enlarged onto its subject.
-    this.frame.classList.toggle('story__frame--cover', beat.cover === true);
+    // A cover is shown whole over a blurred copy of itself, so its painted
+    // title survives; every other panel fills the screen edge to edge and is
+    // enlarged onto its subject.
+    const cover = beat.cover === true;
+    this.root.classList.toggle('story--cover', cover);
+    this.backdrop.hidden = !cover;
+    if (cover) this.backdrop.src = this.art.src;
+    else this.backdrop.removeAttribute('src');
     this.next.textContent = beat.next;
     this.skip.hidden = beat.cover === true;
 

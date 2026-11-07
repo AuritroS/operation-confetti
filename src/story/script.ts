@@ -182,7 +182,7 @@ export const BEATS = {
     image: 'loss',
     // Follow her off the edge: wide, then in on her and the cake.
     from: WHOLE,
-    to: { zoom: 1.5, origin: '68% 26%' },
+    to: { zoom: 1.38, origin: '66% 36%' },
     owner: 'aurora',
     lines: [
       { text: 'The cake remains at large.' },
