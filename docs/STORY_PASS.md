@@ -1,7 +1,21 @@
 # Story and chrome pass — stage 1: script, storyboard, image prompts
 
-Status: **for review**. Nothing here is built and no image has been paid for.
-Stage 2 spends from the $1 image budget only after this page is approved.
+Status: **stages 1–4 done, 7 Nov 2026**; stage 5 (campaign seams, full run)
+is next. Spend so far: **$0.52** of the $1 cap (ledger in
+`.local-tmp/story-art/ledger.json`; `node tools/story-art.mjs --ledger`).
+
+What shipped against this plan, and where it differs:
+- All five panels were generated at **832×1792**, the phone's own aspect,
+  so nothing is cropped at zoom 1 and the camera only pushes in. The
+  prompts below were used verbatim plus a guard block; every panel was
+  picked from a round of two at low quality, with no revision round needed.
+- Panels have **no Next button**: a tap reveals the next line, then turns the
+  page; a line nobody taps for arrives after 4 s. The cover keeps Start.
+- Captions are small caps with no punctuation.
+- The **chapter card** (LEVEL N / title) is part of the game, shown after the
+  comic until the level has built and the player taps.
+- Depth layers exist for `chase` only; `win` and `loss` layers are a later
+  spend if wanted (~$0.05 each).
 
 Related: `design.md` §2 (story), `story-reference/README.md` (what panels must
 match), `src/story/script.ts` (where the copy will live).

@@ -173,9 +173,16 @@ const STORY = [
   'assets/matthew.png',
   'assets/aurora.png',
   'assets/matthew-aurora.png',
-  // Generated panels (docs/STORY_PASS.md). `chase.webp` is the 7 Nov probe
-  // standing in until its final is chosen; the rest arrive with stage 4.
+  // Generated panels (docs/STORY_PASS.md), rendered at the phone's aspect
+  // with tools/story-art.mjs and picked from .local-tmp/story-art/.
+  'assets/vault.webp',
   'assets/chase.webp',
+  'assets/rooftop.webp',
+  'assets/win.webp',
+  'assets/loss.webp',
+  // Depth layers for the chase (background without him; him on alpha).
+  'assets/chase-bg.webp',
+  'assets/chase-chars.webp',
 ];
 
 const warnings = [];

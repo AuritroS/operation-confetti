@@ -117,6 +117,19 @@ async function dismissStory(target) {
   }
 }
 
+/**
+ * The chapter card between the comic and a level waits for a tap. A check
+ * is not a player, so it taps for one, shortly after the cue appears.
+ */
+async function autoTapChapter(target) {
+  await target.evaluate(() => {
+    setInterval(() => {
+      const cue = document.querySelector('.chapter:not([hidden]) .chapter__cue:not([hidden])');
+      if (cue && !cue.dataset.tapped) { cue.dataset.tapped = '1'; setTimeout(() => document.querySelector('.chapter')?.click(), 400); }
+    }, 200);
+  });
+}
+
 async function startLevel(target) {
   await dismissStory(target);
   await target.locator('.tutorial__start').click({ timeout: 30_000 });
@@ -129,6 +142,7 @@ const campaign = () => page.evaluate(() => {
 
 try {
   await page.goto('http://campaign.test/?debug', { waitUntil: 'load' });
+  await autoTapChapter(page);
   await waitForBoot(page);
   console.log('ok  every asset preloaded before the title panel');
   await dismissStory(page);

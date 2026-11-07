@@ -518,9 +518,10 @@ app.append(chapter);
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-/** How long the card is held, at least. */
-const CHAPTER_MS = 2400;
-
+/**
+ * The card leaves on a tap, like a panel, and not before the level behind
+ * it is ready. The cue appears once it is, so a tap never lands on a wait.
+ */
 async function showChapter(spec: StageSpec, until: Promise<unknown> = Promise.resolve()): Promise<void> {
   chapter.replaceChildren();
   const eyebrow = document.createElement('p');
@@ -529,10 +530,16 @@ async function showChapter(spec: StageSpec, until: Promise<unknown> = Promise.re
   const title = document.createElement('p');
   title.className = 'headline chapter__title';
   title.textContent = spec.title;
-  chapter.append(eyebrow, title);
+  const cue = document.createElement('p');
+  cue.className = 'chapter__cue';
+  cue.textContent = 'tap to continue';
+  cue.hidden = true;
+  chapter.append(eyebrow, title, cue);
   chapter.hidden = false;
   await fade.reveal();
-  await Promise.all([wait(CHAPTER_MS), until]);
+  await Promise.all([wait(600), until]);
+  cue.hidden = false;
+  await new Promise<void>((done) => chapter.addEventListener('click', () => done(), { once: true }));
   await fade.cover();
   chapter.hidden = true;
 }

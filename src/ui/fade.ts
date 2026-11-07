@@ -1,9 +1,9 @@
 import './fade.css';
 
 /** How long a close or an open takes. */
-const DURATION = 800;
+const DURATION = 480;
 /** Dark held after a close, so the next thing does not land on the cut. */
-const HOLD = 220;
+const HOLD = 120;
 /** The soft edge of the circle, kept in step with `fade.css`. */
 const FEATHER = 48;
 

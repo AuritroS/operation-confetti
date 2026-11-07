@@ -88,9 +88,10 @@
 .story__foot {
   position: absolute;
   z-index: 2;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  /* A pixel past each edge, so no rounding ever leaves a seam beside it. */
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
   display: grid;
   gap: 12px;
   justify-items: center;

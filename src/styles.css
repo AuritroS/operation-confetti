@@ -16,8 +16,9 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  /* Surround outside the portrait frame, a shade darker than the game. */
-  background: #0a0a0f;
+  /* Surround outside the portrait frame: the comic's ink, so a hairline at
+     the frame's edge is the same colour as what it borders. */
+  background: #0b0710;
   color: var(--ink-fg);
   font: 500 var(--text-body) / 1.45 var(--font-ui);
   overscroll-behavior: none;
@@ -54,8 +55,11 @@ html, body {
 #app {
   position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Centred with auto margins rather than a translate: a fractional
+     translate leaves a half-pixel seam down both sides of the frame. */
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   /* dvh keeps the frame correct while mobile browser chrome collapses */
   height: 100dvh;
   /* Phones fill the screen. Always. */
@@ -289,3 +293,13 @@ html, body {
   background: radial-gradient(120% 80% at 50% 30%, #1b275c 0%, #0a0a0f 70%);
 }
 .chapter__title { font-size: 38px; }
+.chapter__cue {
+  margin: 18px 0 0;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+  animation: story-hint 1.4s ease-in-out infinite;
+}

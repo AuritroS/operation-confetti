@@ -118,10 +118,12 @@ for (const vp of VIEWPORTS) {
     await shot(page, `${vp.name}-story-${i + 1}-${id}-read`);
     await page.waitForTimeout(record ? 900 : 200);
     await turnPage(page, id === 'title');
-    // A chapter card follows some pages; catch it mid-hold.
+    // A chapter card follows some pages; photograph it, then tap it on.
     if (['intro', 'chase', 'rooftop'].includes(id)) {
-      await page.waitForTimeout(1500);
+      await page.waitForSelector('.chapter:not([hidden]) .chapter__cue:not([hidden])', { timeout: 20_000 });
+      await page.waitForTimeout(record ? 1200 : 300);
       await shot(page, `${vp.name}-story-${i + 1}-${id}-chapter`);
+      await page.locator('.chapter').click();
     }
   }
   await page.waitForFunction(() => document.querySelector('.results') && !document.querySelector('.results').hidden,

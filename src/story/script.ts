@@ -19,7 +19,9 @@ export type StoryImage =
   | 'chase'
   | 'rooftop'
   | 'win'
-  | 'loss';
+  | 'loss'
+  | 'chase-bg'
+  | 'chase-chars';
 
 interface ArtSource {
   /** Basename under `/story/`, without extension. */
@@ -31,20 +33,25 @@ interface ArtSource {
 /**
  * Which file carries each image.
  *
- * `matthew` has its title painted in, so it is only ever the cover. `chase`
- * is the 7 Nov probe render at low quality, standing in until the final is
- * chosen. The other new panels borrow the closest existing art so the
- * sequence can be walked end to end.
+ * `matthew` has its title painted in, so it is only ever the cover. The
+ * five generated panels were rendered at the phone's own aspect (832×1792),
+ * so they are shown whole at zoom 1 and the camera only ever pushes in.
+ * `matthew-aurora` is kept for the preload list and review; no beat uses it
+ * since the rooftop got its own image with the cannon.
  */
 export const STORY_ART: Record<StoryImage, ArtSource> = {
   matthew: { file: 'matthew' },
   aurora: { file: 'aurora' },
   'matthew-aurora': { file: 'matthew-aurora' },
-  vault: { file: 'matthew', placeholder: true },
-  chase: { file: 'chase', placeholder: true },
-  rooftop: { file: 'matthew-aurora', placeholder: true },
-  win: { file: 'matthew-aurora', placeholder: true },
-  loss: { file: 'aurora', placeholder: true },
+  vault: { file: 'vault' },
+  chase: { file: 'chase' },
+  rooftop: { file: 'rooftop' },
+  win: { file: 'win' },
+  loss: { file: 'loss' },
+  // The chase cut into depth layers: the street without him, and him alone
+  // on a transparent ground, both edits of the chosen render.
+  'chase-bg': { file: 'chase-bg' },
+  'chase-chars': { file: 'chase-chars' },
 };
 
 /**
@@ -134,10 +141,9 @@ export const BEATS = {
   vault: {
     id: 'vault',
     image: 'vault',
-    // Tight on the open door, pulling back to the city beyond it. While the
-    // cover art stands in, the zoom also keeps its painted title out of frame.
-    from: { zoom: 1.7, origin: '28% 38%' },
-    to: { zoom: 1.45, origin: '30% 45%' },
+    // Tight on his face at the door, pulling back to the whole city.
+    from: { zoom: 1.3, origin: '42% 22%' },
+    to: WHOLE,
     owner: 'matthew',
     lines: [
       { text: 'The vault opens on the city' },
@@ -149,9 +155,10 @@ export const BEATS = {
   chase: {
     id: 'chase',
     image: 'chase',
-    // The street first, then in on him mid-swing.
+    layers: { background: 'chase-bg', characters: 'chase-chars' },
+    // The whole street first, then a push in on him mid-swing.
     from: WHOLE,
-    to: { zoom: 1.35, origin: '45% 28%' },
+    to: { zoom: 1.16, origin: '48% 22%' },
     owner: 'aurora',
     lines: [
       { text: 'A trail of presents' },
@@ -162,9 +169,9 @@ export const BEATS = {
   rooftop: {
     id: 'rooftop',
     image: 'rooftop',
-    // Her and the cake, then a pan across to him and the cannon.
-    from: { zoom: 1.15, origin: '70% 25%' },
-    to: { zoom: 1.15, origin: '30% 55%' },
+    // Her and the cake first, then out to him and the cannon.
+    from: { zoom: 1.35, origin: '72% 20%' },
+    to: WHOLE,
     owner: 'aurora',
     lines: [
       { who: 'AURORA', text: 'You brought a party popper?' },
@@ -175,9 +182,9 @@ export const BEATS = {
   win: {
     id: 'win',
     image: 'win',
-    // In on the cake, then out to the whole confetti shower.
-    from: { zoom: 1.45, origin: '66% 26%' },
-    to: { zoom: 1.1, origin: '50% 40%' },
+    // In on the cake and their faces, then out to the whole confetti shower.
+    from: { zoom: 1.4, origin: '52% 28%' },
+    to: WHOLE,
     owner: 'matthew',
     lines: [
       { text: 'Cake recovered' },
@@ -189,9 +196,9 @@ export const BEATS = {
   loss: {
     id: 'loss',
     image: 'loss',
-    // Follow her off the edge: wide, then in on her and the cake.
-    from: { zoom: 1, origin: '50% 50%', pan: '50% 40%' },
-    to: { zoom: 1.3, origin: '60% 36%', pan: '68% 40%' },
+    // Follow her off the edge: wide, then up and in on her and the cake.
+    from: WHOLE,
+    to: { zoom: 1.22, origin: '58% 18%' },
     owner: 'aurora',
     lines: [
       { text: 'The cake remains at large' },
