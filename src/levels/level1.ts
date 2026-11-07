@@ -4,8 +4,8 @@
  * Three lanes on a straight rooftop route with automatic forward travel.
  * Swipe is the only required action.
  *
- * Pacing: speed ramps 9 to 15.3 u/s — a 70% increase — across 487 units,
- * integrating to about 41 seconds.
+ * Pacing: speed ramps 9 to 15.3 u/s — a 70% increase — across 437 units,
+ * integrating to about 37 seconds.
  *
  * That is deliberately under the doc's proposed 55-65s window. The window was
  * a pacing proposal and §14 lists it as reviewable; the level played too easy
@@ -37,9 +37,9 @@ const LANES = { left: 0, middle: 1, right: 2 } as const;
  * the player learns one verb and the level keeps finding new questions to
  * ask with it.
  *
- *   ACT 1  0-150   learn      one hazard type, wide gaps, ~10 u/s
- *   ACT 2  150-320 combine    all three types, 30u locks, ~12 u/s
- *   ACT 3  320-487 pressure   two lanes closed at once, 24-26u locks, ~14.5 u/s
+ *   ACT 1  0-100   learn      one hazard type, wide gaps, ~10 u/s
+ *   ACT 2  100-270 combine    all three types, 30u locks, ~12 u/s
+ *   ACT 3  270-437 pressure   two lanes closed at once, 24-26u locks, ~14.5 u/s
  *
  * At the top speed the tightest warning is 1.6 seconds, against a 1.2s
  * floor. That is deliberately close: the level is meant to be demanding by
@@ -50,46 +50,49 @@ const LANES = { left: 0, middle: 1, right: 2 } as const;
  * Two invariants are enforced by test rather than inspection: no encounter
  * ever closes all three lanes, and no gap or lock lead falls under the floor.
  *
- * Teaching comes first: two unscored gifts, the second needing a sideways
- * move, before any hazard exists (§5). Neither counts toward the four scored
- * gifts, so the 600-point maximum is unchanged.
+ * The route used to open with two unscored teaching gifts before anything
+ * could score. They were cut on 8 Nov 2026: the rehearsal already teaches
+ * the swipe against the real scene, and fifty units of dead road before the
+ * first point made for a slow opening. Everything moved 50 units earlier
+ * and the route shortened by the same, so spacing and warning times are
+ * unchanged. The first scored gift is in the starting lane, so the level
+ * still opens by giving before it threatens.
  */
 const entities: RouteEntity[] = [
   // ===== ACT 1 — learn ==================================================
-  { id: 't1', kind: 'gift', z: 26, lane: LANES.middle, scored: false },
-  { id: 't2', kind: 'gift', z: 53, lane: LANES.right, scored: false },
-  { id: 'g1', kind: 'gift', z: 83, lane: LANES.middle, scored: true },
+  // The first gift sits in the starting lane: the route opens by giving.
+  { id: 'g1', kind: 'gift', z: 33, lane: LANES.middle, scored: true },
   // First hazard, and the only kind in this act.
-  { id: 'h1', kind: 'hazard', z: 120, lane: LANES.left, scored: false, style: 'laser' },
+  { id: 'h1', kind: 'hazard', z: 70, lane: LANES.left, scored: false, style: 'laser' },
 
   // ===== ACT 2 — combine ================================================
-  { id: 'g2', kind: 'gift', z: 153, lane: LANES.right, scored: true },
+  { id: 'g2', kind: 'gift', z: 103, lane: LANES.right, scored: true },
   // First spotlight, with the longest warning it ever gives.
-  { id: 'h2', kind: 'hazard', z: 185, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 30 },
-  { id: 'h3', kind: 'hazard', z: 218, lane: LANES.middle, scored: false, style: 'fence' },
-  { id: 'g3', kind: 'gift', z: 248, lane: LANES.left, scored: true },
-  { id: 'h4', kind: 'hazard', z: 278, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 30 },
-  { id: 'h5', kind: 'hazard', z: 305, lane: LANES.right, scored: false, style: 'laser' },
+  { id: 'h2', kind: 'hazard', z: 135, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 30 },
+  { id: 'h3', kind: 'hazard', z: 168, lane: LANES.middle, scored: false, style: 'fence' },
+  { id: 'g3', kind: 'gift', z: 198, lane: LANES.left, scored: true },
+  { id: 'h4', kind: 'hazard', z: 228, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 30 },
+  { id: 'h5', kind: 'hazard', z: 255, lane: LANES.right, scored: false, style: 'laser' },
 
   // ===== ACT 3 — pressure ===============================================
   // Two lanes closed: only the right is open.
-  { id: 'h6', kind: 'hazard', z: 335, lane: LANES.left, scored: false, style: 'laser' },
-  { id: 'h7', kind: 'hazard', z: 335, lane: LANES.middle, scored: false, style: 'spotlight', lockLead: 26 },
+  { id: 'h6', kind: 'hazard', z: 285, lane: LANES.left, scored: false, style: 'laser' },
+  { id: 'h7', kind: 'hazard', z: 285, lane: LANES.middle, scored: false, style: 'spotlight', lockLead: 26 },
   // The reward sits in the lane that pinch forced them into.
-  { id: 'g4', kind: 'gift', z: 360, lane: LANES.right, scored: true },
+  { id: 'g4', kind: 'gift', z: 310, lane: LANES.right, scored: true },
   // ...and is immediately threatened, so holding it costs a decision.
-  { id: 'h8', kind: 'hazard', z: 385, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 24 },
-  { id: 'h9', kind: 'hazard', z: 408, lane: LANES.left, scored: false, style: 'fence' },
+  { id: 'h8', kind: 'hazard', z: 335, lane: LANES.right, scored: false, style: 'spotlight', lockLead: 24 },
+  { id: 'h9', kind: 'hazard', z: 358, lane: LANES.left, scored: false, style: 'fence' },
   // Final pinch: only the middle is open.
-  { id: 'h10', kind: 'hazard', z: 432, lane: LANES.right, scored: false, style: 'laser' },
-  { id: 'h11', kind: 'hazard', z: 432, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 26 },
+  { id: 'h10', kind: 'hazard', z: 382, lane: LANES.right, scored: false, style: 'laser' },
+  { id: 'h11', kind: 'hazard', z: 382, lane: LANES.left, scored: false, style: 'spotlight', lockLead: 26 },
 ];
 
 export const LEVEL_1: LevelConfig = {
   id: 1,
   laneCount: 3,
   laneWidth: 1.6,
-  routeLength: 487,
+  routeLength: 437,
   forwardSpeed: 9,
   endForwardSpeed: 15.3,
   invulnerabilitySeconds: 1,

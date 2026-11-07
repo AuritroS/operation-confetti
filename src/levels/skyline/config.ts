@@ -17,61 +17,54 @@ import type { Lane, TravelMode } from './types';
 export const BAY = 27.2;
 
 /**
- * Progressive curved speed ramp (Option 3):
- * Starts at 8.0 u/s and smoothly accelerates to 18.0 u/s at t=45s via v(t) = v0 + dv * (t/D)^1.5.
- * - Act 1 (0-11s):  8.0 ->  9.2 u/s (calm warmup, forgiving reactions)
- * - Act 2 (11-23s): 9.2 -> 11.6 u/s (building momentum through gantry/barricade)
- * - Act 3 (23-34s): 11.6 -> 14.6 u/s (fast slalom weaves)
- * - Act 4 (34-45s): 14.6 -> 18.0 u/s (high-octane runaway climax!)
+ * The speed ramp: 10.5 to 18 u/s, straight, over 42 seconds.
  *
- * Integrated distance across 45s: z(45) = 540.0m (v_avg = 12.0 u/s).
+ * It was 8 to 18 on a (t/45)^1.5 curve, which kept the first ten seconds
+ * between 8 and 9 — too slow to be a chase. Now shaped like level 1's: a
+ * steady rise of about 70%, so ten seconds in he is already at 12.3. The
+ * route shortened from 45 to 42 seconds when the unscored teaching gift
+ * went; encounters are authored in seconds and moved with it.
+ *
+ * Integrated distance: z(42) = 10.5·42 + 7.5·42/2 = 598.5 (v_avg 14.25).
  */
-const START_SPEED = 8.0;
+const START_SPEED = 10.5;
 const END_SPEED = 18.0;
-const DURATION = 45;
-const DELTA_SPEED = END_SPEED - START_SPEED; // 10.0 u/s
-const D_POW_1_5 = Math.pow(DURATION, 1.5); // 45^1.5 ≈ 301.869
-const K_POS = DELTA_SPEED / (2.5 * D_POW_1_5); // 10 / (2.5 * 301.869)
-const K_ACCEL = (1.5 * DELTA_SPEED) / D_POW_1_5; // 15 / 301.869
+const DURATION = 42;
+const DELTA_SPEED = END_SPEED - START_SPEED;
+const ACCEL = DELTA_SPEED / DURATION;
 
 export function speedAt(t: number): number {
   if (t <= 0) return START_SPEED;
   if (t >= DURATION) return END_SPEED;
-  return START_SPEED + (DELTA_SPEED / D_POW_1_5) * t * Math.sqrt(t);
+  return START_SPEED + ACCEL * t;
 }
 
 export function accelerationAt(t: number): number {
   if (t <= 0 || t >= DURATION) return 0;
-  return K_ACCEL * Math.sqrt(t);
+  return ACCEL;
 }
 
-export const ROUTE_LENGTH = 540.0;
+export const ROUTE_LENGTH = START_SPEED * DURATION + (DELTA_SPEED * DURATION) / 2;
 
 export function positionAt(t: number): number {
   if (t <= 0) return t * START_SPEED;
   const clamped = Math.min(DURATION, t);
-  const z = START_SPEED * clamped + K_POS * clamped * clamped * Math.sqrt(clamped);
+  const z = START_SPEED * clamped + (ACCEL * clamped * clamped) / 2;
   return t > DURATION ? z + END_SPEED * (t - DURATION) : z;
 }
 
 export function timeAt(z: number): number {
   if (z <= 0) return z / START_SPEED;
   if (z >= ROUTE_LENGTH) return DURATION + (z - ROUTE_LENGTH) / END_SPEED;
-  // Newton-Raphson inversion with initial guess z / v_avg.
-  // 4 unrolled iterations reach machine precision (< 1e-13).
-  let t = z / 12.0;
-  t -= (positionAt(t) - z) / speedAt(t);
-  t -= (positionAt(t) - z) / speedAt(t);
-  t -= (positionAt(t) - z) / speedAt(t);
-  t -= (positionAt(t) - z) / speedAt(t);
-  return t;
+  // Invert ½·a·t² + v0·t = z exactly.
+  return (-START_SPEED + Math.sqrt(START_SPEED * START_SPEED + 2 * ACCEL * z)) / ACCEL;
 }
 
 /** Route parameters. */
 export const COURSE = {
-  duration: 45,
-  /** Average speed across the route (540 / 45 = 12.0 u/s). */
-  speed: 12.0,
+  duration: DURATION,
+  /** Average speed across the route (598.5 / 42 = 14.25 u/s). */
+  speed: ROUTE_LENGTH / DURATION,
   startSpeed: START_SPEED,
   endSpeed: END_SPEED,
   laneWidth: 3.2,

@@ -8,6 +8,7 @@
 import { Motion, route } from './motion';
 import { hits, SkylineRunner } from './runner';
 import { PLAYER_HALF, ROUTE_LENGTH, timeAt } from './config';
+import { COURSE } from './config';
 import { SKYLINE } from './course';
 import { RULES, scoreRun } from '../../core/scoring';
 import { LANES, type Course, type Direction, type Entity, type Lane, type TravelMode } from './types';
@@ -86,7 +87,7 @@ function measure(c: Course, from: State, to: State, order: Order): number {
 
 /** Test a settled route over the entire contact window, including swing phase. */
 function touches(c: Course, e: Entity, state: State): boolean {
-  const isSkyline = c.duration === 45;
+  const isSkyline = c.duration === COURSE.duration;
   const start = Math.max(0, isSkyline ? timeAt(e.z - e.halfZ - PLAYER_HALF.z) : (e.z - e.halfZ - PLAYER_HALF.z) / c.speed);
   const end = Math.min(c.duration, isSkyline ? timeAt(e.z + e.halfZ + PLAYER_HALF.z) : (e.z + e.halfZ + PLAYER_HALF.z) / c.speed);
   if (start > end) return false;
@@ -101,7 +102,7 @@ function touches(c: Course, e: Entity, state: State): boolean {
 }
 
 export function beats(c: Course = SKYLINE): Beat[] {
-  const isSkyline = c.duration === 45;
+  const isSkyline = c.duration === COURSE.duration;
   const grouped = new Map<number, Entity[]>();
   for (const e of c.entities) {
     const time = +(isSkyline ? timeAt(e.z) : e.z / c.speed).toFixed(3);
@@ -211,7 +212,7 @@ export const clean = (outcome: Outcome, c: Course = SKYLINE): boolean => outcome
 
 export function solve(c: Course = SKYLINE): Result {
   const target = scoredGifts(c);
-  const maxZ = c.duration === 45 ? ROUTE_LENGTH : c.duration * c.speed;
+  const maxZ = c.duration === COURSE.duration ? ROUTE_LENGTH : c.duration * c.speed;
   const invalid = [c.duration, c.speed, c.laneWidth, c.cycle].some(n => !Number.isFinite(n) || n <= 0) ||
     !Number.isFinite(c.groundY) || new Set(c.entities.map(e => e.id)).size !== c.entities.length ||
     c.entities.some(e => ![e.x, e.y, e.z, e.halfX, e.halfY, e.halfZ].every(Number.isFinite) ||

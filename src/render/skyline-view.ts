@@ -39,7 +39,14 @@ export const CAMERA_DISTANCE = 12.5;
  * than letting them slide off the edge.
  */
 export const CAMERA_ASPECT_REFERENCE = 0.48;
-export const CAMERA_ASPECT_PULLBACK = 8;
+/*
+ * Raised from 8 to 12 on 8 Nov 2026: the swing review's framing check put
+ * the hero's centre at the 95% edge after a left swipe on the narrowest
+ * screens (a folding phone's cover at 0.43, and a 390x844 phone once the
+ * ramp started faster). At 390x844 this is +0.47 units of stand-off; at
+ * 0.48 and wider it is nothing.
+ */
+export const CAMERA_ASPECT_PULLBACK = 12;
 
 /** Height above the tracked focus point. Steeper down-pitch opens road vertically. */
 export const CAMERA_HEIGHT = 5.4;

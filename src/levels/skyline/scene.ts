@@ -264,48 +264,51 @@ for (let bay = FIRST_BAY; bay <= LAST_BAY; bay++) {
  * Four acts. Scored gifts are capped at four by the scoring rules, so the
  * route's length buys hazard variety and breathing room, not collectibles.
  *
- *   teach    0-11   one archetype at a time
- *   commit   11-23  the bridge and the barricade, each admitting one answer
- *   mix      23-34  lane choice and height choice in the same beat
- *   closing  34-45  tightest spacing, every archetype in play
+ *   teach    0-8    one archetype at a time
+ *   commit   8-20   the bridge and the barricade, each admitting one answer
+ *   mix      20-31  lane choice and height choice in the same beat
+ *   closing  31-42  tightest spacing, every archetype in play
+ *
+ * The unscored teaching gift at 3.5 s was cut on 8 Nov 2026 and everything
+ * moved three seconds earlier; the rehearsal loop teaches the swing.
  */
 const encounters: Encounter[] = ([
-  // ---- teach (0-11s) ----------------------------------------------------
-  { id: 'teach', assembly: 'gift', lane: 0, t: 3.5, mode: 'swing', scored: false },
-  { id: 'gift-left', assembly: 'gift', lane: -1, t: 7, mode: 'swing', scored: true },
+  // ---- teach (0-8s) -----------------------------------------------------
+  // The first swing is the first gift: the route opens by giving.
+  { id: 'gift-left', assembly: 'gift', lane: -1, t: 4, mode: 'swing', scored: true },
   // Double-decker blocker closing lane 0
-  { id: 'first-middle-low', assembly: 'laneBlock', lane: 0, t: 7 },
-  { id: 'first-middle-high', assembly: 'hangingSign', lane: 0, t: 7 },
-  { id: 'cone-right', assembly: 'laneBlock', lane: 1, t: 10.5 },
+  { id: 'first-middle-low', assembly: 'laneBlock', lane: 0, t: 4 },
+  { id: 'first-middle-high', assembly: 'hangingSign', lane: 0, t: 4 },
+  { id: 'cone-right', assembly: 'laneBlock', lane: 1, t: 7.5 },
 
-  // ---- commit (11-23s) ---------------------------------------------------
-  { id: 'gift-ground', assembly: 'gift', lane: 0, t: 13.5, mode: 'run', scored: true },
-  { id: 'bridge', assembly: 'bridge', lane: 0, t: 15.5 },
+  // ---- commit (8-20s) ----------------------------------------------------
+  { id: 'gift-ground', assembly: 'gift', lane: 0, t: 10.5, mode: 'run', scored: true },
+  { id: 'bridge', assembly: 'bridge', lane: 0, t: 12.5 },
   // Choice gate: overhead in lane -1, cones in lane 0; lane 1 open
-  { id: 'sign-left', assembly: 'hangingSign', lane: -1, t: 18.5 },
-  { id: 'mid-cones', assembly: 'laneBlock', lane: 0, t: 18.5 },
-  { id: 'barricade', assembly: 'barricade', lane: 0, t: 22 },
+  { id: 'sign-left', assembly: 'hangingSign', lane: -1, t: 15.5 },
+  { id: 'mid-cones', assembly: 'laneBlock', lane: 0, t: 15.5 },
+  { id: 'barricade', assembly: 'barricade', lane: 0, t: 19 },
 
-  // ---- mix & slalom (23-34s) --------------------------------------------
-  { id: 'gift-right', assembly: 'gift', lane: 1, t: 25, mode: 'swing', scored: true },
-  { id: 'upper-left', assembly: 'hangingSign', lane: -1, t: 25 },
-  { id: 'slalom-cones-mid', assembly: 'laneBlock', lane: 0, t: 27.5 },
+  // ---- mix & slalom (20-31s) --------------------------------------------
+  { id: 'gift-right', assembly: 'gift', lane: 1, t: 22, mode: 'swing', scored: true },
+  { id: 'upper-left', assembly: 'hangingSign', lane: -1, t: 22 },
+  { id: 'slalom-cones-mid', assembly: 'laneBlock', lane: 0, t: 24.5 },
   // Choice gate: sign in lane 1, cones in lane -1; lane 0 open
-  { id: 'gate-sign-right', assembly: 'hangingSign', lane: 1, t: 30 },
-  { id: 'gate-cones-left', assembly: 'laneBlock', lane: -1, t: 30 },
+  { id: 'gate-sign-right', assembly: 'hangingSign', lane: 1, t: 27 },
+  { id: 'gate-cones-left', assembly: 'laneBlock', lane: -1, t: 27 },
   // Return of the Highway Gantry: high-speed dive beneath
-  { id: 'second-bridge', assembly: 'bridge', lane: 0, t: 32.5 },
+  { id: 'second-bridge', assembly: 'bridge', lane: 0, t: 29.5 },
 
-  // ---- closing climax (34-45s) ------------------------------------------
-  { id: 'gift-low-left', assembly: 'gift', lane: -1, t: 35.5, mode: 'run', scored: true },
+  // ---- closing climax (31-42s) ------------------------------------------
+  { id: 'gift-low-left', assembly: 'gift', lane: -1, t: 32.5, mode: 'run', scored: true },
   // Climax double-decker in middle lane
-  { id: 'climax-double-mid-low', assembly: 'laneBlock', lane: 0, t: 37.5 },
-  { id: 'climax-double-mid-high', assembly: 'hangingSign', lane: 0, t: 37.5 },
+  { id: 'climax-double-mid-low', assembly: 'laneBlock', lane: 0, t: 34.5 },
+  { id: 'climax-double-mid-high', assembly: 'hangingSign', lane: 0, t: 34.5 },
   // Return of the Barricade Wall: vault over into flight
-  { id: 'second-barricade', assembly: 'barricade', lane: 0, t: 40 },
+  { id: 'second-barricade', assembly: 'barricade', lane: 0, t: 37 },
   // Final needle gate: overhead sign in mid, cones on right; thread lane -1
-  { id: 'final-sign-mid', assembly: 'hangingSign', lane: 0, t: 42.5 },
-  { id: 'final-cones-right', assembly: 'laneBlock', lane: 1, t: 42.5 },
+  { id: 'final-sign-mid', assembly: 'hangingSign', lane: 0, t: 39.5 },
+  { id: 'final-cones-right', assembly: 'laneBlock', lane: 1, t: 39.5 },
 ] satisfies Encounter[]).sort((a, b) => a.t - b.t);
 
 /** Landing markings removed — player can land anywhere on the road. */

@@ -71,6 +71,24 @@ the reveal is a room, not the empty map. `?ending=N` (`&loop`,
 
 ### 2. Course data (before anything that looks at the courses)
 
+**Done 8 Nov.** `t1`, `t2` and `teach` removed; level 1 moved 50 units
+earlier (route 437, ~37 s), level 2 three seconds earlier (42 s). Level 2's
+ramp is 10.5 → 18 u/s, straight, route 598.5 units. The production-course
+test in the solver, runner and scene keyed off a literal `45` and now reads
+`COURSE.duration`. Suite, route solver (600-point route found, 16/16 seeded
+trials at ±0.1 s), swing review and campaign gate all green.
+
+The swing review had been broken since the campaign took over `/`: it
+opened the root expecting the standalone level 2 page, clicked a replay
+button that no longer exists, pressed P for a pause that is now automatic,
+and asserted on a HUD label that is gone. All four fixed. Two findings
+from running it: the narrow-aspect camera pull-back was marginal (the hero
+at the 95% edge after a left swipe at 0.43 aspect, and at 390x844 once the
+ramp started faster), raised from 8 to 12 (+0.47 units at 390x844, nothing
+at 0.48 and wider); and the street was already at the 60-draw budget, so
+the finish gate's ~27 draws for its last three seconds tipped it to 87.
+The budget is 90 now, with the reason in the tool. Triangles 55.5k of 60k.
+
 - Remove the unscored gifts: level 1 `t1`, `t2`; level 2 `teach`. They never
   emit a scoring event, so the cap, the Worker recompute and existing
   scores are untouched. No migration.

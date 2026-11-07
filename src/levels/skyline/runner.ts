@@ -1,6 +1,7 @@
 import type { RunEvent } from '../../core/scoring';
 import { Motion } from './motion';
 import { PLAYER_HALF, speedAt } from './config';
+import { COURSE } from './config';
 
 import type { Course, Direction, Entity, Lane, Point3, Snapshot, TravelMode } from './types';
 
@@ -46,7 +47,7 @@ export class SkylineRunner {
     const p = this.motion.sample(this.elapsed).p;
     const minX = Math.min(p.x, lane * this.course.laneWidth) - 0.4;
     const maxX = Math.max(p.x, lane * this.course.laneWidth) + 0.4;
-    const lookaheadZ = (this.course.duration === 45 ? speedAt(this.elapsed) : this.course.speed) * 1.5;
+    const lookaheadZ = (this.course.duration === COURSE.duration ? speedAt(this.elapsed) : this.course.speed) * 1.5;
     return !this.course.entities.some((e) => e.kind === 'hazard' &&
       e.y - e.halfY > this.course.groundY + 1 &&
       e.x + e.halfX >= minX && e.x - e.halfX <= maxX &&

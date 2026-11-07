@@ -325,22 +325,21 @@ describe('the authored level 1 route', () => {
     }
   });
 
-  it('teaches before it threatens', () => {
-    // The doc requires an unscored demonstration first, with hazards only
-    // afterwards (section 5), so a first-time player meets the swipe before
-    // it can cost them anything.
+  it('gives before it threatens', () => {
+    // The route opens with a gift in the starting lane, so a first-time
+    // player meets the reward before anything can cost them. The rehearsal
+    // teaches the swipe itself; the unscored demonstration gifts are gone.
     const sorted = [...LEVEL_1.entities].sort((a, b) => a.z - b.z);
     const firstHazard = sorted.findIndex((e) => e.kind !== 'gift');
     const before = sorted.slice(0, firstHazard);
 
     expect(before.length, 'something must come before the first hazard').toBeGreaterThan(0);
     expect(before.every((e) => e.kind === 'gift')).toBe(true);
-    expect(before.some((e) => !e.scored), 'at least one must be unscored').toBe(true);
   });
 
-  it('keeps tutorial gifts outside the four scored ones', () => {
+  it('has exactly the four scored gifts and nothing unscored', () => {
     const tutorial = LEVEL_1.entities.filter((e) => e.kind === 'gift' && !e.scored);
-    expect(tutorial.length).toBeGreaterThan(0);
+    expect(tutorial).toHaveLength(0);
     const scored = LEVEL_1.entities.filter((e) => e.kind === 'gift' && e.scored);
     expect(scored).toHaveLength(4);
   });
@@ -394,15 +393,14 @@ describe('the authored level 1 route', () => {
     // Documenting it here proves a perfect run is actually reachable, which
     // a naive gift-chasing bot cannot establish.
     const line = [
-      { at: 30, lane: 2 }, //  after t1, over for the t2 teaching gift
-      { at: 58, lane: 1 }, //  back for g1 (lane 1) at 83
-      { at: 125, lane: 2 }, // past h1 laser (lane 0), on for g2 at 153
-      { at: 158, lane: 0 }, // clear of h2 spotlight (lane 2) and h3 fence (lane 1)
-      { at: 252, lane: 1 }, // after g3, clear of h4 spotlight (lane 0)
-      { at: 310, lane: 2 }, // past h5 laser (lane 2)? no — clear of the pinch
-      { at: 340, lane: 2 }, // the 335 pinch closes left and middle
-      { at: 365, lane: 1 }, // after g4, clear of h8 spotlight (lane 2)
-      { at: 412, lane: 1 }, // h9 fence is lane 0; middle stays safe
+      // g1 (lane 1) at 33 is in the starting lane: nothing to do.
+      { at: 75, lane: 2 }, //  past h1 laser (lane 0), on for g2 at 103
+      { at: 108, lane: 0 }, // clear of h2 spotlight (lane 2) and h3 fence (lane 1)
+      { at: 202, lane: 1 }, // after g3, clear of h4 spotlight (lane 0)
+      { at: 260, lane: 2 }, // clear of the pinch
+      { at: 290, lane: 2 }, // the 285 pinch closes left and middle
+      { at: 315, lane: 1 }, // after g4, clear of h8 spotlight (lane 2)
+      { at: 362, lane: 1 }, // h9 fence is lane 0; middle stays safe
     ];
 
     const r = new LevelRunner(LEVEL_1);

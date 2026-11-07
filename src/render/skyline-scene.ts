@@ -31,6 +31,7 @@ import type { SkylineHero } from './skyline-hero';
 import { SkylineRope } from './skyline-rope';
 import { LANES } from '../levels/skyline/types';
 import { BAY, LAND_TIME, ROUTE_LENGTH } from '../levels/skyline/config';
+import { COURSE } from '../levels/skyline/config';
 import type { Course, Point3, Snapshot } from '../levels/skyline/types';
 
 /** Anchor markers drawn at once, across all three state pools. */
@@ -528,7 +529,7 @@ export class SkylineScene {
      * floated them above the carriageway. The Kenney road carries its own
      * painted markings, so there is nothing left for them to do.
      */
-    const bayPitch = this.course.duration === 45 ? BAY : this.course.cycle * this.course.speed;
+    const bayPitch = this.course.duration === COURSE.duration ? BAY : this.course.cycle * this.course.speed;
     const playerBay = Math.floor(scrollZ / bayPitch);
     const targetBay = playerBay + 1;
     const activeId = s.anchor?.id;
@@ -573,7 +574,7 @@ export class SkylineScene {
       pool.count = anchorCounts[i] ?? 0;
       pool.instanceMatrix.needsUpdate = true;
     });
-    const finish = scrollZ - (this.course.duration === 45 ? ROUTE_LENGTH : this.course.duration * this.course.speed);
+    const finish = scrollZ - (this.course.duration === COURSE.duration ? ROUTE_LENGTH : this.course.duration * this.course.speed);
     // Well short of the endpoint, so he arrives in front of the gate with
     // room to celebrate, and so the run-up never puts the door face across
     // the whole frame: at 26 units wide it fills a 12.5-unit camera stand-off

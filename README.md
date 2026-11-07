@@ -29,7 +29,7 @@ anchor and blends into a landing and run. An up-swipe beneath/near an overhead
 obstruction is remembered: the HUD shows “Swing selected” and launch starts
 after clearance. A down-swipe cancels that pending launch.
 
-The **45-second** course teaches one archetype at a time, then commits: a
+The **42-second** course teaches one archetype at a time, then commits: a
 bridge that can only be run under, a barricade that can only be swung over,
 and a closing stretch mixing lane and height choices. Four scored gifts
 (+100 each) plus completion (+200) make 600.
@@ -53,8 +53,9 @@ from the current course. The solver also reports sampled input-timing tolerance;
 failure to find a route is not proof that a course is impossible. See
 [`docs/ROUTE_SOLVER.md`](./docs/ROUTE_SOLVER.md) for the checks and their limits.
 
-There is one unscored teaching gift and four scored gifts, distributed across
-all three lanes, with obstacles ahead of each choice. A verified safe route
+There are four scored gifts, distributed across all three lanes, with
+obstacles ahead of each choice; the unscored teaching gift was cut in the
+polish pass, since the rehearsal loop teaches the swing. A verified safe route
 collects all four for **600 points**. Gifts give +100, hits deduct 50, and
 completion gives +200. A hit causes recoil and one second of protection;
 travel and lane controls continue. The old freeze-and-reattach flow is removed.
