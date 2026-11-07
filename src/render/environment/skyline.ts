@@ -137,8 +137,8 @@ export class SkylineLayer implements EnvironmentLayer {
   update(travelled: number, step = 0, laneX = 0): void {
     // The far band barely moves with the lane, but it does move: a city
     // that stays put while the street slides reads as a painted wall.
-    this.driftX += (laneX - this.driftX) * (1 - Math.exp(-step * 2.2));
-    this.object.position.x = -this.driftX * 0.06;
+    this.driftX += (laneX - this.driftX) * (1 - Math.exp(-step * 1.4));
+    this.object.position.x = -this.driftX * 0.02;
     const drift = travelled * DRIFT_RATE;
     for (const [i, item] of this.items.entries()) {
       const anchor = this.anchors[i];

@@ -26,8 +26,8 @@ const ARRIVAL_SECONDS = 2.4;
  */
 const STRIDE_UNITS = 2.1;
 const BOB_AMPLITUDE = 0.018;
-const LEAN_ROLL = 0.035;
-const LEAN_SLIDE = 0.18;
+const LEAN_ROLL = 0.017;
+const LEAN_SLIDE = 0;
 const FOV_WIDEN_DEGREES = 5;
 /** How long the arrival shot takes to settle within that hold. */
 const ARRIVAL_SHOT_S = 2.0;

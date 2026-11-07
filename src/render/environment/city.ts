@@ -20,9 +20,6 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   type Object3D,
-  Box3,
-  MeshBasicMaterial,
-  DoubleSide,
 } from 'three';
 import { PALETTE } from '../palette';
 import type { EnvironmentLayer, LayerContext } from './layer';
@@ -34,13 +31,6 @@ const SHAPES: PropId[] = ['buildingE', 'buildingA', 'buildingF', 'buildingB'];
 const PER_SIDE = 6;
 const SPACING = 26;
 
-/**
- * Signage: a slip of self-lit colour on every other near façade, facing the
- * route. The cheapest neon there is — one plane, one of three shared
- * materials — and what turns a row of dark blocks into a street at night.
- */
-const SIGN_COLOURS = [0xcc29c3, 0xeaac5b];
-const SIGN_MATERIALS = SIGN_COLOURS.map((c) => new MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, side: DoubleSide }));
 
 /**
  * The mid band: a second row of buildings behind the street, moving at
@@ -63,9 +53,9 @@ const MID_SPAWN = 180;
  * moves the whole city a little the other way, nearer bands more than far,
  * which is the parallax a real street gives a walker who crosses it.
  */
-const DRIFT_NEAR = 0.35;
-const DRIFT_MID = 0.18;
-const DRIFT_FOLLOW = 2.2;
+const DRIFT_NEAR = 0.12;
+const DRIFT_MID = 0.06;
+const DRIFT_FOLLOW = 1.4;
 
 /**
  * Where a building first appears, in units ahead.
@@ -101,8 +91,6 @@ export class CityLayer implements EnvironmentLayer {
   private readonly street: Mesh;
   private readonly near = new Group();
   private readonly mid = new Group();
-  /** Blade signs, by the building they hang from; they ride with it. */
-  private readonly signs = new Map<Object3D, Mesh>();
   private driftX = 0;
 
   constructor(ctx: LayerContext) {
@@ -119,28 +107,6 @@ export class CityLayer implements EnvironmentLayer {
         items.push(prop);
         this.near.add(prop);
         this.owned.push(prop);
-        if (i % 2 === 0) {
-          // A blade sign: hung out from the face that looks onto the route,
-          // standing perpendicular to it so it faces the player coming up
-          // the roof. On the façade itself it would only ever be seen
-          // edge-on from a camera near the centre line. A sibling of the
-          // building, not a child: the prop carries its registry scale, and
-          // a child would inherit it sevenfold.
-          const box = new Box3().setFromObject(prop);
-          const blade = new Mesh(
-            new PlaneGeometry(2.2 + (i % 3) * 0.5, 0.8),
-            SIGN_MATERIALS[(i / 2 + (sign > 0 ? 1 : 0)) % SIGN_MATERIALS.length]!,
-          );
-          // Near the top: the roof is at y 0 and these façades are based
-          // twelve units below it, so anything lower than ~90% of a
-          // building's height is under the parapet from where he runs.
-          const inner = sign > 0 ? box.min.x : box.max.x;
-          blade.position.set(inner - sign * 1.3, GROUND_Y + (box.max.y - GROUND_Y) * 0.92, 0);
-          blade.userData.dz = (i % 3) * 1.5 - 1.5;
-          this.signs.set(prop, blade);
-          this.near.add(blade);
-          this.owned.push(blade);
-        }
       }
       this.rings.push({ ring: new RingPlacer(items, SPACING, SPAWN_DISTANCE, 1), items });
 
@@ -185,8 +151,6 @@ export class CityLayer implements EnvironmentLayer {
     for (const { ring } of this.rings) {
       ring.update(travelled, (item, z) => {
         item.position.z = z;
-        const blade = this.signs.get(item);
-        if (blade) blade.position.z = z + (blade.userData.dz as number);
       });
     }
     // Slide the bands against the lane, slowly, so a change is felt by
