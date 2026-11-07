@@ -132,7 +132,13 @@ export class SkylineLayer implements EnvironmentLayer {
    * rushing past rather than a distant city, and it is long enough that the
    * route finishes before anything would need recycling.
    */
-  update(travelled: number): void {
+  private driftX = 0;
+
+  update(travelled: number, step = 0, laneX = 0): void {
+    // The far band barely moves with the lane, but it does move: a city
+    // that stays put while the street slides reads as a painted wall.
+    this.driftX += (laneX - this.driftX) * (1 - Math.exp(-step * 2.2));
+    this.object.position.x = -this.driftX * 0.06;
     const drift = travelled * DRIFT_RATE;
     for (const [i, item] of this.items.entries()) {
       const anchor = this.anchors[i];

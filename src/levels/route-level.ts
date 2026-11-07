@@ -14,6 +14,21 @@ import { Environment, requestedLayers } from '../render/environment';
 
 /** How long the arrival celebration holds before the level reports done. */
 const ARRIVAL_SECONDS = 2.4;
+
+/**
+ * The camera's response to running.
+ *
+ * A fixed point behind him made speed a number rather than a feeling. Three
+ * small things fix that: a vertical bob on his stride, a roll into a lane
+ * change, and a wider view as the ramp climbs. All are presentation; the
+ * camera's framing of the next hazard is unchanged at rest, and all three
+ * are off under reduced motion.
+ */
+const STRIDE_UNITS = 2.1;
+const BOB_AMPLITUDE = 0.045;
+const LEAN_ROLL = 0.035;
+const LEAN_SLIDE = 0.18;
+const FOV_WIDEN_DEGREES = 5;
 /** How long the arrival shot takes to settle within that hold. */
 const ARRIVAL_SHOT_S = 2.0;
 /**
@@ -88,6 +103,8 @@ export class RouteLevel implements LevelController {
   private ending = 0;
   /** Seconds into the arrival shot, or -1 while the run is still on. */
   private arrival = -1;
+  private readonly reduced =
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   inPractice = true;
   result: LevelOutcome | null = null;
 
@@ -216,7 +233,7 @@ export class RouteLevel implements LevelController {
        * the player, and a route with nothing along it. It is also what keeps
        * the sky and clouds alive while the sheet is up.
        */
-      this.environment?.update(0, step);
+      this.environment?.update(0, step, this.runner.lanes.renderX);
       this.runner.lanes.update(step);
       this.player.setLean(this.runner.lanes.lean);
       this.player.update(step, true);
@@ -229,7 +246,7 @@ export class RouteLevel implements LevelController {
       // reports done once that has played, or the shell cuts it off.
       this.ending = Math.max(0, this.ending - step);
       this.player.update(step, false);
-      this.environment?.update(this.runner.snapshot.travelled, step);
+      this.environment?.update(this.runner.snapshot.travelled, step, this.runner.lanes.renderX);
       if (this.ending === 0) this.result = 'complete';
       return;
     }
@@ -238,13 +255,13 @@ export class RouteLevel implements LevelController {
       // Keep animating after the run ends, or the celebration never plays and
       // Matthew freezes mid-stride at the vault.
       this.player.update(step, false);
-      this.environment?.update(this.runner.snapshot.travelled, step);
+      this.environment?.update(this.runner.snapshot.travelled, step, this.runner.lanes.renderX);
       return;
     }
 
     this.runner.update(step);
     const snap = this.runner.snapshot;
-    this.environment?.update(snap.travelled, step);
+    this.environment?.update(snap.travelled, step, this.runner.lanes.renderX);
 
     this.hitAge += step;
     if (this.player.setHitTint) this.player.setHitTint(this.hitAge);
@@ -298,10 +315,21 @@ export class RouteLevel implements LevelController {
       }
     }
     this.confetti.update(STEP_S);
+    // Running: a bob on the stride, a roll into the lane change, and a view
+    // that widens with speed. None of it during the rehearsal, the ending
+    // or under reduced motion.
+    const running = !this.inPractice && this.arrival < 0 && this.result === null && !this.reduced;
+    const topSpeed = LEVEL_1.endForwardSpeed ?? LEVEL_1.forwardSpeed + 1;
+    const speedT = Math.max(0, Math.min(1, (this.runner.speed - LEVEL_1.forwardSpeed) / (topSpeed - LEVEL_1.forwardSpeed)));
+    const bob = running ? Math.sin((snap.travelled / STRIDE_UNITS) * Math.PI * 2) * BOB_AMPLITUDE * (0.6 + 0.4 * speedT) : 0;
+    const lean = running ? this.runner.lanes.lean : 0;
+    this.stage.setFovOffset(running ? FOV_WIDEN_DEGREES * speedT : 0);
+
     // Camera trails the lane slightly, which reads as weight without taking
     // the next hazard out of frame.
-    this.stage.camera.position.set(x * 0.3, 2.5 + 2.2 * arrive, 5.2 + 6 * arrive);
-    this.stage.camera.lookAt(x * 0.12 + (x - x * 0.12) * arrive, 1.0 + 1.8 * arrive, -6 + 1 * arrive);
+    this.stage.camera.position.set(x * 0.3 + lean * LEAN_SLIDE, 2.5 + bob + 2.2 * arrive, 5.2 + 6 * arrive);
+    this.stage.camera.lookAt(x * 0.12 + (x - x * 0.12) * arrive, 1.0 + bob * 0.5 + 1.8 * arrive, -6 + 1 * arrive);
+    this.stage.camera.rotation.z += -lean * LEAN_ROLL;
     this.stage.render();
   }
 

@@ -144,8 +144,8 @@ export class Environment {
     return clone;
   }
 
-  update(travelled: number, step: number): void {
-    for (const layer of this.layers) layer.update(travelled, step);
+  update(travelled: number, step: number, laneX = 0): void {
+    for (const layer of this.layers) layer.update(travelled, step, laneX);
   }
 
   dispose(): void {

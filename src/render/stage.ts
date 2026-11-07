@@ -102,13 +102,27 @@ export class Stage {
     this.unobserve = null;
   }
 
+  /** Degrees added to the fitted field of view; a level's speed can widen it. */
+  private fovOffset = 0;
+
   private readonly fit = (width: number, height: number): void => {
     this.camera.aspect = width / height;
+    this.applyFov();
+  };
+
+  private applyFov(): void {
     // Portrait screens are narrow: widen the FOV so the lanes and the next
     // hazard stay visible without moving the camera back.
-    this.camera.fov = this.camera.aspect < 0.72 ? 64 : 54;
+    this.camera.fov = (this.camera.aspect < 0.72 ? 64 : 54) + this.fovOffset;
     this.camera.updateProjectionMatrix();
-  };
+  }
+
+  /** Widen (or narrow) the view by `degrees` on top of the fitted base. */
+  setFovOffset(degrees: number): void {
+    if (Math.abs(degrees - this.fovOffset) < 0.01) return;
+    this.fovOffset = degrees;
+    this.applyFov();
+  }
 
   render(): void {
     this.host.render(this.scene, this.camera);

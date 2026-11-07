@@ -126,6 +126,17 @@ the boss readouts at two widths into `tools/shots/hud/`.
 
 ### 4. Level 1 environment and camera
 
+**Cycle 1 done, 8 Nov (parallax and camera).** A mid band of five taller,
+darker buildings a side behind the street at 40% of travel, out of fog like
+the far band, so the depth runs near 100 → mid 40 → far 12. The near, mid
+and far bands slide against a lane change (35%, 18%, 6% of the player's
+sideways position, eased). The camera bobs on his stride, rolls into a
+lane change, and widens by up to five degrees as the ramp climbs; all off
+under reduced motion. Lit façade materials are shared per band, which took
+the material count from 67 back under the budget of 60.
+`tools/shoot-level1.mjs <tag> [query]` photographs three route positions at
+two widths; `before-*` and `after-*` in `tools/shots/level1/`.
+
 - Environment: denser mid-city with more building variety and lit signage,
   street-level props placed beyond the parapets where they have ground
   under them (the earlier floating-clutter problem is why `clutter` is

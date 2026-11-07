@@ -154,7 +154,7 @@ describe('decoration cannot become gameplay', () => {
     // source, because the type disappears at runtime. Comments are stripped
     // first — the prose explaining the rule naturally uses the same words.
     const contract = stripComments(readFileSync('src/render/environment/layer.ts', 'utf8'));
-    expect(contract).toContain('update(travelled: number, step: number): void;');
+    expect(contract).toContain('update(travelled: number, step: number, laneX?: number): void;');
     expect(contract).not.toMatch(/\bemit\b|RunEvent|onEvent/);
   });
 

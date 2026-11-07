@@ -24,12 +24,37 @@ import {
 import { PALETTE } from '../palette';
 import type { EnvironmentLayer, LayerContext } from './layer';
 import { RingPlacer } from './ring';
-import { disposeTree } from './skyline';
+import { disposeTree, unfog } from './skyline';
 import type { PropId } from './props';
 
 const SHAPES: PropId[] = ['buildingE', 'buildingA', 'buildingF', 'buildingB'];
 const PER_SIDE = 4;
 const SPACING = 34;
+
+/**
+ * The mid band: a second row of buildings behind the street, moving at
+ * 40% of travel.
+ *
+ * The near city moved at 100% and the far skyline at 12% with nothing in
+ * between, so the scene read as a wall sliding past a backdrop. A band at
+ * an intermediate rate is what makes the depth continuous: three rates,
+ * three distances, and the eye fills in the rest.
+ */
+const MID_SHAPES: PropId[] = ['buildingC', 'buildingD', 'buildingE', 'buildingF', 'buildingA'];
+const MID_PER_SIDE = 5;
+const MID_SPACING = 30;
+const MID_PARALLAX = 0.4;
+const MID_SPAWN = 180;
+
+/**
+ * How far each band slides against a lane change, as a fraction of the
+ * player's sideways position, and how quickly it follows. A step in a lane
+ * moves the whole city a little the other way, nearer bands more than far,
+ * which is the parallax a real street gives a walker who crosses it.
+ */
+const DRIFT_NEAR = 0.35;
+const DRIFT_MID = 0.18;
+const DRIFT_FOLLOW = 2.2;
 
 /**
  * Where a building first appears, in units ahead.
@@ -63,6 +88,9 @@ export class CityLayer implements EnvironmentLayer {
   private readonly rings: { ring: RingPlacer; items: Object3D[] }[] = [];
   private readonly owned: Object3D[] = [];
   private readonly street: Mesh;
+  private readonly near = new Group();
+  private readonly mid = new Group();
+  private driftX = 0;
 
   constructor(ctx: LayerContext) {
     for (const sign of [-1, 1] as const) {
@@ -76,11 +104,31 @@ export class CityLayer implements EnvironmentLayer {
         // ending in mid-air. Close buildings read as a street, not a roof.
         prop.position.set(sign * (ctx.corridor.edge + 11 + (i % 2) * 4), GROUND_Y, 0);
         items.push(prop);
-        this.object.add(prop);
+        this.near.add(prop);
         this.owned.push(prop);
       }
       this.rings.push({ ring: new RingPlacer(items, SPACING, SPAWN_DISTANCE, 1), items });
+
+      // The mid band, further out and taller, darkened toward the sky so it
+      // reads as a block behind rather than beside.
+      const midItems: Object3D[] = [];
+      for (let i = 0; i < MID_PER_SIDE; i++) {
+        const prop = ctx.prop(MID_SHAPES[(i + (sign > 0 ? 3 : 0)) % MID_SHAPES.length] as PropId);
+        if (!prop) continue;
+        litWindows(prop, 'mid');
+        // Out of fog, like the far band: in the portrait frustum this row is
+        // only ever seen a hundred-odd units ahead, where fog would erase it.
+        // Its darkening is what carries distance instead.
+        unfog(prop);
+        prop.scale.y *= 1.35 + (i % 3) * 0.2;
+        prop.position.set(sign * (ctx.corridor.edge + 28 + (i % 3) * 6), GROUND_Y - 2, 0);
+        midItems.push(prop);
+        this.mid.add(prop);
+        this.owned.push(prop);
+      }
+      this.rings.push({ ring: new RingPlacer(midItems, MID_SPACING, MID_SPAWN, MID_PARALLAX), items: midItems });
     }
+    this.object.add(this.near, this.mid);
 
     /**
      * The street.
@@ -98,12 +146,17 @@ export class CityLayer implements EnvironmentLayer {
     this.object.add(this.street);
   }
 
-  update(travelled: number): void {
+  update(travelled: number, step: number, laneX = 0): void {
     for (const { ring } of this.rings) {
       ring.update(travelled, (item, z) => {
         item.position.z = z;
       });
     }
+    // Slide the bands against the lane, slowly, so a change is felt by
+    // the whole street and not just the figure.
+    this.driftX += (laneX - this.driftX) * (1 - Math.exp(-step * DRIFT_FOLLOW));
+    this.near.position.x = -this.driftX * DRIFT_NEAR;
+    this.mid.position.x = -this.driftX * DRIFT_MID;
   }
 
   dispose(): void {
@@ -119,22 +172,35 @@ export class CityLayer implements EnvironmentLayer {
  * Make the windows already printed in the atlas glow, by reusing the diffuse
  * texture as an emissive map. Free detail: no geometry, no second texture.
  */
-function litWindows(root: Object3D): void {
+/**
+ * One lit material per source material and band, shared by every building
+ * that uses it. Cloning per mesh put a material on every façade; with the
+ * mid band that was 67 against a budget of 60, and none of them differed.
+ */
+const LIT = new Map<string, MeshStandardMaterial>();
+
+function litWindows(root: Object3D, band: 'near' | 'mid' = 'near'): void {
   root.traverse((o) => {
     const mesh = o as Mesh;
     if (!mesh.isMesh) return;
     const source = mesh.material as MeshStandardMaterial;
-    const cloned = source.clone();
-    if (cloned.map) {
-      // Low intensity on purpose. The emissive map is the whole diffuse
-      // texture, so a high value lights the brickwork as brightly as the
-      // glass and the building reads as a glowing block rather than a dark
-      // facade with lit windows.
-      cloned.emissiveMap = cloned.map;
-      cloned.emissive = new Color(PALETTE.orangeWarm);
-      cloned.emissiveIntensity = 0.3;
+    const key = `${source.uuid}:${band}`;
+    let cloned = LIT.get(key);
+    if (!cloned) {
+      cloned = source.clone();
+      if (cloned.map) {
+        // Low intensity on purpose. The emissive map is the whole diffuse
+        // texture, so a high value lights the brickwork as brightly as the
+        // glass and the building reads as a glowing block rather than a dark
+        // facade with lit windows.
+        cloned.emissiveMap = cloned.map;
+        cloned.emissive = new Color(PALETTE.orangeWarm);
+        cloned.emissiveIntensity = band === 'mid' ? 0.22 : 0.3;
+      }
+      // The mid band sits further into the night.
+      cloned.color.lerp(new Color(PALETTE.ink), band === 'mid' ? 0.8 : 0.7);
+      LIT.set(key, cloned);
     }
-    cloned.color.lerp(new Color(PALETTE.ink), 0.7);
     mesh.material = cloned;
   });
 }

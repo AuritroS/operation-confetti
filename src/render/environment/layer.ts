@@ -27,7 +27,8 @@ export interface EnvironmentLayer {
   /** Parented into the scene by the composer. */
   readonly object: Object3D;
   /** `travelled` is route distance; `step` is the fixed simulation step. */
-  update(travelled: number, step: number): void;
+  /** `laneX` is the player's sideways position; layers that drift with it read it. */
+  update(travelled: number, step: number, laneX?: number): void;
   /** Must release every geometry and material it created. */
   dispose(): void;
 }
