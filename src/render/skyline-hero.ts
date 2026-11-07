@@ -146,6 +146,8 @@ export interface SkylineHero {
   update(s: Snapshot, dt: number, reduced: boolean): void;
   /** Arrival celebration at the gate. Level 1's hero has the same beat. */
   celebrate?(): void;
+  /** Clear the celebration so a replay chooses clips from the phase again. */
+  reset?(): void;
   /**
    * World position midway between the hands, for the cable to start at.
    *
@@ -277,6 +279,18 @@ class RiggedHero implements SkylineHero {
   private settleTo: string | null = null;
   /** Set once the run is over, so phase changes stop choosing the clip. */
   private celebrating = false;
+  /**
+   * The chest lean applied last frame, and the value it left the bone at.
+   *
+   * The lean is added on top of whatever the clip wrote, which is fine while
+   * a clip is writing. A clip that has finished and clamped stops writing
+   * the bone, and an add-on-top then accumulates every frame: the chest
+   * wound up through the body at the end of the cheer. If the bone still
+   * holds the value we left, the clip did not touch it, and last frame's
+   * lean is taken off before this frame's goes on.
+   */
+  private appliedLean = 0;
+  private lastChestX = Number.NaN;
   private settleAt = 0;
 
   constructor(
@@ -339,6 +353,16 @@ class RiggedHero implements SkylineHero {
     this.actor.play(CLIPS.matthew.cheer, { loop: false, clampWhenFinished: true, fade: 0.2 });
   }
 
+  /** Back to the start line: the cheer is over and the phase picks clips again. */
+  reset(): void {
+    this.celebrating = false;
+    this.lastPhase = '';
+    this.settleTo = null;
+    this.appliedLean = 0;
+    this.lastChestX = Number.NaN;
+    this.actor.play(CLIPS.matthew.run);
+  }
+
   update(s: Snapshot, dt: number, reduced: boolean): void {
     this.actor.update(dt);
     this.clock += dt;
@@ -373,7 +397,8 @@ class RiggedHero implements SkylineHero {
     // ---- procedural arms, applied AFTER the mixer ------------------------
     // Blended rather than switched, so letting go of a cable releases the
     // arms into the clip instead of snapping them.
-    const holding = !!s.anchor && (s.anchor.kind === 'lower' || s.anchor.y > s.p.y + ANCHOR_MIN_RISE);
+    // The arrival cheer owns the whole rig; nothing procedural touches it.
+    const holding = !this.celebrating && !!s.anchor && (s.anchor.kind === 'lower' || s.anchor.y > s.p.y + ANCHOR_MIN_RISE);
     this.grip += ((holding ? 1 : 0) - this.grip) * (1 - Math.exp(-dt / ARM_SETTLE));
 
     if (this.grip > 0.01) {
@@ -452,7 +477,7 @@ class RiggedHero implements SkylineHero {
     }
 
     // Athletic flight soar pose: trailing left arm for balance, forward-held right blaster
-    if (!holding && (s.phase === 'flight' || s.phase === 'descend')) {
+    if (!holding && !this.celebrating && (s.phase === 'flight' || s.phase === 'descend')) {
       this.readBasis();
       const upperR = this.rightArm[0], lowerR = this.rightArm[1];
       const upperL = this.leftArm[0], lowerL = this.leftArm[1];
@@ -490,8 +515,11 @@ class RiggedHero implements SkylineHero {
     // Lean the chest into the arc. Small, because the clip is already
     // animating the spine and a large override reads as a broken rig.
     if (this.chest && !reduced) {
-      const lean = MathUtils.clamp(s.v.y * 0.015, -0.22, 0.22);
+      if (this.chest.rotation.x === this.lastChestX) this.chest.rotation.x -= this.appliedLean;
+      const lean = this.celebrating ? 0 : MathUtils.clamp(s.v.y * 0.015, -0.22, 0.22);
       this.chest.rotation.x += lean;
+      this.appliedLean = lean;
+      this.lastChestX = this.chest.rotation.x;
     }
   }
 

@@ -45,6 +45,7 @@ build order, decisions and evidence.
 | `/?review=chrome` | Every non-level screen in order: loader, cover and name, tutorial sheet, pause, results (win, loss), board, rotate prompt. Each is left by its own button |
 | `/?results=win`, `/?results=loss` | The end-of-run card with a sample score, and the leaderboard behind it. Presentational only: no level is mounted and nothing is submitted |
 | `/?level=1`, `/?level=2` | A single level's standalone review page, skipping the rehearsal |
+| `/?ending=1`, `/?ending=2` | The campaign dropped into that level five seconds before its finish: run-up, arrival, door, iris, chapter card. `&loop` replays the ending each time it finishes; `&closeup` (level 2) keeps the camera tight on Matthew. `tools/shoot-endings.mjs` captures the same route as a frame strip |
 | `/level3.html` | The boss fight alone, with `?debug` for the cue harness |
 | `/?layers=all`, `?layers=clutter` | Level 1 environment layers; the default omits layers that are review-only |
 | `/?start=400` | Fast-forward level 1's standalone page, for looking at its ending |

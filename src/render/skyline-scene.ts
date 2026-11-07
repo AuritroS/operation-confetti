@@ -150,6 +150,10 @@ export class SkylineScene {
 
   constructor(host: RendererHost, private course: Course) {
     this.stage = new Stage(host); this.camera = new SkylineCamera(this.stage.camera);
+    // Review hook: lets a headless check read the hero's pose each frame.
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) {
+      Object.assign(window, { __skyline: this });
+    }
     this.stage.scene.background = new Color(0x111e32);
     /**
      * Thinner fog than level 1, and a further clip plane.
@@ -577,6 +581,7 @@ export class SkylineScene {
   }
   reset(): void {
     this.arrival = -1;
+    this.rigged?.reset?.();
     const leaf = this.finishDoor.getObjectByName('leaf');
     if (leaf) leaf.rotation.y = 0;
     this.camera.reset();

@@ -41,6 +41,8 @@ import { ResultsScreen } from './ui/results';
 import { preloadAssets } from './assets/preload';
 import { flushPending, newId, submitRun, type Identity } from './net/scoreClient';
 import { BEATS, type StoryBeat } from './story/script';
+import { LEVEL_1 } from './levels/level1';
+import { COURSE as SKYLINE_COURSE } from './levels/skyline/config';
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -106,7 +108,19 @@ const debug = params.has('debug');
  * does the same for the campaign, though for levels 1 and 2 `entry.ts` sends
  * that to the standalone page instead.
  */
-const jumpTo = Number(params.get('tutorial') ?? params.get('level') ?? 0);
+const jumpTo = Number(params.get('tutorial') ?? params.get('level') ?? params.get('ending') ?? 0);
+/**
+ * `?ending=N` drops into level N a few seconds before its finish.
+ *
+ * The ending is the one part of a level nobody reaches quickly by playing,
+ * and it is where the arrival shot, the door and the iris all live. With
+ * `&loop` the ending replays every time it finishes, for watching one
+ * change again and again on a phone. Level 2 also honours `&closeup`.
+ */
+const endingAt = Number(params.get('ending') ?? 0);
+const endingLoop = params.has('loop');
+/** Seconds of run-up before the finish. */
+const ENDING_LEAD_S = 5;
 
 /** How a level is built. The shell never reaches inside one. */
 interface StageSpec {
@@ -189,7 +203,8 @@ let identity: Identity | null = null;
  * precisely so a dev run does not have to be silently dropped.
  */
 const testRunReason: string | null =
-  jumpTo >= 1 && jumpTo <= 3 ? `Level ${jumpTo} jump — not submitted to the leaderboard.`
+  endingAt >= 1 && endingAt <= 2 ? `Level ${endingAt} ending review — not submitted to the leaderboard.`
+    : jumpTo >= 1 && jumpTo <= 3 ? `Level ${jumpTo} jump — not submitted to the leaderboard.`
     : params.has('story') || params.has('results') || params.has('review')
       ? 'Review screen — not submitted to the leaderboard.'
       : debug ? 'Debug run — not submitted to the leaderboard.'
@@ -320,12 +335,16 @@ async function mountStage(): Promise<void> {
   // player looks at while it loads rather than a black screen.
   const level = spec.make();
   const mounting = level.mount(ctx);
-  await tell(spec.beats);
-
-  // Then the chapter card, which is where any load still outstanding hides:
-  // it holds for a reading beat, or until the level is ready if that is
-  // longer, and the iris closes on it before opening on the rehearsal.
-  await showChapter(spec, mounting);
+  if (endingAt === spec.id) {
+    // The ending review wants the ending, not the pages before it.
+    await mounting;
+  } else {
+    await tell(spec.beats);
+    // Then the chapter card, which is where any load still outstanding
+    // hides: it holds until the level is ready and the player taps, and the
+    // iris closes on it before opening on the rehearsal.
+    await showChapter(spec, mounting);
+  }
   current = level;
 
   // Every level opens in a rehearsal. The sheet explains the verbs, the
@@ -335,11 +354,26 @@ async function mountStage(): Promise<void> {
   tutorial.show(spec.copy, beginPlay);
 
   useInputFor(spec.id);
+  if (endingAt === spec.id) {
+    // Straight into the scored run, a few seconds from the finish.
+    tutorial.hide();
+    current.beginPlay();
+    skipToEnding();
+  }
   switching = false;
   if (!lifecycle.isPaused) loop.start();
   // The iris opens on the rehearsal with the sheet already up, so the first
   // thing seen of a level is the level and how to play it, together.
   await fade.reveal();
+}
+
+/** Advance the mounted level to `ENDING_LEAD_S` seconds before its finish. */
+function skipToEnding(): void {
+  if (current instanceof RouteLevel) {
+    current.fastForward(LEVEL_1.routeLength - ENDING_LEAD_S * (LEVEL_1.endForwardSpeed ?? LEVEL_1.forwardSpeed));
+  } else if (current instanceof SkylineLevel) {
+    current.fastForward(SKYLINE_COURSE.duration - ENDING_LEAD_S);
+  }
 }
 
 async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
@@ -356,6 +390,16 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
   // than freezing on the frame the result arrived in.
   await fade.cover();
   loop.stop();
+
+  if (endingLoop && endingAt === stage().id && current) {
+    // Review: play the same ending again rather than moving on.
+    current.beginPlay();
+    skipToEnding();
+    switching = false;
+    loop.start();
+    await fade.reveal();
+    return;
+  }
 
   if (beaten || last) { await endCampaign(result); return; }
 
