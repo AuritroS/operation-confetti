@@ -602,40 +602,62 @@ export function buildVaultDoor(width = 4.8, height = 3.4): Group {
   const wall = matte(PALETTE.slate, 0.85);
   const steel = matte(PALETTE.steel, 0.5);
 
-  // Surrounding wall, recessed behind the door.
-  const frame = new Mesh(new BoxGeometry(width, height, 0.35), wall);
-  frame.position.set(0, height / 2, -0.2);
-  vault.add(frame);
+  // Surrounding wall, recessed behind the door, with an opening the size of
+  // the door behind the leaf. A solid slab meant opening the door revealed
+  // a wall; this reveals whatever is beyond, which is the point of a door.
+  const opening = Math.min(width, height) * 0.38 * 2.1;
+  const pillarW = (width - opening) / 2;
+  const bandH = (height - opening) / 2;
+  for (const [w, h, x, y] of [
+    [pillarW, height, -(opening + pillarW) / 2, height / 2],
+    [pillarW, height, (opening + pillarW) / 2, height / 2],
+    [opening, bandH, 0, height - bandH / 2],
+    [opening, bandH, 0, bandH / 2],
+  ] as const) {
+    const part = new Mesh(new BoxGeometry(w, Math.max(0.05, h), 0.35), wall);
+    part.position.set(x, y, -0.2);
+    vault.add(part);
+  }
+
+  // Everything that swings — face, rim, spokes, emblem — hangs on one
+  // hinged leaf at the door's left edge, so an arrival can open it. The
+  // level finds it by name; a door that cannot open is just a wall with a
+  // badge on it, and both levels end by walking through one.
+  const radius = Math.min(width, height) * 0.38;
+  const hinge = -radius * 1.04;
+  const leaf = new Group();
+  leaf.name = 'leaf';
+  leaf.position.set(hinge, height * 0.5, 0);
+  vault.add(leaf);
 
   // Door face: a disc proud of the wall, so it reads as a vault.
-  const radius = Math.min(width, height) * 0.38;
   const door = new Mesh(new CylinderGeometry(radius, radius, 0.3, 32), steel);
   door.rotation.x = Math.PI / 2;
-  door.position.set(0, height * 0.5, 0);
-  vault.add(door);
+  door.position.set(-hinge, 0, 0);
+  leaf.add(door);
 
   // Rim, a touch wider, to catch the light along the edge.
   const rim = new Mesh(new TorusGeometry(radius * 1.04, 0.07, 8, 36), matte(PALETTE.gold, 0.35));
-  rim.position.set(0, height * 0.5, 0.08);
-  vault.add(rim);
+  rim.position.set(-hinge, 0, 0.08);
+  leaf.add(rim);
 
   // Spokes radiating from the centre, the locking-bolt read.
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2;
     const spoke = new Mesh(new BoxGeometry(radius * 0.78, 0.05, 0.06), steel);
     spoke.position.set(
-      Math.cos(angle) * radius * 0.48,
-      height * 0.5 + Math.sin(angle) * radius * 0.48,
+      Math.cos(angle) * radius * 0.48 - hinge,
+      Math.sin(angle) * radius * 0.48,
       0.17,
     );
     spoke.rotation.z = angle;
-    vault.add(spoke);
+    leaf.add(spoke);
   }
 
   // The emblem sized to the door, centred on it, standing off the face.
   const emblem = buildGiftEmblem(radius * 1.15);
-  emblem.position.set(0, height * 0.5, 0.22);
-  vault.add(emblem);
+  emblem.position.set(-hinge, 0, 0.22);
+  leaf.add(emblem);
 
   return vault;
 }

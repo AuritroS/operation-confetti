@@ -13,7 +13,15 @@ import { loadRoguePlayer } from '../render/rogue';
 import { Environment, requestedLayers } from '../render/environment';
 
 /** How long the arrival celebration holds before the level reports done. */
-const ARRIVAL_SECONDS = 1.6;
+const ARRIVAL_SECONDS = 2.4;
+/** How long the arrival shot takes to settle within that hold. */
+const ARRIVAL_SHOT_S = 2.0;
+/**
+ * How far past the finish the vault stands. Further than the shared gate
+ * gap: from six units the 12-unit door face crossed the whole frame on the
+ * run-up, before the arrival shot could pull back from it.
+ */
+const VAULT_GAP = GATE_GAP * 1.6;
 
 /** What a HUD or debug panel needs from the route, as plain data. */
 export interface RouteSnapshot {
@@ -76,6 +84,8 @@ export class RouteLevel implements LevelController {
 
   /** Seconds left of the arrival celebration before the level reports done. */
   private ending = 0;
+  /** Seconds into the arrival shot, or -1 while the run is still on. */
+  private arrival = -1;
   inPractice = true;
   result: LevelOutcome | null = null;
 
@@ -87,7 +97,7 @@ export class RouteLevel implements LevelController {
 
     // Hidden until the route end comes into range; `update` reveals it.
     this.vault.visible = false;
-    this.vault.position.set(0, 0, -(LEVEL_1.routeLength + GATE_GAP));
+    this.vault.position.set(0, 0, -(LEVEL_1.routeLength + VAULT_GAP));
     this.world.add(this.vault);
     if (!this.hasRooftop) this.world.add(this.markers.group);
     this.world.add(buildRoute(LEVEL_1, { surface: !this.hasRooftop, dimDividers: this.hasRooftop }));
@@ -144,6 +154,9 @@ export class RouteLevel implements LevelController {
    * so it is kept — which is also what stops a replay leaking its meshes.
    */
   restart(): void {
+    this.arrival = -1;
+    const leaf = this.vault.getObjectByName('leaf');
+    if (leaf) leaf.rotation.y = 0;
     this.runner = new LevelRunner(LEVEL_1);
     if (this.ctx) {
       const ctx = this.ctx;
@@ -234,8 +247,8 @@ export class RouteLevel implements LevelController {
 
     // The vault grows out of the fog as the route ends, so the run has a
     // visible goal rather than just a progress bar.
-    this.vault.position.z = -(LEVEL_1.routeLength + GATE_GAP - snap.travelled);
-    this.vault.visible = LEVEL_1.routeLength + GATE_GAP - snap.travelled < 70;
+    this.vault.position.z = -(LEVEL_1.routeLength + VAULT_GAP - snap.travelled);
+    this.vault.visible = LEVEL_1.routeLength + VAULT_GAP - snap.travelled < 70;
 
     if (snap.incidents > this.lastIncidents) {
       this.lastIncidents = snap.incidents;
@@ -244,6 +257,7 @@ export class RouteLevel implements LevelController {
 
     if (snap.complete) {
       this.ending = ARRIVAL_SECONDS;
+      this.arrival = 0;
       this.player.setBlink(false);
       this.player.celebrate();
     }
@@ -258,10 +272,21 @@ export class RouteLevel implements LevelController {
 
     const x = this.runner.lanes.renderX;
     this.player.object.position.x = x;
+
+    // The arrival shot: back and up, looking at him and the opening door,
+    // so the ending frames both rather than a door face filling the screen.
+    let arrive = 0;
+    if (this.arrival >= 0) {
+      this.arrival += STEP_S;
+      const t = Math.min(1, this.arrival / ARRIVAL_SHOT_S);
+      arrive = 1 - (1 - t) * (1 - t);
+      const leaf = this.vault.getObjectByName('leaf');
+      if (leaf) leaf.rotation.y = 1.35 * arrive;
+    }
     // Camera trails the lane slightly, which reads as weight without taking
     // the next hazard out of frame.
-    this.stage.camera.position.set(x * 0.3, 2.5, 5.2);
-    this.stage.camera.lookAt(x * 0.12, 1.0, -6);
+    this.stage.camera.position.set(x * 0.3, 2.5 + 2.2 * arrive, 5.2 + 6 * arrive);
+    this.stage.camera.lookAt(x * 0.12 + (x - x * 0.12) * arrive, 1.0 + 1.8 * arrive, -6 + 1 * arrive);
     this.stage.render();
   }
 

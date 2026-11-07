@@ -8,6 +8,9 @@ import { Stage } from './stage';
 import type { RendererHost } from './renderer-host';
 import { GATE_GAP } from './look';
 import { SkylineCamera } from './skyline-camera';
+
+/** How long the arrival shot takes to settle. The level holds at least this long. */
+export const ARRIVAL_SHOT_S = 2.0;
 import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
@@ -130,6 +133,8 @@ export class SkylineScene {
   private markBuffer: Vector3[] = [];
   private landmark: Object3D | null = null;
   private gameplayVisible = true;
+  /** Seconds into the arrival shot, or -1 while the chase is still on. */
+  private arrival = -1;
   private playerShadow: Mesh;
 
   setGameplayVisible(visible: boolean): void {
@@ -280,8 +285,14 @@ export class SkylineScene {
    * The stand-in is hidden rather than removed: it is what the level falls
    * back to, and a failed reload should not leave an empty street.
    */
-  /** Arrival celebration, forwarded to whichever hero is installed. */
+  /**
+   * Arrival: the hero settles to the ground and cheers, the rope goes, the
+   * vault leaf swings open, and the camera pulls back to frame him and the
+   * door together. Eased over `ARRIVAL_SHOT_S`; the level holds the ending
+   * at least that long.
+   */
   celebrate(): void {
+    this.arrival = 0;
     this.rigged?.celebrate?.();
   }
 
@@ -354,6 +365,19 @@ export class SkylineScene {
     const crouch = landing ? 0.14 * Math.sin(Math.PI * Math.min(1, s.landingAge / LAND_TIME)) : 0;
     this.hero.position.set(s.p.x, s.p.y - crouch, 0);
 
+    // The arrival shot's progress. He may have crossed the line mid-swing,
+    // so the pose is brought down to the ground rather than left hanging.
+    let arrive = 0;
+    if (this.arrival >= 0) {
+      this.arrival += dt;
+      const t = Math.min(1, this.arrival / ARRIVAL_SHOT_S);
+      arrive = 1 - (1 - t) * (1 - t);
+      this.hero.position.y += (this.course.groundY - this.hero.position.y) * arrive;
+      const leaf = this.finishDoor.getObjectByName('leaf');
+      if (leaf) leaf.rotation.y = 1.35 * arrive;
+    }
+    this.camera.setArrival(arrive);
+
     // Target pitch:
     // Diving forward into the ground when descending (v.y < 0): negative rotation around X (nose-down dive)
     // Soaring into the air when ascending (v.y > 0): positive rotation around X (nose-up climb)
@@ -371,9 +395,9 @@ export class SkylineScene {
 
     // Smooth rotational changes across frames to eliminate twitch
     const rotSmooth = 1 - Math.exp(-dt / 0.08);
-    this.hero.rotation.x += (targetPitch - this.hero.rotation.x) * rotSmooth;
-    this.hero.rotation.y += (targetYaw - this.hero.rotation.y) * rotSmooth;
-    this.hero.rotation.z += (targetRoll - this.hero.rotation.z) * rotSmooth;
+    this.hero.rotation.x += ((1 - arrive) * targetPitch - this.hero.rotation.x) * rotSmooth;
+    this.hero.rotation.y += ((1 - arrive) * targetYaw - this.hero.rotation.y) * rotSmooth;
+    this.hero.rotation.z += ((1 - arrive) * targetRoll - this.hero.rotation.z) * rotSmooth;
     this.hero.visible = this.gameplayVisible && !this.rigged;
     if (this.rigged) {
       this.rigged.object.visible = this.gameplayVisible;
@@ -426,7 +450,7 @@ export class SkylineScene {
     const live = s.anchor && !s.complete;
     if (live) this.anchorAt.set(s.anchor!.x, s.anchor!.y, scrollZ - s.anchor!.z);
     this.rope.update(this.grip, live ? this.anchorAt : null, dt);
-    if (!this.gameplayVisible) this.rope.object.visible = false;
+    if (!this.gameplayVisible || arrive > 0) this.rope.object.visible = false;
     let b = 0, w = 0;
     if (this.street) {
       this.street.update(scrollZ);
@@ -502,9 +526,11 @@ export class SkylineScene {
       pool.instanceMatrix.needsUpdate = true;
     });
     const finish = scrollZ - (this.course.duration === 45 ? ROUTE_LENGTH : this.course.duration * this.course.speed);
-    // Short of the endpoint, so he arrives in front of the gate with room
-    // to celebrate rather than finishing inside the door.
-    this.finishDoor.position.z = finish - GATE_GAP;
+    // Well short of the endpoint, so he arrives in front of the gate with
+    // room to celebrate, and so the run-up never puts the door face across
+    // the whole frame: at 26 units wide it fills a 12.5-unit camera stand-off
+    // from six units away.
+    this.finishDoor.position.z = finish - GATE_GAP * 2;
     for (const [mesh, count] of [[this.blocks, b], [this.trims, w]] as const) {
       mesh.count = count; mesh.instanceMatrix.needsUpdate = true;
     }
@@ -549,7 +575,13 @@ export class SkylineScene {
     }
     this.stage.render();
   }
-  reset(): void { this.camera.reset(); this.rope.reset(); }
+  reset(): void {
+    this.arrival = -1;
+    const leaf = this.finishDoor.getObjectByName('leaf');
+    if (leaf) leaf.rotation.y = 0;
+    this.camera.reset();
+    this.rope.reset();
+  }
   dispose(): void {
     this.root.removeFromParent(); this.box.dispose(); this.diamond.dispose();
     this.rope.dispose();

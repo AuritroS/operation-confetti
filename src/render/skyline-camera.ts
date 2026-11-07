@@ -26,6 +26,12 @@ import {
  */
 const CLOSEUP = 0.45;
 
+/** The arrival shot's dolly back, rise, and where it looks (hero at z 0, door ahead). */
+const ARRIVAL_BACK = 12;
+const ARRIVAL_RISE = 3.5;
+const ARRIVAL_LOOK_Y = 3.6;
+const ARRIVAL_LOOK_Z = -5;
+
 /**
  * `?inspect` framing: high, back, and looking down the contact sheet.
  *
@@ -70,6 +76,7 @@ const INSPECT_VIEW = (() => {
 export class SkylineCamera {
   private focusY = FOCUS_START;
   private distanceSurge = 0;
+  private arrivalK = 0;
   private initialized = false;
   private readonly closeup: boolean;
 
@@ -113,21 +120,32 @@ export class SkylineCamera {
     this.distanceSurge += (targetSurge - this.distanceSurge) * (1 - Math.exp(-dt / 0.45));
     const distance = this.closeup ? full * CLOSEUP : full + this.distanceSurge;
 
+    const k = this.arrivalK;
+    // The arrival shot: back and up, and the look pulled in from the far
+    // road to the hero and the door he has stopped at, so the ending frames
+    // both instead of a door face filling the screen.
     this.camera.position.set(
       CAMERA_SIDE,
-      this.focusY + (this.closeup ? CAMERA_HEIGHT * 0.5 : CAMERA_HEIGHT),
-      distance,
+      this.focusY + (this.closeup ? CAMERA_HEIGHT * 0.5 : CAMERA_HEIGHT) + ARRIVAL_RISE * k,
+      distance + ARRIVAL_BACK * k,
     );
+    const lx = CAMERA_SIDE + Math.sin(CAMERA_YAW) * CAMERA_LOOK_AHEAD;
+    const ly = this.focusY + (this.closeup ? CAMERA_LOOK_HEIGHT * 0.4 : CAMERA_LOOK_HEIGHT);
+    const lz = this.closeup ? CAMERA_LOOK_AHEAD * 0.4 : CAMERA_LOOK_AHEAD;
     this.camera.lookAt(
-      CAMERA_SIDE + Math.sin(CAMERA_YAW) * CAMERA_LOOK_AHEAD,
-      this.focusY + (this.closeup ? CAMERA_LOOK_HEIGHT * 0.4 : CAMERA_LOOK_HEIGHT),
-      this.closeup ? CAMERA_LOOK_AHEAD * 0.4 : CAMERA_LOOK_AHEAD,
+      lx + (s.p.x - lx) * k,
+      ly + (ARRIVAL_LOOK_Y - ly) * k,
+      lz + (ARRIVAL_LOOK_Z - lz) * k,
     );
     // Horizon stays level and stable to avoid vestibular disorientation and motion sickness.
     this.camera.rotation.z = 0;
   }
 
+  /** 0 during play; eased to 1 across the arrival celebration. */
+  setArrival(k: number): void { this.arrivalK = Math.max(0, Math.min(1, k)); }
+
   reset(): void {
+    this.arrivalK = 0;
     this.focusY = FOCUS_START;
     this.distanceSurge = 0;
     this.initialized = false;

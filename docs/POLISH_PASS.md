@@ -37,6 +37,15 @@ placement and layering.
 
 ### 1. Shell and seams (first, because every later capture runs through it)
 
+**Done 7 Nov.** Found: both route levels ended with the vault door face
+filling the frame (26 units wide, six units past the finish, camera 12.5
+back), and the door was a solid slab with a badge. Fixed with an arrival
+shot — the leaf swings open on a hinge to show the city beyond, the camera
+dollies back and up to frame him under the opening, a mid-air finish is
+brought to the ground — and the doors moved further past the finish so the
+run-up never fills the frame. `tools/shoot-endings.mjs` captures either
+ending as a strip. `?perf` chip added.
+
 - The campaign end to end with the new comic: level ending → iris → panels →
   chapter card → next level; boss win/loss → iris → ending panel → results.
 - Diagnose and fix the level 2 ending break Auri saw (celebration clip,

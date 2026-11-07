@@ -634,6 +634,32 @@ async function reviewChrome(): Promise<void> {
   mark('chrome · done — reload to run again');
 }
 
+/*
+ * `?perf`: frame timing on screen, for a phone.
+ *
+ * Headless captures cannot measure this, and "it judders" is hard to act
+ * on. One chip at the bottom, updated each second from the loop's own
+ * counters: current fps, the lowest second so far, and dropped simulation
+ * steps over the run. Also logged every ten seconds so a desktop session
+ * can read it back from the console.
+ */
+if (params.has('perf')) {
+  const chipPerf = document.createElement('div');
+  chipPerf.className = 'review-chip review-chip--perf';
+  app.append(chipPerf);
+  let minFps = Infinity;
+  let seconds = 0;
+  setInterval(() => {
+    if (!loop.isRunning) return;
+    seconds++;
+    const { fps, droppedSteps } = loop.stats;
+    if (fps > 0) minFps = Math.min(minFps, fps);
+    const line = `fps ${fps} · min ${minFps === Infinity ? '–' : minFps} · dropped ${droppedSteps} steps / ${seconds}s`;
+    chipPerf.textContent = line;
+    if (seconds % 10 === 0) console.info(`[perf] ${line}`);
+  }, 1000);
+}
+
 // ---- boot --------------------------------------------------------------
 
 hud.reset();
