@@ -46,6 +46,17 @@ brought to the ground — and the doors moved further past the finish so the
 run-up never fills the frame. `tools/shoot-endings.mjs` captures either
 ending as a strip. `?perf` chip added.
 
+**Ending cycles, 7–8 Nov.** The level 2 cheer wound the chest through the
+body (an add-on-top chest lean accumulating once the clip clamped; fixed
+and measured). An airborne finish now falls and lands with the landing
+clip and a camera dip before the cheer. The pause card names the chapter
+instead of comic copy. Both gates are buildings: level 2 a brick
+gatehouse spanning the street with pilasters, lanterns, windows and a
+stepped plinth; level 1 a rooftop bulkhead the parapets run into. Both
+doors open onto a lit interior — the stairwell up, the gift vault — so
+the reveal is a room, not the empty map. `?ending=N` (`&loop`,
+`&closeup`) is the review route.
+
 - The campaign end to end with the new comic: level ending → iris → panels →
   chapter card → next level; boss win/loss → iris → ending panel → results.
 - Diagnose and fix the level 2 ending break Auri saw (celebration clip,

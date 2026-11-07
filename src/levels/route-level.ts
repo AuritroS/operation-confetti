@@ -8,7 +8,7 @@ import { GATE_GAP, LOOK } from '../render/look';
 import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from '../render/primitives';
 import { EntityVisuals } from '../render/entities';
 import { loadGameplayProps, type PropProvider } from '../render/props-loader';
-import { buildVaultDoor } from '../render/custom';
+import { buildBulkhead } from '../render/custom';
 import { loadRoguePlayer } from '../render/rogue';
 import { Environment, requestedLayers } from '../render/environment';
 
@@ -59,14 +59,11 @@ export class RouteLevel implements LevelController {
   private readonly hasRooftop: boolean;
   private readonly markers = new RouteMarkers(LEVEL_1);
   /**
-   * The route's end, built to the same proportions level 2 finishes on.
-   *
-   * It used to span only the lanes at 4.8 by 3.6, which left the disc and
-   * its mask too small to read and the rooftop visible either side of it.
-   * Wider than the parapets and tall enough to block the route end, so the
-   * emblem dominates the frame the way level 2's does.
+   * The route's end: the vault set into a rooftop bulkhead the parapets run
+   * into. The door is sized to the roof it sits on; a 12-unit door on a
+   * 5.7-unit roof was wider than the building that was supposed to hold it.
    */
-  private readonly vault = buildVaultDoor(12, 9);
+  private readonly vault = buildBulkhead(5.6, 4.6, LEVEL_1.laneWidth * LEVEL_1.laneCount / 2 + 0.45);
 
   private runner = new LevelRunner(LEVEL_1);
   private entityVisuals: EntityVisuals;
