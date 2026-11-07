@@ -420,7 +420,7 @@ export class SkylineScene {
       arrive = 1 - (1 - t) * (1 - t);
       this.hero.position.y = this.course.groundY - crouch;
       const leaf = this.finishDoor.getObjectByName('leaf');
-      if (leaf) leaf.rotation.y = 1.35 * arrive;
+      if (leaf) leaf.rotation.y = -1.15 * arrive;
     }
     this.camera.setArrival(arrive);
     // Past the line the snapshot is frozen; the body settles upright.

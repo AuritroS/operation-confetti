@@ -291,7 +291,7 @@ export class RouteLevel implements LevelController {
       const t = Math.min(1, this.arrival / ARRIVAL_SHOT_S);
       arrive = 1 - (1 - t) * (1 - t);
       const leaf = this.vault.getObjectByName('leaf');
-      if (leaf) leaf.rotation.y = 1.35 * arrive;
+      if (leaf) leaf.rotation.y = -1.15 * arrive;
       if (!this.confettiFired && arrive > 0.25) {
         this.confettiFired = true;
         this.confetti.burst(new Vector3(0, VAULT_H * 0.5, 0.6));
