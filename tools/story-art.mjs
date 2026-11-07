@@ -71,17 +71,19 @@ const PANELS = {
       + ' and the raised blaster arm fully inside the middle of the frame with clear sky above.',
   },
   rooftop: {
-    refs: ['aurora', 'matthew-aurora', 'tower'],
+    refs: ['aurora-face', 'aurora', 'matthew-aurora', 'tower'],
     prompt:
-      'The woman in image 1, same face, crown and purple-and-gold gown, and the man in image 2,'
-      + ' same face, glasses, hair and navy-and-gold suit, facing each other on a rooftop at'
-      + ' night, a brick parapet between them. He holds up a confetti cannon: a chunky, short,'
-      + ' wide-barrelled toy blaster in steel grey and deep blue with gold bands, a gold grip and a'
-      + ' grey bowl-shaped hopper on top, painted with the same soft materials and highlights as'
-      + ' his suit, clearly a party toy and not a real gun. She holds the same birthday cake she'
-      + ' holds in image 1, candles lit, head tilted, unimpressed and amused. Toronto skyline with'
-      + ' the CN Tower from image 3 and the full moon behind her. Three-quarter view with him'
-      + ' nearer the camera, cannon fully visible, both faces in the upper middle of the frame.',
+      'Image 1 is a close portrait of the woman and image 2 shows her full figure: reproduce her'
+      + ' face exactly, same facial structure, eyes, brows, nose, lips, smile, skin tone, hair'
+      + ' and crown, as if painting the same real person. The man in image 3, same face,'
+      + ' glasses, hair and navy-and-gold suit. They face each other on a rooftop at night with a'
+      + ' brick parapet between them. He holds up a CONFETTI CANNON: a short, chunky, wide-mouthed'
+      + ' party cannon in deep blue and gold with a round grey hopper on top heaped with colourful'
+      + ' paper confetti, a few pieces of gold and purple confetti already puffing out of the wide'
+      + ' muzzle, clearly a harmless party toy. She holds the same birthday cake she holds in'
+      + ' image 2, candles lit, head tilted, unimpressed and amused. Toronto skyline with the CN'
+      + ' Tower from image 4 and the full moon behind her. Three-quarter view with him nearer the'
+      + ' camera, cannon fully visible, both faces in the upper middle of the frame.',
   },
   win: {
     refs: ['matthew-aurora', 'aurora'],
@@ -96,16 +98,18 @@ const PANELS = {
       + ' the bottom of the frame in front of him. Warm, celebratory.',
   },
   loss: {
-    refs: ['aurora', 'matthew'],
+    refs: ['aurora-face', 'aurora', 'matthew-aurora', 'matthew'],
     prompt:
-      'The woman in image 1, same face, crown and purple-and-gold gown, standing on the edge of'
-      + ' a rooftop parapet, turning back over her shoulder to laugh at the viewer the instant'
-      + ' before she leaps into the night, holding the same birthday cake she holds in image 1'
-      + ' in both hands at chest height, candles lit. A spiral of magenta magic winds around her.'
-      + ' In the near foreground at the bottom left, the gloved hand and arm of the man in'
-      + ' image 2 reaching after her, the cake just out of reach. Toronto skyline and moon'
-      + ' beyond. Her face and the cake in the upper middle of the frame, nothing in the top'
-      + ' corners. Playful, not grim.',
+      'Image 1 is a close portrait of the woman and image 2 shows her full figure in her crown'
+      + ' and purple-and-gold gown: reproduce her face exactly, same facial structure, eyes,'
+      + ' brows, nose, lips, smile, skin tone and hair, as if painting the same real person'
+      + ' (image 3 shows her once more, beside the man). She stands on the edge of a rooftop'
+      + ' parapet, turning back over her shoulder to laugh at the viewer the instant before she'
+      + ' leaps into the night, holding the same birthday cake she holds in image 2 in both hands'
+      + ' at chest height, candles lit. A spiral of magenta magic winds around her. In the near'
+      + ' foreground at the bottom left, the gloved hand and arm of the man in image 4 reaching'
+      + ' after her, the cake just out of reach. Toronto skyline and moon beyond. Her face and'
+      + ' the cake in the upper middle of the frame, nothing in the top corners. Playful.',
   },
 };
 
