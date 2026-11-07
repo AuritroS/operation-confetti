@@ -22,7 +22,7 @@
  *
  * Needs OPENAI_API_KEY in .env (gitignored). Never logs it.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { loadEnv } from './env.mjs';
@@ -222,6 +222,9 @@ async function generate(panel, layer = null) {
   } catch (e) {
     console.error(`\n  curl failed: ${e.message.slice(0, 300)}`);
     return false;
+  } finally {
+    // The key lives in .env; the header file exists only for the call.
+    try { unlinkSync(headerFile); } catch { /* already gone */ }
   }
   if (body.error) {
     console.error(`\n  ${body.error.message ?? JSON.stringify(body).slice(0, 300)}`);

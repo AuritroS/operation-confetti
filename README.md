@@ -10,6 +10,19 @@ Design doc: [`design.md`](./design.md) · Settled tech spec: [`docs/TECH_SPEC.md
   on `operation-confetti.auritro.com`
 - **Data:** Supabase Postgres, reached only from the Worker
 
+## Review routes
+
+| Path | Shows |
+|---|---|
+| `/` | The campaign: cover, comic, three levels, results and the board |
+| `/?review=story` | The whole comic in order with the real transitions |
+| `/?review=chrome` | Every non-level screen in order |
+| `/?ending=1`, `/?ending=2` | A level's last five seconds; `&loop` replays |
+| `/?tutorial=N` | The campaign at level N with its tutorial sheet up |
+| `/?perf` | A frame-timing chip on any route |
+
+See `AGENTS.md` for the full table and the capture tools.
+
 ## Current review: level 2 — swipe, swing and run
 
 The game opens in **Skyline Chase** at `/` (also `/?level=2`). Level 1 is

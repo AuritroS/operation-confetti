@@ -46,6 +46,7 @@ build order, decisions and evidence.
 | `/?results=win`, `/?results=loss` | The end-of-run card with a sample score, and the leaderboard behind it. Presentational only: no level is mounted and nothing is submitted |
 | `/?level=1`, `/?level=2` | A single level's standalone review page, skipping the rehearsal |
 | `/?ending=1`, `/?ending=2` | The campaign dropped into that level five seconds before its finish: run-up, arrival, door, iris, chapter card. `&loop` replays the ending each time it finishes; `&closeup` (level 2) keeps the camera tight on Matthew. `tools/shoot-endings.mjs` captures the same route as a frame strip |
+| `/?perf` | Any route, with a chip at the bottom: fps, the lowest second so far, dropped simulation steps. Logged every ten seconds too |
 | `/level3.html` | The boss fight alone, with `?debug` for the cue harness |
 | `/?layers=all`, `?layers=clutter` | Level 1 environment layers; the default omits layers that are review-only |
 | `/?start=400` | Fast-forward level 1's standalone page, for looking at its ending |
@@ -55,8 +56,14 @@ asset plates. `node tools/shoot-story-pass.mjs` photographs both review routes
 at two phone widths into `tools/shots/story-pass/` (ignored; regenerate it)
 and records the story route as `story-review.mp4`.
 
+Other captures: `tools/shoot-endings.mjs <1|2>` (a level's last seconds as
+a frame strip), `tools/shoot-hud.mjs` (reward, hit, present row, boss
+readouts), `tools/shoot-level1.mjs <tag> [query]` (three route positions,
+two widths). All write under `tools/shots/`, which is ignored.
+
 The comic's script, storyboard, image prompts and budget are in
-`docs/STORY_PASS.md`. `src/story/script.ts` maps each panel to its image and
+`docs/STORY_PASS.md`; the level polish pass and its evidence are in
+`docs/POLISH_PASS.md`. `src/story/script.ts` maps each panel to its image and
 marks which are still placeholders.
 
 ## Habits
