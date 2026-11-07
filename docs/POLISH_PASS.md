@@ -106,6 +106,13 @@ The budget is 90 now, with the reason in the tool. Triangles 55.5k of 60k.
 
 ### 3. HUD
 
+**Done 8 Nov.** Reward: a gold glow around the whole frame for ~560 ms and
+a 30px display-face `+100` rising over 1.1 s. Hit: the vignette in the fault
+red, harder and shorter, with a matching `−50`. Four present glyphs under
+the score fill in gold with a pop as gifts are taken, hidden on the boss
+level. `tools/shoot-hud.mjs` captures the start, the reward, the hit and
+the boss readouts at two widths into `tools/shots/hud/`.
+
 - Reward: a gold edge glow around the whole frame for ~500 ms and a larger
   `+100` that rises from the score with weight, in the comic's display
   face.

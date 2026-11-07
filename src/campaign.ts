@@ -216,13 +216,22 @@ const ctx: LevelContext = {
   emit: (event) => {
     events.push(event);
     hud.setScore(scoreRun(events).total);
-    if (event.t === 'gift') hud.showReward(POINTS.gift);
+    if (event.t === 'gift') {
+      hud.showReward(POINTS.gift);
+      hud.setGifts(giftsTaken(), stage().id !== 3);
+    }
     if (event.t === 'incident') hud.showPenalty(POINTS.incident);
   },
   debug,
 };
 
 function stage(): StageSpec { return STAGES[index]!; }
+
+/** Gifts taken in the level on screen, for the HUD's row of four. */
+function giftsTaken(): number {
+  const id = stage().id;
+  return events.filter((e) => e.t === 'gift' && e.level === id).length;
+}
 
 function showPause(visible: boolean): void {
   // The card only ever appears mid-level, so it says which one.
@@ -334,6 +343,8 @@ async function mountStage(): Promise<void> {
   const spec = stage();
   stageLabel.textContent = `${spec.id}/3`;
   hud.setVisible(true);
+  // The row of presents belongs to the route levels; the boss has her own bars.
+  hud.setGifts(0, spec.id !== 3);
   bossHud.setVisible(false);
 
   // The panels go up before the level is built, so the comic is what the

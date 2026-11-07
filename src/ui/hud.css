@@ -1,4 +1,4 @@
-@import './theme.css';
+@import './chrome.css';
 
 /*
  * The score HUD, shared by every level.
@@ -43,37 +43,109 @@
   /* Legible over bright and dark backgrounds. */
   text-shadow: 0 2px 10px rgba(8, 10, 20, 0.85);
 }
+/*
+ * The points just won or lost, large and brief.
+ *
+ * A body-size figure beside the score was easy to miss mid-run. This is the
+ * comic's display face at twice the size, rising with weight and holding
+ * long enough to read, in the colour of what happened: gold for a gift,
+ * the fault red for a hit.
+ */
 .hud__delta {
-  font-family: var(--font-ui);
-  font-size: var(--text-body);
-  font-weight: 700;
+  font-family: var(--font-display, var(--font-ui));
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
-  animation: hud-delta-float 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  text-shadow: 0 2px 8px rgba(8, 10, 20, 0.9);
+  animation: hud-delta-float 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  text-shadow: 0 2px 0 var(--frame-ink, #0b0710), 0 3px 14px rgba(8, 10, 20, 0.85);
 }
 .hud__delta--reward {
   color: #ffd166;
 }
 .hud__delta--penalty {
-  color: #ff5555;
+  color: var(--fault);
 }
 @keyframes hud-delta-float {
   0% {
     opacity: 0;
-    transform: translateY(4px) scale(0.9);
+    transform: translateY(10px) scale(0.6);
   }
-  15% {
+  12% {
     opacity: 1;
-    transform: translateY(0) scale(1.05);
+    transform: translateY(0) scale(1.25);
   }
-  35% {
-    transform: translateY(-2px) scale(1);
+  30% {
+    transform: translateY(-3px) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-14px);
+    transform: translateY(-26px) scale(0.95);
   }
+}
+
+/*
+ * The whole frame glows gold for a moment on a reward.
+ *
+ * Nothing in the scene is as large as the screen's own edge, so an edge
+ * glow is the one reward cue that cannot be missed wherever the eye is.
+ * Gold is Matthew's and the gift's colour; the hit vignette keeps red.
+ */
+.hud__glow {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  pointer-events: none;
+  box-shadow: inset 0 0 110px 30px rgba(255, 209, 102, 0.85), inset 0 0 28px 6px rgba(255, 236, 180, 0.7);
+  opacity: 0;
+  animation: hud-glow 560ms ease-out forwards;
+}
+@keyframes hud-glow {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/*
+ * The level's four presents, under the score.
+ *
+ * A map of what is left rather than a count: four outlines fill in gold
+ * as they are taken, and the one just taken pops. Hidden on the boss
+ * fight, whose readouts are its own.
+ */
+.hud__gifts {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+.hud__gift {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+.hud__gift svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.hud__gift-box, .hud__gift-lid {
+  fill: rgba(11, 7, 16, 0.55);
+  stroke: rgba(247, 211, 128, 0.55);
+  stroke-width: 1.4;
+}
+.hud__gift-ribbon, .hud__gift-bow {
+  fill: rgba(247, 211, 128, 0.35);
+}
+.hud__gift--taken .hud__gift-box { fill: #eaac5b; stroke: #ffe7b0; }
+.hud__gift--taken .hud__gift-lid { fill: #f2bd6a; stroke: #ffe7b0; }
+.hud__gift--taken .hud__gift-ribbon, .hud__gift--taken .hud__gift-bow { fill: #b54b3a; }
+.hud__gift--taken { animation: hud-gift-pop 520ms cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes hud-gift-pop {
+  0% { transform: scale(0.6); }
+  45% { transform: scale(1.45); }
+  100% { transform: scale(1); }
 }
 .hud__stage {
   font-size: 11px;
@@ -94,16 +166,26 @@
   cursor: pointer;
   backdrop-filter: blur(6px);
 }
+/*
+ * The hit pulse: the fault red, hard and short.
+ *
+ * It was Aurora's magenta, which read as her magic rather than as damage.
+ * Red is the one colour the HUD keeps for things that cost.
+ */
 .vignette {
   position: absolute;
   inset: 0;
   z-index: 25;
   pointer-events: none;
-  box-shadow: inset 0 0 90px 24px var(--magenta);
+  box-shadow: inset 0 0 120px 34px var(--fault), inset 0 0 30px 8px rgba(255, 90, 70, 0.9);
   opacity: 0;
-  animation: vignette-pulse 420ms ease-out forwards;
+  animation: vignette-pulse 380ms ease-out forwards;
 }
 @keyframes vignette-pulse {
-  0% { opacity: 0.75; }
+  0% { opacity: 1; }
   100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud__glow, .vignette { animation-duration: 200ms; }
+  .hud__gift--taken { animation: none; }
 }
