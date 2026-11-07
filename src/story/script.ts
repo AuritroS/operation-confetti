@@ -196,9 +196,11 @@ export const BEATS = {
   loss: {
     id: 'loss',
     image: 'loss',
-    // Follow her off the edge: wide, then up and in on her and the cake.
+    // Follow her off the edge: wide, then a gentle push toward her and the
+    // cake. Her face already sits high in the render, so the push is small
+    // or the crown ends up under the skip button on a short phone.
     from: WHOLE,
-    to: { zoom: 1.22, origin: '58% 18%' },
+    to: { zoom: 1.08, origin: '55% 30%' },
     owner: 'aurora',
     lines: [
       { text: 'The cake remains at large' },

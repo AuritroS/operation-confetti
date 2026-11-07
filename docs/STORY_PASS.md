@@ -1,8 +1,19 @@
 # Story and chrome pass — stage 1: script, storyboard, image prompts
 
 Status: **stages 1–4 done, 7 Nov 2026**; stage 5 (campaign seams, full run)
-is next. Spend so far: **$0.52** of the $1 cap (ledger in
-`.local-tmp/story-art/ledger.json`; `node tools/story-art.mjs --ledger`).
+is next. Spend so far: **$1.16** of a $3 cap raised from $1 on 7 Nov for the
+medium-tier re-render (ledger in `.local-tmp/story-art/ledger.json`;
+`node tools/story-art.mjs --ledger`).
+
+Second round, same day: all five panels re-rendered at the **medium** tier at
+**1024×2208** (about $0.07 per image, $0.045 per layer), with faces as
+full-resolution references, the low-poly cannon and cake plates dropped in
+favour of words and the intro's painted cake, a top-corner safe zone added to
+the guard block, and the "quiet lower third" softened to "no faces or text".
+That fixed the cartoon props, Aurora's likeness, Matthew's missing legs, the
+vault headroom and the loss panel's cut cake. The asset build now serves
+story images at up to 1200px wide at quality 90; the old 900px cap upscaled
+every panel on a 3x phone and read as grain.
 
 What shipped against this plan, and where it differs:
 - All five panels were generated at **832×1792**, the phone's own aspect,

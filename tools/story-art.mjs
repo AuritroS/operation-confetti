@@ -30,17 +30,20 @@ import { loadEnv } from './env.mjs';
 const OUT = resolve('.local-tmp/story-art');
 const REFS = join(OUT, 'refs');
 const LEDGER = join(OUT, 'ledger.json');
-const CAP_USD = 0.95;
+const CAP_USD = 2.95;
 /** Spent on the 7 Nov probes before the ledger existed. */
 const PRIOR_USD = 0.065;
 const PRICE = { textIn: 5 / 1e6, imageIn: 8 / 1e6, imageOut: 30 / 1e6 };
 const MODEL = 'gpt-image-2.6-sunburst';
 
 const GUARD =
-  ' Same illustration style, palette and lighting as image 1: painted, saturated, night, gold and purple'
-  + ' light. Tall phone-screen portrait composition. No text, no title, no lettering, no logos, no'
-  + ' watermark. Keep the lower third of the frame quiet and dark (ground, street or rooftop) so'
-  + ' captions can sit over it. Faces and hands fully in frame, nothing important cut by the edges.';
+  ' Same painted illustration style, palette and lighting as image 1: saturated night, gold and'
+  + ' purple light, soft painterly rendering of every object including props. Tall phone-screen'
+  + ' portrait composition. No text, no title, no lettering, no logos, no watermark. Keep the top'
+  + ' 12% of the frame free of faces and key objects (a button sits there), and keep the bottom'
+  + ' quarter free of faces and text, with ground, street or rooftop there instead. Faces and'
+  + ' hands fully in frame and anatomically correct, five fingers per hand, nothing important cut'
+  + ' by the edges.';
 
 /** Panel id → references (in order; "image 1" is the first) and prompt. */
 const PANELS = {
@@ -53,48 +56,56 @@ const PANELS = {
       + ' out. Beyond the door: a rooftop edge and the Toronto skyline at night with the CN Tower'
       + ' from image 4 lit purple, and a full moon. A few yellow presents like image 5 are stacked'
       + ' at his feet. Low three-quarter angle from behind his shoulder, so the city is the subject;'
-      + ' his face is seen in profile, in the upper half of the frame.',
+      + ' his face is seen in profile. His whole figure sits in the lower two thirds of the frame'
+      + ' with generous night sky above his head.',
   },
   chase: {
     refs: ['matthew', 'blaster', 'present', 'tower'],
     prompt:
       'The man in image 1, same face, glasses, hair and suit, swinging on a glowing gold cable'
       + ' from the blaster in image 2, low over a Toronto night street between brick buildings'
-      + ' with striped awnings and hanging street signs, CN Tower from image 4 and full moon'
-      + ' behind. A yellow present like image 3 is tucked under his arm, and two more presents are'
-      + ' falling ahead of him down the street, as if dropped by someone fleeing. Dynamic diagonal'
-      + ' composition, motion lines on the cable, his whole body in the upper two thirds.',
+      + ' with striped awnings and hanging street signs, CN Tower from image 4 behind him and the'
+      + ' full moon low on the left side of the sky. A yellow present like image 3 is tucked under'
+      + ' his arm, and two more presents are falling ahead of him down the street, as if dropped by'
+      + ' someone fleeing. Dynamic diagonal composition, motion lines on the cable, his whole body'
+      + ' and the raised blaster arm fully inside the middle of the frame with clear sky above.',
   },
   rooftop: {
-    refs: ['matthew-aurora', 'cannon', 'cake', 'tower'],
+    refs: ['aurora', 'matthew-aurora', 'tower'],
     prompt:
-      'The two people in image 1, same faces, hair, crown and costumes, facing each other on a'
-      + ' rooftop at night, a parapet between them. He holds up the confetti cannon from image 2'
-      + ' exactly: a chunky, short, wide-barrelled blaster in steel grey and blue with gold bands,'
-      + ' a gold grip, and a grey bowl-shaped hopper on top, toy-like and clearly not a real gun.'
-      + ' She holds the birthday cake from image 3 with candles lit, head tilted, unimpressed and'
-      + ' amused. Toronto skyline with the CN Tower from image 4 and the full moon behind her.'
-      + ' Three-quarter view with him nearer the camera, cannon fully visible, both faces in the'
-      + ' upper half of the frame.',
+      'The woman in image 1, same face, crown and purple-and-gold gown, and the man in image 2,'
+      + ' same face, glasses, hair and navy-and-gold suit, facing each other on a rooftop at'
+      + ' night, a brick parapet between them. He holds up a confetti cannon: a chunky, short,'
+      + ' wide-barrelled toy blaster in steel grey and deep blue with gold bands, a gold grip and a'
+      + ' grey bowl-shaped hopper on top, painted with the same soft materials and highlights as'
+      + ' his suit, clearly a party toy and not a real gun. She holds the same birthday cake she'
+      + ' holds in image 1, candles lit, head tilted, unimpressed and amused. Toronto skyline with'
+      + ' the CN Tower from image 3 and the full moon behind her. Three-quarter view with him'
+      + ' nearer the camera, cannon fully visible, both faces in the upper middle of the frame.',
   },
   win: {
-    refs: ['matthew-aurora', 'cake', 'cannon'],
+    refs: ['matthew-aurora', 'aurora'],
     prompt:
-      'The two people in image 1, same faces, hair and costumes. On a rooftop at night under'
-      + ' confetti falling everywhere in gold and purple. The man holds the birthday cake from'
-      + ' image 2 with all its candles lit, grinning; the gold-and-blue confetti cannon from'
-      + ' image 3 is slung on his back, still smoking a little. The woman sits on the parapet'
-      + ' behind him, arms crossed, smiling despite herself, her crown slightly askew. Toronto'
-      + ' skyline and CN Tower behind. Warm, celebratory. Both faces in the upper half.',
+      'The two people in image 1, same faces, hair and costumes; her face also as in image 2.'
+      + ' On a rooftop at night under confetti falling everywhere in gold and purple. The man'
+      + ' stands on the rooftop with his whole body visible down to his boots, holding the same'
+      + ' birthday cake she holds in image 2 with all its candles lit, grinning. A chunky toy'
+      + ' confetti cannon in steel grey, deep blue and gold is slung on his back, still smoking a'
+      + ' little. The woman sits on the parapet behind him, arms crossed, smiling despite herself,'
+      + ' her crown slightly askew. Toronto skyline and CN Tower behind. The rooftop floor fills'
+      + ' the bottom of the frame in front of him. Warm, celebratory.',
   },
   loss: {
-    refs: ['aurora', 'matthew', 'cake'],
+    refs: ['aurora', 'matthew'],
     prompt:
-      'The woman in image 1, same face, crown and purple-and-gold gown, leaping off a rooftop'
-      + ' edge into the night with the birthday cake from image 3 held high, trailing a spiral of'
-      + ' magenta magic, laughing back over her shoulder. In the near foreground, the gloved hand'
-      + ' and arm of the man in image 2 reaching after her, the cake just out of reach. Toronto'
-      + ' skyline and moon beyond. Playful, not grim. Her face in the upper half of the frame.',
+      'The woman in image 1, same face, crown and purple-and-gold gown, standing on the edge of'
+      + ' a rooftop parapet, turning back over her shoulder to laugh at the viewer the instant'
+      + ' before she leaps into the night, holding the same birthday cake she holds in image 1'
+      + ' in both hands at chest height, candles lit. A spiral of magenta magic winds around her.'
+      + ' In the near foreground at the bottom left, the gloved hand and arm of the man in'
+      + ' image 2 reaching after her, the cake just out of reach. Toronto skyline and moon'
+      + ' beyond. Her face and the cake in the upper middle of the frame, nothing in the top'
+      + ' corners. Playful, not grim.',
   },
 };
 
@@ -132,9 +143,9 @@ const opt = (name, fallback) => {
 const which = args.find((a) => !a.startsWith('--') && !Object.values(opts()).includes(a));
 function opts() { return { n: opt('n'), quality: opt('quality'), tag: opt('tag'), size: opt('size'), suffix: opt('prompt-suffix') }; }
 const N = Number(opt('n', '2'));
-const QUALITY = opt('quality', 'low');
+const QUALITY = opt('quality', 'medium');
 const TAG = opt('tag', 'r1');
-const SIZE = opt('size', '832x1792');
+const SIZE = opt('size', '1024x2208');
 const SUFFIX = opt('prompt-suffix', '');
 
 // ---- ledger -------------------------------------------------------------
@@ -184,7 +195,7 @@ async function generate(panel, layer = null) {
   writeFileSync(headerFile, `Authorization: Bearer ${KEY}\n`, { mode: 0o600 });
   const promptFile = join(OUT, `.prompt-${panel}.txt`);
   writeFileSync(promptFile, spec.prompt + GUARD + (SUFFIX ? ` ${SUFFIX}` : ''));
-  const argv = ['-s', '-m', '600', 'https://api.openai.com/v1/images/edits', '-H', `@${headerFile}`,
+  const argv = ['-s', '-m', '900', 'https://api.openai.com/v1/images/edits', '-H', `@${headerFile}`,
     '-F', `model=${MODEL}`];
   for (const ref of spec.refs) {
     const file = join(REFS, `${ref}.png`);

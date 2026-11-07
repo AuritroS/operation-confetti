@@ -373,9 +373,11 @@ for (const src of STORY) {
     continue;
   }
 
-  // Portrait panels never need more than ~900px of width on a phone at 1.5x.
+  // A 390px phone at 3x needs 1170px across, and the panel is drawn a touch
+  // over size for the tilt, so 1200 is the floor rather than a ceiling. The
+  // earlier 900 cap served every panel upscaled, which read as grain.
   const dest = join(STORY_OUT, `${name}.webp`);
-  await sharp(src).resize({ width: 900, withoutEnlargement: true }).webp({ quality: 82 }).toFile(dest);
+  await sharp(src).resize({ width: 1200, withoutEnlargement: true }).webp({ quality: 90 }).toFile(dest);
   report.push({ file: basename(dest), step: `webp (was ${kb(src)} KB)`, kb: kb(dest) });
 }
 
