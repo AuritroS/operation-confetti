@@ -17,7 +17,7 @@ import { SkylineStreet } from './skyline-street';
 import { SkylineBoxes, SHOW_BOXES } from './skyline-boxes';
 import { INSPECTING, InspectLabels } from './skyline-inspect';
 import { SkyLayer } from './environment/sky';
-import { buildCnTower, buildGatehouse, buildMoon } from './custom';
+import { buildCnTower, buildMoon, buildStreetGate } from './custom';
 import { FACADE_X } from '../levels/skyline/scene';
 import { MOON } from './look';
 import { GiftGlowField, shadowTexture } from './effects';
@@ -221,7 +221,7 @@ export class SkylineScene {
      */
     // The street ends at a building: the door in a façade that spans to the
     // flanking towers and leaves the top of the frame.
-    this.finishDoor = buildGatehouse(16, 13, FACADE_X + 4, 46);
+    this.finishDoor = buildStreetGate(16, 13, FACADE_X + 4, 46);
     this.stage.scene.add(this.finishDoor);
 
     this.trims = new InstancedMesh(this.box, this.windowMat, 500);

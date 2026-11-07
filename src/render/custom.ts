@@ -31,6 +31,8 @@ import {
   Color,
   ConeGeometry,
   CircleGeometry,
+  Box3,
+  SRGBColorSpace,
 } from 'three';
 import { PALETTE, ROLE } from './palette';
 import { Sparkle } from './effects';
@@ -607,8 +609,6 @@ export function vaultOpening(width: number, height: number): number {
 export function buildVaultDoor(width = 4.8, height = 3.4, wall: MeshStandardMaterial = matte(PALETTE.slate, 0.85)): Group {
   const vault = new Group();
 
-  const steel = matte(PALETTE.steel, 0.5);
-
   // Surrounding wall, recessed behind the door, with an opening the size of
   // the door behind the leaf. A solid slab meant opening the door revealed
   // a wall; this reveals whatever is beyond, which is the point of a door.
@@ -637,8 +637,9 @@ export function buildVaultDoor(width = 4.8, height = 3.4, wall: MeshStandardMate
   leaf.position.set(hinge, height * 0.5, 0);
   vault.add(leaf);
 
-  // Door face: a disc proud of the wall, so it reads as a vault.
-  const door = new Mesh(new CylinderGeometry(radius, radius, 0.3, 32), steel);
+  // Door face: a disc proud of the wall, so it reads as a vault. Dark navy
+  // under gold, as the comic's vault panel paints it.
+  const door = new Mesh(new CylinderGeometry(radius, radius, 0.3, 32), matte(PALETTE.navyDeep, 0.6));
   door.rotation.x = Math.PI / 2;
   door.position.set(-hinge, 0, 0);
   leaf.add(door);
@@ -651,7 +652,7 @@ export function buildVaultDoor(width = 4.8, height = 3.4, wall: MeshStandardMate
   // Spokes radiating from the centre, the locking-bolt read.
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2;
-    const spoke = new Mesh(new BoxGeometry(radius * 0.78, 0.05, 0.06), steel);
+    const spoke = new Mesh(new BoxGeometry(radius * 0.78, 0.05, 0.06), matte(PALETTE.gold, 0.4));
     spoke.position.set(
       Math.cos(angle) * radius * 0.48 - hinge,
       Math.sin(angle) * radius * 0.48,
@@ -691,173 +692,161 @@ function buildLantern(): Group {
 }
 
 /**
- * What is behind a gate once it opens: a lit room a few units deep.
+ * Warm light with a soft falloff, painted once onto a small canvas.
  *
- * Both levels end at a door, and a door that opens onto the rest of the map
- * shows an empty map. The arrival shot looks straight at the opening, so a
- * small chamber is all the camera ever sees through it. `kind` picks the
- * dressing: the gift vault with its stacked presents, or the stairwell up to
- * the rooftop with light spilling down it.
+ * Flat planes cannot fade, and a lit doorway that is one colour reads as a
+ * card. A 128px radial gradient costs nothing to make and nothing to load,
+ * and is the only texture this file has ever needed. Falls back to a plain
+ * glow where there is no canvas (tests).
  */
-export function buildGateInterior(width: number, height: number, kind: 'vault' | 'stairs'): Group {
+function radiantMaterial(): MeshBasicMaterial {
+  if (typeof document === 'undefined') return glow(0xffc070);
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return glow(0xffc070);
+  const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.04, size / 2, size / 2, size / 2);
+  g.addColorStop(0, '#fff3d2');
+  g.addColorStop(0.28, '#ffd48e');
+  g.addColorStop(0.6, '#b86a28');
+  g.addColorStop(1, '#3a2010');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return new MeshBasicMaterial({ map: texture });
+}
+
+/**
+ * The gift vault, behind level 1's door: the comic's own room.
+ *
+ * Deep slate walls with a gold trim line, warm gold light, and the real
+ * presents — clones of the yellow present the player has been collecting
+ * all level, stacked in two tiers against the back wall. `present` is the
+ * loaded model, or null to use a plain gold box until it arrives.
+ */
+export function buildVaultRoom(opening: number, present: Object3D | null): Group {
   const room = new Group();
-  const depth = Math.max(4, width * 0.45);
-  // Lit, not luminous: the room has to read as a room with things in it,
-  // and a wall glowing like a lamp turned the whole opening into a slab.
-  const warm = new MeshStandardMaterial({
-    color: 0x5a3a24, roughness: 0.9, metalness: 0.05, emissive: new Color(0xff8a2c), emissiveIntensity: 0.06,
+  const depth = opening * 0.9;
+  const wall = new MeshStandardMaterial({
+    color: 0x232a4a, roughness: 0.9, metalness: 0.05, emissive: new Color(0xff9a3c), emissiveIntensity: 0.05,
   });
-  // Back wall, side walls, floor and ceiling, all facing inward.
-  const back = new Mesh(new PlaneGeometry(width, height), warm);
-  back.position.set(0, height / 2, -depth);
+  const back = new Mesh(new PlaneGeometry(opening, opening), wall);
+  back.position.set(0, opening / 2, -depth);
   room.add(back);
   for (const sign of [-1, 1] as const) {
-    const side = new Mesh(new PlaneGeometry(depth, height), warm);
-    side.position.set(sign * width / 2, height / 2, -depth / 2);
+    const side = new Mesh(new PlaneGeometry(depth, opening), wall);
+    side.position.set(sign * opening / 2, opening / 2, -depth / 2);
     side.rotation.y = -sign * Math.PI / 2;
     room.add(side);
   }
-  const floor = new Mesh(new PlaneGeometry(width, depth), matte(0x2a1a10, 0.95));
+  const floor = new Mesh(new PlaneGeometry(opening, depth), matte(0x1b1f36, 0.95));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0.01, -depth / 2);
   room.add(floor);
-  const ceiling = new Mesh(new PlaneGeometry(width, depth), warm);
+  const ceiling = new Mesh(new PlaneGeometry(opening, depth), wall);
   ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(0, height, -depth / 2);
+  ceiling.position.set(0, opening, -depth / 2);
   room.add(ceiling);
-  // The light itself: a glowing slab on the ceiling and its spill on the floor.
-  const lamp = new Mesh(new PlaneGeometry(width * 0.4, 0.3), glow(0xffd9a0, 0.9));
+  // Gold trim where the walls meet the ceiling, like the door's rim.
+  const trim = matte(PALETTE.gold, 0.4);
+  const rail = new Mesh(new BoxGeometry(opening, 0.08, 0.08), trim);
+  rail.position.set(0, opening - 0.06, -depth + 0.04);
+  room.add(rail);
+  for (const sign of [-1, 1] as const) {
+    const side = new Mesh(new BoxGeometry(0.08, 0.08, depth), trim);
+    side.position.set(sign * (opening / 2 - 0.04), opening - 0.06, -depth / 2);
+    room.add(side);
+  }
+  // The lamp: a gold-lit slab on the ceiling and its spill on the floor.
+  const lamp = new Mesh(new PlaneGeometry(opening * 0.35, 0.25), glow(0xffd9a0, 0.9));
   lamp.rotation.x = Math.PI / 2;
-  lamp.position.set(0, height - 0.02, -depth / 2);
+  lamp.position.set(0, opening - 0.02, -depth / 2);
   room.add(lamp);
-  const spill = new Mesh(new PlaneGeometry(width * 0.7, depth * 0.7), glow(0xffb060, 0.12));
+  const spill = new Mesh(new PlaneGeometry(opening * 0.8, depth * 0.8), glow(0xffb060, 0.14));
   spill.rotation.x = -Math.PI / 2;
   spill.position.set(0, 0.02, -depth / 2);
   room.add(spill);
 
-  if (kind === 'vault') {
-    // Presents stacked against the walls, the same gold as the collectible.
-    const gift = matte(PALETTE.gold, 0.5);
-    const ribbon = matte(0xa06a28, 0.45);
-    const u = width / 12;
-    const spots: Array<[number, number, number]> = [
-      [-0.36, 0, 1.0], [-0.22, 0, 0.8], [-0.3, 1, 0.75], [0.34, 0, 1.1], [0.2, 0, 0.85], [0.3, 1, 0.8], [0.0, 0, 0.9],
-    ];
-    for (const [fx, tier, size] of spots) {
-      const sz = u * size;
-      const box = new Mesh(new BoxGeometry(sz, sz, sz), gift);
-      box.position.set(fx * width, sz / 2 + tier * sz * 1.02, -depth * 0.62 - sz * 0.5);
-      room.add(box);
-      const band = new Mesh(new BoxGeometry(sz * 1.02, sz * 0.22, sz * 1.02), ribbon);
-      band.position.copy(box.position);
-      room.add(band);
+  // Presents: two tiers against the back wall, the real model where it is
+  // loaded. Sizes vary a little so the stack reads as a pile, not a grid.
+  const unit = opening * 0.19;
+  const spots: Array<[number, number, number, number]> = [
+    [-0.33, 0, 1.0, 0.3], [-0.11, 0, 0.9, -0.2], [0.12, 0, 1.05, 0.5], [0.34, 0, 0.85, -0.4],
+    [-0.22, 1, 0.8, 0.1], [0.02, 1, 0.9, -0.6], [0.24, 1, 0.75, 0.35],
+  ];
+  for (const [fx, tier, size, spin] of spots) {
+    const sz = unit * size;
+    let gift: Object3D;
+    if (present) {
+      gift = present.clone(true);
+      const box = new Box3().setFromObject(gift);
+      const h = Math.max(1e-3, box.max.y - box.min.y);
+      gift.scale.multiplyScalar(sz / h);
+    } else {
+      gift = new Mesh(new BoxGeometry(sz, sz, sz), matte(PALETTE.gold, 0.5));
+      gift.position.y = sz / 2;
     }
-  } else {
-    // A stair rising to the back wall, each tread a step higher and deeper.
-    const tread = matte(0x4a3324, 0.9);
-    const steps = 6;
-    const rise = (height * 0.55) / steps;
-    const run = (depth * 0.7) / steps;
-    for (let i = 0; i < steps; i++) {
-      const step = new Mesh(new BoxGeometry(width * 0.6, rise, run), tread);
-      step.position.set(0, rise * (i + 0.5), -depth * 0.3 - run * (i + 0.5));
-      room.add(step);
-    }
-    // Light from the top of the stair, where the roof door would be.
-    const top = new Mesh(new PlaneGeometry(width * 0.22, height * 0.34), glow(0xfff0c0, 0.5));
-    top.position.set(0, height * 0.55 + height * 0.17, -depth + 0.05);
-    room.add(top);
+    gift.position.set(fx * opening, tier * unit * 0.95 + (present ? 0 : sz / 2), -depth * 0.68 - sz * 0.3);
+    gift.rotation.y = spin;
+    room.add(gift);
   }
   return room;
 }
 
 /**
- * The level 2 gatehouse: a façade spanning the street, with the vault door
- * set into it over a stepped plinth.
+ * The level 2 gate: a plain wall across the street with the vault door in
+ * it, a lantern each side, and warm light behind the door.
  *
- * The door used to stand in the road with nothing holding it. Now the
- * street ends at a building: pilasters either side of the door, a lantern
- * on each, a cornice over it, and the façade wide enough to meet the
- * flanking buildings and tall enough to leave the frame. The plinth is
- * three steps up to a threshold he stops on, so the door has a floor.
+ * Kept simple on purpose. The street ends at a wall in the flanking
+ * buildings' own colour, and the door opens onto light rather than a room:
+ * the comic's "vault opens on the city" beat, and the iris closes on it
+ * before anyone asks what is behind.
  */
-export function buildGatehouse(doorWidth: number, doorHeight: number, spanX: number, facadeHeight: number): Group {
-  const house = new Group();
-  const brick = new MeshStandardMaterial({ color: 0x7a4a40, roughness: 0.92, metalness: 0.02 });
-  const stone = matte(0x6e6a72, 0.85);
-  const trim = matte(PALETTE.gold, 0.4);
-
+export function buildStreetGate(doorWidth: number, doorHeight: number, spanX: number, wallHeight: number): Group {
+  const gate = new Group();
+  const brick = new MeshStandardMaterial({ color: 0x6b3f36, roughness: 0.92, metalness: 0.02 });
   const door = buildVaultDoor(doorWidth, doorHeight, brick);
-  house.add(door);
-  // The room fills the opening exactly, so nothing beyond shows over it.
-  const opening = vaultOpening(doorWidth, doorHeight);
-  const interior = buildGateInterior(opening, opening, 'stairs');
-  interior.position.set(0, (doorHeight - opening) / 2, -0.4);
-  house.add(interior);
-
-  // Façade either side of the door, up to the flanking buildings.
+  gate.add(door);
   const wingW = spanX - doorWidth / 2;
   for (const sign of [-1, 1] as const) {
-    const wing = new Mesh(new BoxGeometry(wingW, facadeHeight, 1.2), brick);
-    wing.position.set(sign * (doorWidth / 2 + wingW / 2), facadeHeight / 2, -0.5);
-    house.add(wing);
-    // Windows: a column of warm panes up each wing, clear of the pilaster.
-    if (wingW > 2.4) {
-      for (let row = 0; row < 5; row++) {
-        const pane = new Mesh(new PlaneGeometry(1.4, 2.0), glow(0xffc784, 0.7));
-        pane.position.set(sign * (doorWidth / 2 + 1.3 + (wingW - 1.3) / 2), doorHeight * 0.45 + row * 3.4, 0.12);
-        house.add(pane);
-      }
-    }
-  }
-  // Over the door: brick up to the top, with a gold cornice line.
-  const lintel = new Mesh(new BoxGeometry(doorWidth, facadeHeight - doorHeight, 1.2), brick);
-  lintel.position.set(0, doorHeight + (facadeHeight - doorHeight) / 2, -0.5);
-  house.add(lintel);
-  const cornice = new Mesh(new BoxGeometry(doorWidth + 2.4, 0.5, 0.6), trim);
-  cornice.position.set(0, doorHeight + 0.6, 0.2);
-  house.add(cornice);
-
-  // Pilasters framing the door, each carrying a lantern.
-  for (const sign of [-1, 1] as const) {
-    const pilaster = new Mesh(new BoxGeometry(1.2, doorHeight + 1.1, 1.0), stone);
-    pilaster.position.set(sign * (doorWidth / 2 + 0.6), (doorHeight + 1.1) / 2, 0.3);
-    house.add(pilaster);
+    const wing = new Mesh(new BoxGeometry(wingW, wallHeight, 1.2), brick);
+    wing.position.set(sign * (doorWidth / 2 + wingW / 2), wallHeight / 2, -0.5);
+    gate.add(wing);
     const lantern = buildLantern();
-    lantern.position.set(sign * (doorWidth / 2 + 0.6), doorHeight * 0.62, 0.95);
-    house.add(lantern);
+    lantern.position.set(sign * (doorWidth / 2 + 1.2), doorHeight * 0.6, 0.6);
+    gate.add(lantern);
   }
-
-  // The plinth: three steps up to a threshold, wider than the door.
-  const steps = 3;
-  for (let i = 0; i < steps; i++) {
-    const w = doorWidth + 3.0 + (steps - 1 - i) * 1.2;
-    const d = 1.1 + (steps - 1 - i) * 1.0;
-    const step = new Mesh(new BoxGeometry(w, 0.28, d), stone);
-    step.position.set(0, 0.14 + i * 0.28, 0.9 + d / 2 + (steps - 1 - i) * 0.0);
-    house.add(step);
-  }
-  // Raise the door and everything on it onto the top step.
-  const lift = steps * 0.28;
-  door.position.y = lift;
-  interior.position.y += lift;
-  return house;
+  const lintel = new Mesh(new BoxGeometry(doorWidth, wallHeight - doorHeight, 1.2), brick);
+  lintel.position.set(0, doorHeight + (wallHeight - doorHeight) / 2, -0.5);
+  gate.add(lintel);
+  // Behind the door: light. A warm plane filling the opening, set back so
+  // the open leaf has depth to swing into, and its spill on the road.
+  // One plane painted with a radial gradient, wider than the opening so
+  // nothing beyond the gate shows at the edges: a glow, not a card.
+  const opening = vaultOpening(doorWidth, doorHeight);
+  const light = new Mesh(new PlaneGeometry(opening * 2.2, opening * 2.2), radiantMaterial());
+  light.position.set(0, doorHeight / 2 - opening * 0.05, -2.6);
+  gate.add(light);
+  const spill = new Mesh(new PlaneGeometry(opening * 1.2, 6), glow(0xffb060, 0.12));
+  spill.rotation.x = -Math.PI / 2;
+  spill.position.set(0, 0.02, 3);
+  gate.add(spill);
+  return gate;
 }
 
 /**
- * The level 1 bulkhead: a rooftop penthouse block the parapets run into,
- * with the vault door set in its face.
+ * The level 1 bulkhead: a rooftop block the parapets run into, with the
+ * vault door in a stone architrave and the gift vault behind it.
  *
- * The vault stood on the roof with sky on three sides. A block as wide as
- * the roof plus its parapets, taller than the door, with a threshold slab
- * and a lantern each side, makes the roof end at a wall rather than at a
- * door standing in air.
+ * `present` is the loaded present model, or null; `setVaultPresents` swaps
+ * the stand-ins for the real thing once it arrives.
  */
-export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWidth: number): Group {
+export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWidth: number, present: Object3D | null): Group {
   const block = new Group();
-  const render = new MeshStandardMaterial({ color: 0x3a3e5c, roughness: 0.92, metalness: 0.02 });
+  const render = new MeshStandardMaterial({ color: 0x2e3350, roughness: 0.92, metalness: 0.02 });
   const stone = matte(0x6a6878, 0.85);
-  // At least the roof and its parapets, and always wider than the door.
   const w = Math.max(roofHalfWidth * 2 + 1.2, doorWidth + 4.4);
   const h = doorHeight + 1.6;
   const depth = 6;
@@ -865,12 +854,11 @@ export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWid
   const door = buildVaultDoor(doorWidth, doorHeight, render);
   block.add(door);
   const opening = vaultOpening(doorWidth, doorHeight);
-  const interior = buildGateInterior(opening, opening, 'vault');
-  interior.position.set(0, (doorHeight - opening) / 2, -0.4);
-  block.add(interior);
+  const room = buildVaultRoom(opening, present);
+  room.name = 'room';
+  room.position.set(0, (doorHeight - opening) / 2, -0.4);
+  block.add(room);
 
-  // The block: a wall either side of the door, a lintel over it, and a
-  // body behind, so it reads as a room and not a sheet.
   const wingW = (w - doorWidth) / 2;
   for (const sign of [-1, 1] as const) {
     const wing = new Mesh(new BoxGeometry(wingW, h, depth), render);
@@ -880,8 +868,6 @@ export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWid
   const lintel = new Mesh(new BoxGeometry(doorWidth, h - doorHeight, depth), render);
   lintel.position.set(0, doorHeight + (h - doorHeight) / 2, -depth / 2);
   block.add(lintel);
-  // A stone architrave around the opening, proud of the face, so the door
-  // sits in a frame rather than a hole.
   const arch = 0.45;
   for (const [bw, bh, bx, by] of [
     [arch, opening + arch * 2, -(opening / 2 + arch / 2), doorHeight / 2],
@@ -892,11 +878,9 @@ export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWid
     bar.position.set(bx, by, 0.1);
     block.add(bar);
   }
-  // A coping along the top edge, like the parapets' own.
-  const coping = new Mesh(new BoxGeometry(w + 0.3, 0.16, depth + 0.3), stone);
+  const coping = new Mesh(new BoxGeometry(w + 0.3, 0.16, depth + 0.3), matte(PALETTE.gold, 0.45));
   coping.position.set(0, h + 0.08, -depth / 2);
   block.add(coping);
-  // Threshold slab in front of the door.
   const sill = new Mesh(new BoxGeometry(doorWidth + 1.0, 0.1, 1.4), stone);
   sill.position.set(0, 0.05, 0.75);
   block.add(sill);
@@ -907,6 +891,18 @@ export function buildBulkhead(doorWidth: number, doorHeight: number, roofHalfWid
     block.add(lantern);
   }
   return block;
+}
+
+/** Rebuild the vault's room with the real present model once it has loaded. */
+export function setVaultPresents(bulkhead: Group, doorWidth: number, doorHeight: number, present: Object3D): void {
+  const old = bulkhead.getObjectByName('room');
+  if (!old) return;
+  const opening = vaultOpening(doorWidth, doorHeight);
+  const room = buildVaultRoom(opening, present);
+  room.name = 'room';
+  room.position.copy(old.position);
+  bulkhead.remove(old);
+  bulkhead.add(room);
 }
 
 // ---------------------------------------------------------- confetti -----

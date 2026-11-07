@@ -1,4 +1,4 @@
-import { Group } from 'three';
+import { Group, Vector3 } from 'three';
 import type { LevelContext, LevelController, LevelOutcome } from '../core/level';
 import { STEP_S } from '../core/loop';
 import { LevelRunner } from './runner';
@@ -8,7 +8,7 @@ import { GATE_GAP, LOOK } from '../render/look';
 import { buildRoute, makeCapsulePlayer, RouteMarkers, type PlayerVisual } from '../render/primitives';
 import { EntityVisuals } from '../render/entities';
 import { loadGameplayProps, type PropProvider } from '../render/props-loader';
-import { buildBulkhead } from '../render/custom';
+import { buildBulkhead, Confetti, setVaultPresents } from '../render/custom';
 import { loadRoguePlayer } from '../render/rogue';
 import { Environment, requestedLayers } from '../render/environment';
 
@@ -22,6 +22,8 @@ const ARRIVAL_SHOT_S = 2.0;
  * run-up, before the arrival shot could pull back from it.
  */
 const VAULT_GAP = GATE_GAP * 1.6;
+const VAULT_W = 5.6;
+const VAULT_H = 4.6;
 
 /** What a HUD or debug panel needs from the route, as plain data. */
 export interface RouteSnapshot {
@@ -63,7 +65,10 @@ export class RouteLevel implements LevelController {
    * into. The door is sized to the roof it sits on; a 12-unit door on a
    * 5.7-unit roof was wider than the building that was supposed to hold it.
    */
-  private readonly vault = buildBulkhead(5.6, 4.6, LEVEL_1.laneWidth * LEVEL_1.laneCount / 2 + 0.45);
+  private readonly vault = buildBulkhead(VAULT_W, VAULT_H, LEVEL_1.laneWidth * LEVEL_1.laneCount / 2 + 0.45, null);
+  /** Gold confetti out of the vault as the door swings. Decorative only. */
+  private readonly confetti = new Confetti(48);
+  private confettiFired = false;
 
   private runner = new LevelRunner(LEVEL_1);
   private entityVisuals: EntityVisuals;
@@ -96,6 +101,7 @@ export class RouteLevel implements LevelController {
     this.vault.visible = false;
     this.vault.position.set(0, 0, -(LEVEL_1.routeLength + VAULT_GAP));
     this.world.add(this.vault);
+    this.vault.add(this.confetti.group);
     if (!this.hasRooftop) this.world.add(this.markers.group);
     this.world.add(buildRoute(LEVEL_1, { surface: !this.hasRooftop, dimDividers: this.hasRooftop }));
 
@@ -115,7 +121,13 @@ export class RouteLevel implements LevelController {
       .catch((e: unknown) => console.error('[environment] build failed', e));
 
     void loadGameplayProps()
-      .then((provider) => { this.gameplayProps = provider; this.rebuildEntities(); })
+      .then((provider) => {
+        this.gameplayProps = provider;
+        this.rebuildEntities();
+        // The vault's presents are the same model the route collects.
+        const present = provider('gift');
+        if (present) setVaultPresents(this.vault, VAULT_W, VAULT_H, present);
+      })
       .catch((e: unknown) => console.error('[props] load failed; keeping primitives', e));
 
     void loadRoguePlayer()
@@ -152,6 +164,7 @@ export class RouteLevel implements LevelController {
    */
   restart(): void {
     this.arrival = -1;
+    this.confettiFired = false;
     const leaf = this.vault.getObjectByName('leaf');
     if (leaf) leaf.rotation.y = 0;
     this.runner = new LevelRunner(LEVEL_1);
@@ -279,7 +292,12 @@ export class RouteLevel implements LevelController {
       arrive = 1 - (1 - t) * (1 - t);
       const leaf = this.vault.getObjectByName('leaf');
       if (leaf) leaf.rotation.y = 1.35 * arrive;
+      if (!this.confettiFired && arrive > 0.25) {
+        this.confettiFired = true;
+        this.confetti.burst(new Vector3(0, VAULT_H * 0.5, 0.6));
+      }
     }
+    this.confetti.update(STEP_S);
     // Camera trails the lane slightly, which reads as weight without taking
     // the next hazard out of frame.
     this.stage.camera.position.set(x * 0.3, 2.5 + 2.2 * arrive, 5.2 + 6 * arrive);
