@@ -170,9 +170,11 @@ materials, one lit material per band, one cloud material per opacity;
 ### 5. Level 2 and level 3 polish
 
 **Done 8 Nov.** Level 2: the view widens by up to five degrees up the
-ramp, and wind streaks — 44 short lines in the camera's own frame, one
-draw call — fade in from 13.5 u/s to full at 18, rushing toward the
-camera; off past the finish and under reduced motion. The ending already
+ramp, and comic speed lines stream down the screen's edges as the ramp
+climbs — a DOM overlay like the reward glow, never in the scene (a first
+pass as 3D lines near the camera drew in front of obstacles and the
+gate, correct depth but the wrong read); off past the finish and under
+reduced motion. The ending already
 runs through the iris and the landing. Level 3: victory confetti 220 →
 320 pieces; lighting and the shield cue left as tuned. Swing review at
 90 draws, 56.4k triangles, exactly at the budget.
@@ -185,6 +187,9 @@ runs through the iris and the landing. Level 3: victory confetti 220 →
   in level 2.
 
 ### 6. Tutorials
+
+**Done 8 Nov.** Auri reviewed all three sheets and rehearsals: fine as
+they are.
 
 - Auri reviews each sheet on `/?tutorial=N` and plays each rehearsal; Claude
   fixes gaps and glitches found, including copy and gesture glyphs changed

@@ -16,6 +16,7 @@ import { SKYLINE } from './levels/skyline/course';
 import { SkylineLevel } from './levels/skyline/controller';
 import type { Direction } from './levels/skyline/types';
 import { Hud } from './ui/hud';
+import { SpeedLines } from './ui/speedlines';
 
 document.body.dataset['level'] = '2';
 // Review-only: the portrait letterbox is correct for play and useless for a
@@ -30,6 +31,7 @@ const pauseOverlay = document.getElementById('pause')!;
 const resumeBtn = document.getElementById('btn-resume') as HTMLButtonElement;
 
 const hud = new Hud();
+const speedLines = new SpeedLines(document.getElementById('app') ?? document.body);
 const host = new RendererHost(document.getElementById('stage') as HTMLCanvasElement);
 host.observe();
 
@@ -52,7 +54,7 @@ let paused = false;
 
 const loop = new FixedLoop({
   update: (dt) => level.update(dt),
-  render: () => level.render(),
+  render: () => { level.render(); speedLines.set(level.view.ramp); },
 });
 
 const lifecycle = new Lifecycle({

@@ -1,0 +1,55 @@
+@import './theme.css';
+
+/*
+ * Speed lines: two edge bands of thin streaks, streaming toward the viewer.
+ *
+ * `--speed` (0..1) sets both how much of the edge they cover and how fast
+ * they stream. The gradient repeats on a short period and the animation
+ * scrolls it, which is the whole of the motion: no per-line elements.
+ */
+.speedlines {
+  position: absolute;
+  inset: 0;
+  z-index: 22;
+  pointer-events: none;
+  --speed: 0;
+}
+.speedlines__band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(14% + 12% * var(--speed));
+  opacity: calc(0.18 + 0.5 * var(--speed));
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(223, 233, 255, 0) 0px,
+    rgba(223, 233, 255, 0) 14px,
+    rgba(223, 233, 255, 0.9) 15px,
+    rgba(223, 233, 255, 0.9) 17px,
+    rgba(223, 233, 255, 0) 18px,
+    rgba(223, 233, 255, 0) 46px
+  );
+  background-size: 100% 46px;
+  animation: speedlines-stream calc(0.55s - 0.3s * var(--speed)) linear infinite;
+}
+/* Fade each band into the frame, so the lines belong to the edge. */
+.speedlines__band--left {
+  left: 0;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
+}
+.speedlines__band--right {
+  right: 0;
+  -webkit-mask-image: linear-gradient(270deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
+  mask-image: linear-gradient(270deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
+}
+/* The lines are slanted toward the vanishing point: a skew per side. */
+.speedlines__band--left { transform: skewY(-14deg); transform-origin: left center; }
+.speedlines__band--right { transform: skewY(14deg); transform-origin: right center; }
+@keyframes speedlines-stream {
+  from { background-position-y: 0; }
+  to { background-position-y: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .speedlines { display: none !important; }
+}
