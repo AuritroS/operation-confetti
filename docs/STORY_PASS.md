@@ -1,7 +1,8 @@
 # Story and chrome pass — stage 1: script, storyboard, image prompts
 
-Status: **stages 1–4 done, 7 Nov 2026**; stage 5 (campaign seams, full run)
-is next. Spend so far: **$1.16** of a $3 cap raised from $1 on 7 Nov for the
+Status: **done, approved by Auri 7 Nov 2026** ("good enough"). The campaign
+seams and the full-run check fold into the level polish pass
+(`docs/POLISH_PASS.md`). Spend so far: **$1.16** of a $3 cap raised from $1 on 7 Nov for the
 medium-tier re-render (ledger in `.local-tmp/story-art/ledger.json`;
 `node tools/story-art.mjs --ledger`).
 
