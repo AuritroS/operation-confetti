@@ -33,6 +33,7 @@ import {
   CircleGeometry,
   Box3,
   SRGBColorSpace,
+  RingGeometry,
 } from 'three';
 import { PALETTE, ROLE } from './palette';
 import { Sparkle } from './effects';
@@ -632,6 +633,16 @@ export function buildVaultDoor(width = 4.8, height = 3.4, wall: MeshStandardMate
   // badge on it, and both levels end by walking through one.
   const radius = Math.min(width, height) * 0.38;
   const hinge = -radius * 1.04;
+  // The opening is the circle the leaf covers, not the square the wall
+  // leaves: a collar in the wall's material fills the corners, and a gold
+  // ring sits in it so the leaf has a frame to swing out of.
+  const collar = new Mesh(new RingGeometry(radius * 1.02, opening * 0.75, 48), wall);
+  collar.position.set(0, height * 0.5, -0.03);
+  vault.add(collar);
+  const frameRing = new Mesh(new TorusGeometry(radius * 1.06, 0.09, 8, 48), matte(PALETTE.gold, 0.35));
+  frameRing.position.set(0, height * 0.5, -0.02);
+  vault.add(frameRing);
+
   const leaf = new Group();
   leaf.name = 'leaf';
   leaf.position.set(hinge, height * 0.5, 0);
