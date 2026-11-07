@@ -46,6 +46,9 @@ interface Band {
 const BANDS: Band[] = [
   { count: 4, y: 30, spread: 70, depth: -150, size: 46, opacity: 0.16, drift: 0.9 },
   { count: 4, y: -5.5, spread: 34, depth: -52, size: 20, opacity: 0.2, drift: 3.4 },
+  // Near and low: wisps that pass under the parapet line, the strongest
+  // speed cue the sky can give.
+  { count: 5, y: -2.5, spread: 30, depth: -26, size: 11, opacity: 0.2, drift: 6.5 },
 ];
 
 /**
@@ -97,19 +100,25 @@ export class CloudsLayer implements EnvironmentLayer {
     this.texture = cloudTexture();
     this.geometry = new PlaneGeometry(1, 0.5);
 
+    const byOpacity = new Map<number, MeshBasicMaterial>();
     for (const band of BANDS) {
-      // One material per band, so a band is one draw call rather than one
-      // per cloud.
-      const material = new MeshBasicMaterial({
-        map: this.texture,
-        transparent: true,
-        opacity: band.opacity,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        // Backdrop, like the skyline: dense fog would erase these entirely.
-        fog: false,
-      });
-      this.materials.push(material);
+      // One material per opacity, shared by the bands that use it: a band
+      // is one draw call rather than one per cloud, and the material count
+      // is budgeted.
+      let material = byOpacity.get(band.opacity);
+      if (!material) {
+        material = new MeshBasicMaterial({
+          map: this.texture,
+          transparent: true,
+          opacity: band.opacity,
+          depthWrite: false,
+          blending: AdditiveBlending,
+          // Backdrop, like the skyline: dense fog would erase these entirely.
+          fog: false,
+        });
+        byOpacity.set(band.opacity, material);
+        this.materials.push(material);
+      }
 
       for (let i = 0; i < band.count; i++) {
         const mesh = new Mesh(this.geometry, material);

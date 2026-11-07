@@ -13,6 +13,7 @@
  */
 import { Group, type Object3D } from 'three';
 import type { EnvironmentLayer, LayerContext } from './layer';
+import { TERRACE_Y } from './rooftop';
 import { resolve, type Placement } from './placement';
 import { disposeTree } from './skyline';
 import type { PropId } from './props';
@@ -27,27 +28,35 @@ interface ClutterSpec {
  * The arrangement. Read as: which prop, which side, how far past the parapet.
  * An x coordinate cannot appear here.
  */
+/**
+ * Rooftop dressing, standing on the terraces the rooftop layer lays either
+ * side of the parapets (`TERRACE_Y`, within `TERRACE_WIDTH`). `beyond` is
+ * measured from the parapet's outer face; the widest prop here, the water
+ * tower, spans about 2.6 units, so 2.0 keeps it on the terrace.
+ */
 const ARRANGEMENT: ClutterSpec[] = [
-  { prop: 'watertower', placement: { side: 'left', beyond: 1.6, z: 0 } },
-  { prop: 'acUnit', placement: { side: 'right', beyond: 0.35, z: 14 } },
-  { prop: 'vent', placement: { side: 'left', beyond: 0.3, z: 27 } },
-  { prop: 'dumpster', placement: { side: 'right', beyond: 0.9, z: 41 } },
-  { prop: 'giftDecor', placement: { side: 'left', beyond: 0.4, z: 55 } },
-  { prop: 'bush', placement: { side: 'right', beyond: 0.5, z: 68 } },
-  { prop: 'acUnit', placement: { side: 'left', beyond: 0.8, z: 82 } },
-  { prop: 'trash', placement: { side: 'right', beyond: 0.3, z: 95 } },
-  { prop: 'watertower', placement: { side: 'right', beyond: 2.1, z: 109 } },
-  { prop: 'vent', placement: { side: 'left', beyond: 0.35, z: 122 } },
-  { prop: 'giftDecor', placement: { side: 'right', beyond: 0.45, z: 136 } },
-  { prop: 'bush', placement: { side: 'left', beyond: 0.6, z: 150 } },
+  { prop: 'watertower', placement: { side: 'left', beyond: 2.0, z: 0, y: TERRACE_Y } },
+  { prop: 'acUnit', placement: { side: 'right', beyond: 0.6, z: 11, y: TERRACE_Y } },
+  { prop: 'vent', placement: { side: 'left', beyond: 0.5, z: 22, y: TERRACE_Y } },
+  { prop: 'bush', placement: { side: 'right', beyond: 1.4, z: 30, y: TERRACE_Y } },
+  { prop: 'dumpster', placement: { side: 'right', beyond: 1.1, z: 41, y: TERRACE_Y } },
+  { prop: 'giftDecor', placement: { side: 'left', beyond: 0.7, z: 52, y: TERRACE_Y } },
+  { prop: 'acUnit', placement: { side: 'left', beyond: 1.6, z: 64, y: TERRACE_Y } },
+  { prop: 'bush', placement: { side: 'right', beyond: 0.6, z: 70, y: TERRACE_Y } },
+  { prop: 'trash', placement: { side: 'right', beyond: 1.9, z: 84, y: TERRACE_Y } },
+  { prop: 'vent', placement: { side: 'left', beyond: 1.2, z: 93, y: TERRACE_Y } },
+  { prop: 'watertower', placement: { side: 'right', beyond: 2.0, z: 106, y: TERRACE_Y } },
+  { prop: 'acUnit', placement: { side: 'left', beyond: 0.5, z: 118, y: TERRACE_Y } },
+  { prop: 'giftDecor', placement: { side: 'right', beyond: 0.8, z: 130, y: TERRACE_Y } },
+  { prop: 'dumpster', placement: { side: 'left', beyond: 1.3, z: 141, y: TERRACE_Y } },
+  { prop: 'bush', placement: { side: 'left', beyond: 0.5, z: 152, y: TERRACE_Y } },
 ];
-
-/** Street level, well below the roof: the Interpol nod and lamp posts. */
 const STREET: ClutterSpec[] = [
   // Standing on the street plane the city layer provides, at y = -12.
-  { prop: 'carPolice', placement: { side: 'left', beyond: 5.2, z: 36, y: -12 } },
-  { prop: 'streetlight', placement: { side: 'right', beyond: 4.6, z: 70, y: -12 } },
-  { prop: 'streetlight', placement: { side: 'left', beyond: 4.6, z: 128, y: -12 } },
+  { prop: 'carPolice', placement: { side: 'left', beyond: 6.0, z: 36, y: -12 } },
+  { prop: 'streetlight', placement: { side: 'right', beyond: 5.4, z: 20, y: -12 } },
+  { prop: 'streetlight', placement: { side: 'left', beyond: 5.4, z: 74, y: -12 } },
+  { prop: 'streetlight', placement: { side: 'right', beyond: 5.4, z: 128, y: -12 } },
 ];
 
 const PERIOD = 164;

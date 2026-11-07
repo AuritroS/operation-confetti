@@ -137,6 +137,18 @@ the material count from 67 back under the budget of 60.
 `tools/shoot-level1.mjs <tag> [query]` photographs three route positions at
 two widths; `before-*` and `after-*` in `tools/shots/level1/`.
 
+**Cycle 2 done, 8 Nov (richness).** The rooftop lays a terrace a step
+down either side of the parapets, and the clutter layer stands on it:
+water towers, AC units, vents, dumpsters, bushes, litter and decorative
+presents, fifteen pieces on a 164-unit period, plus a police car and three
+streetlights on the street below. The layer is on by default again. The
+near city is six buildings a side at 26 units, window glow up, with a
+blade sign in magenta or gold hung from every other façade near the
+roofline, facing the player. A third, near and low cloud band; gold drift
+at 110 flecks. Material budget: shared parapet, coping and terrace
+materials, one lit material per band, one cloud material per opacity;
+59 of 60. `rich-*` captures in `tools/shots/level1/`.
+
 - Environment: denser mid-city with more building variety and lit signage,
   street-level props placed beyond the parapets where they have ground
   under them (the earlier floating-clutter problem is why `clutter` is

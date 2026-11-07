@@ -21,7 +21,7 @@ import { PALETTE } from '../palette';
 import { dotTexture } from '../effects';
 import type { EnvironmentLayer } from './layer';
 
-const COUNT = 60;
+const COUNT = 110;
 const FIELD_Z = 70;
 const FIELD_X = 16;
 const FIELD_Y = 14;

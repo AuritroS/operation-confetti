@@ -31,19 +31,11 @@ export type { LayerId } from './layer';
 export { LAYER_IDS } from './layer';
 
 /**
- * Layers off by default.
- *
- * `clutter` places rooftop dressing — watertower, vents, AC units, a dumpster
- * — beyond the parapet, between x 3.15 and 4.95. The rooftop surface is
- * exactly corridor width, ±2.4, so every one of those props stood over empty
- * space with nothing under it. Rather than widen the roof to catch them, the
- * level keeps its buildings and drops the dressing: it was never load-bearing
- * and it was the whole of the "floating assets" problem.
- *
- * Still reachable with `?layers=clutter` for review, and `?layers=all` brings
- * everything back.
+ * Layers off by default. None, now: the clutter layer used to place rooftop
+ * dressing over empty air beyond the parapets, and was review-only until
+ * the rooftop grew terraces for it to stand on.
  */
-const OFF_BY_DEFAULT: ReadonlySet<LayerId> = new Set<LayerId>(['clutter']);
+const OFF_BY_DEFAULT: ReadonlySet<LayerId> = new Set<LayerId>();
 
 /** Parse `?layers=`. Absent means everything that is on by default. */
 export function requestedLayers(search = location.search): ReadonlySet<LayerId> {

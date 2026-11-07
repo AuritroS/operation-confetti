@@ -22,6 +22,9 @@ import type { EnvironmentLayer, LayerContext } from './layer';
 
 /** How far the surface extends ahead; fog hides the end. */
 const SURFACE_LENGTH = 150;
+/** The lower roof either side of the parapets: how wide, and how far down. */
+export const TERRACE_WIDTH = 4.4;
+export const TERRACE_Y = -0.5;
 const GRAVEL_PATCHES = 96;
 /**
  * The distance over which the gravel arrangement repeats.
@@ -61,12 +64,13 @@ export class RooftopLayer implements EnvironmentLayer {
     this.object.add(this.surface);
 
     // Parapets: a low wall each side, with a lighter coping along the top so
-    // the edge catches the rim light and reads at distance.
+    // the edge catches the rim light and reads at distance. One material per
+    // part, shared by both sides: the count is budgeted.
+    const wallMaterial = new MeshStandardMaterial({ color: PALETTE.slateLine, roughness: 0.9 });
+    const copingMaterial = new MeshStandardMaterial({ color: PALETTE.steel, roughness: 0.65 });
+    const terraceMaterial = new MeshStandardMaterial({ color: PALETTE.slate, roughness: 0.97 });
     for (const sign of [-1, 1] as const) {
-      const wall = new Mesh(
-        new BoxGeometry(PARAPET_WIDTH, 0.62, SURFACE_LENGTH),
-        new MeshStandardMaterial({ color: PALETTE.slateLine, roughness: 0.9 }),
-      );
+      const wall = new Mesh(new BoxGeometry(PARAPET_WIDTH, 0.62, SURFACE_LENGTH), wallMaterial);
       wall.position.set(
         sign * (ctx.corridor.halfWidth + PARAPET_WIDTH / 2),
         0.31,
@@ -75,13 +79,26 @@ export class RooftopLayer implements EnvironmentLayer {
       this.object.add(wall);
       this.parapets.push(wall);
 
-      const coping = new Mesh(
-        new BoxGeometry(PARAPET_WIDTH * 1.25, 0.1, SURFACE_LENGTH),
-        new MeshStandardMaterial({ color: PALETTE.steel, roughness: 0.65 }),
-      );
+      const coping = new Mesh(new BoxGeometry(PARAPET_WIDTH * 1.25, 0.1, SURFACE_LENGTH), copingMaterial);
       coping.position.set(wall.position.x, 0.66, this.surface.position.z);
       this.object.add(coping);
       this.parapets.push(coping);
+    }
+
+    // Terraces: a lower roof either side of the parapets, so the dressing
+    // beyond them stands on something. The play surface is exactly corridor
+    // width, and the clutter layer used to float over the drop. One plane a
+    // side, a step down, a shade darker.
+    for (const sign of [-1, 1] as const) {
+      const terrace = new Mesh(new PlaneGeometry(TERRACE_WIDTH, SURFACE_LENGTH), terraceMaterial);
+      terrace.rotation.x = -Math.PI / 2;
+      terrace.position.set(
+        sign * (ctx.corridor.edge + TERRACE_WIDTH / 2),
+        TERRACE_Y,
+        this.surface.position.z,
+      );
+      this.object.add(terrace);
+      this.parapets.push(terrace);
     }
 
     // Gravel: flat patches breaking up the surface so it is not a plain

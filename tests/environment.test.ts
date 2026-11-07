@@ -170,14 +170,9 @@ describe('decoration cannot become gameplay', () => {
 
 describe('layers stay independently reviewable', () => {
   it('parses the ?layers switch, including all and none', () => {
-    // The default is everything that is on by default, which is not the same
-    // as everything: `clutter` places rooftop dressing beyond the parapet,
-    // where there is no roof under it, so it is review-only until the surface
-    // is wide enough to carry it.
-    expect(requestedLayers('')).not.toContain('clutter');
-    expect(requestedLayers('')).toEqual(
-      new Set(LAYER_IDS.filter((id) => id !== 'clutter')),
-    );
+    // The default is every layer. `clutter` was review-only while its props
+    // floated beyond the parapet; the rooftop's terraces now carry it.
+    expect(requestedLayers('')).toEqual(new Set(LAYER_IDS));
     // `all` still means all, so a reviewer can always see everything.
     expect(requestedLayers('?layers=all')).toEqual(new Set(LAYER_IDS));
     expect(requestedLayers('?layers=clutter')).toEqual(new Set(['clutter']));
