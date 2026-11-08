@@ -207,6 +207,11 @@ export class ResultsScreen {
           ? [this.message('No runs yet. Yours could be first.')]
           : rows.map((row) => this.row(row))),
       );
+      // Land on your own row: the one you came to find.
+      const self = this.listEl.querySelector<HTMLElement>('.results__row--self');
+      if (self && typeof self.scrollIntoView === 'function') {
+        self.scrollIntoView({ block: 'center' });
+      }
     } catch {
       this.listEl.replaceChildren(this.message('Could not reach the leaderboard.'));
     }

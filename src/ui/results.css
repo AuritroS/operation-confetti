@@ -129,7 +129,26 @@
   font-size: 26px;
 }
 
-.results__board { display: grid; gap: 5px; width: 100%; }
+/*
+ * The list scrolls inside the frame.
+ *
+ * It used to run past the bottom of the overlay on a phone with nothing to
+ * say it continued. Now it is its own region, capped so the heading and
+ * the buttons stay put, with a fade at each edge where there is more.
+ */
+.results__board {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  max-height: min(52dvh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 12px;
+  /* A touch of clearance for the self-row's border, and a fade at the ends. */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 10px, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 10px, #000 calc(100% - 22px), transparent 100%);
+}
 
 .results__row {
   display: grid;
