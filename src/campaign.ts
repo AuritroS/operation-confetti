@@ -38,7 +38,6 @@ import { StoryPlayer } from './ui/story';
 import { LoadingScreen } from './ui/loader';
 import { NameEntry } from './ui/name-entry';
 import { ResultsScreen } from './ui/results';
-import { SpeedLines } from './ui/speedlines';
 import { preloadAssets } from './assets/preload';
 import { flushPending, newId, submitRun, type Identity } from './net/scoreClient';
 import { BEATS, type StoryBeat } from './story/script';
@@ -69,7 +68,6 @@ const story = new StoryPlayer(app);
 const results = new ResultsScreen(app);
 const fade = new Fade(app);
 const loading = new LoadingScreen(app);
-const speedLines = new SpeedLines(app);
 /**
  * The cover's name field, with the leaderboard hung off it.
  *
@@ -345,7 +343,6 @@ const loop = new FixedLoop({
   render(alpha) {
     current?.render(alpha);
     if (current instanceof BossLevel) bossHud.update(current.snapshot);
-    speedLines.set(current instanceof SkylineLevel && !switching ? current.view.ramp : 0);
   },
 });
 
@@ -420,7 +417,6 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
   await fade.cover();
   closing = false;
   loop.stop();
-  speedLines.set(0);
 
   if (endingLoop && endingAt === stage().id && current) {
     // Review: play the same ending again rather than moving on. A fresh

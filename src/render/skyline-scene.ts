@@ -8,6 +8,7 @@ import { Stage } from './stage';
 import type { RendererHost } from './renderer-host';
 import { GATE_GAP } from './look';
 import { SkylineCamera } from './skyline-camera';
+import { SkylineAir } from './skyline-air';
 
 /** How long the arrival shot takes to settle. The level holds at least this long. */
 export const ARRIVAL_SHOT_S = 2.0;
@@ -74,6 +75,7 @@ export class SkylineScene {
   private cyan = new MeshBasicMaterial({ color: 0x4aaeb8, fog: false });
   /** The level-end marker, shared with level 1. Moves with the scroll. */
   private readonly finishDoor: Group;
+  private readonly air = new SkylineAir();
   /** How many degrees the view widens at the top of the ramp. */
   private static readonly FOV_WIDEN = 5;
   private idle = new MeshBasicMaterial({ color: 0x3d4f66, transparent: true, opacity: 0.5 });
@@ -226,6 +228,7 @@ export class SkylineScene {
     // flanking towers and leaves the top of the frame.
     this.finishDoor = buildStreetGate(16, 13, FACADE_X + 4, 46);
     this.stage.scene.add(this.finishDoor);
+    this.stage.scene.add(this.air.object);
 
     this.trims = new InstancedMesh(this.box, this.windowMat, 500);
     for (const mesh of [this.blocks, this.trims]) { mesh.frustumCulled = false; this.root.add(mesh); }
@@ -619,6 +622,7 @@ export class SkylineScene {
     const forward = settled ? 0 : s.v.z;
     this.ramp = reduced ? 0 : Math.max(0, Math.min(1, (forward - COURSE.startSpeed) / (COURSE.endSpeed - COURSE.startSpeed)));
     this.stage.setFovOffset(SkylineScene.FOV_WIDEN * this.ramp);
+    this.air.update(this.ramp, forward, dt, this.stage.camera, reduced);
   }
 
   /** 0 at the ramp's start, 1 at its top; what the speed lines read. */
@@ -650,6 +654,7 @@ export class SkylineScene {
     this.rope.reset();
   }
   dispose(): void {
+    this.air.dispose();
     this.root.removeFromParent(); this.box.dispose(); this.diamond.dispose();
     this.rope.dispose();
     for (const m of [this.city, this.windowMat, this.groundMat, this.blue, this.gold, this.pale, this.cyan, this.idle, this.pink, this.darkPink]) m.dispose();
