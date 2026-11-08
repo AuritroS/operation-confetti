@@ -57,7 +57,6 @@ const rotatePrompt = byId('rotate');
 const pauseOverlay = byId('pause');
 const pauseChapter = byId('pause-chapter');
 const resumeBtn = byId<HTMLButtonElement>('btn-resume');
-const stageLabel = byId('hud-stage');
 const levelHud = byId('level-hud');
 
 const host = new RendererHost(canvas);
@@ -355,7 +354,6 @@ const loop = new FixedLoop({
 async function mountStage(): Promise<void> {
   switching = true;
   const spec = stage();
-  stageLabel.textContent = `${spec.id}/3`;
   hud.setVisible(true);
   // The row of presents belongs to the route levels; the boss has her own bars.
   hud.setGifts(0, spec.id !== 3);
