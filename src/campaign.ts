@@ -755,6 +755,9 @@ void (async () => {
   if (endScreen === 'win' || endScreen === 'loss') {
     loading.hide();
     hud.setVisible(false);
+    // `&board=sample` fills the board with forty made-up rows, locally, so
+    // the list's scroll can be felt on a phone without a long live table.
+    if (params.get('board') === 'sample') results.useSampleBoard();
     const sample: [number, number, number] = endScreen === 'win' ? [600, 450, 900] : [500, 250, 150];
     results.show(
       { outcome: endScreen, total: sample[0] + sample[1] + sample[2], levelScores: sample },
