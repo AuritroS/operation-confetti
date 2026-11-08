@@ -104,6 +104,9 @@ void level.mount(ctx).then(() => {
 if (import.meta.env.DEV) Object.assign(window, { __skylineReview: {
   get snapshot() { return level.snapshot; }, get paused() { return paused; },
   get events() { return level.events; }, framing: () => level.framing(),
+  // Review only: fewer pixels per frame. The framing assertions are about
+  // where the camera projects things, which pixel count does not change.
+  setPixelRatioCap: (cap: number) => host.setPixelRatioCap(cap),
   // The offline solver stays outside the player bundle. The browser check
   // compares this course with the one it solved before sending real swipes.
   course: SKYLINE,
