@@ -67,7 +67,9 @@ export const MOON = {
    * which should win.
    */
   route: { size: 24, x: 22, y: 40, z: -140 },
-  skyline: { size: 28, x: 16, y: 32, z: -155 },
+  /* Level with the CN Tower's top (base y -2, 78 tall): a moon at 32 sat
+     well down the tower, and the skyline read as a moon behind a mast. */
+  skyline: { size: 28, x: 30, y: 74, z: -155 },
   /** Right of the tower, matching levels 1 and 2, and clear of the arch. */
   boss: { size: 4.6, x: 11.2, y: 12.4, z: -24 },
 } as const;
