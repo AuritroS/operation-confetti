@@ -25,7 +25,7 @@ const ARRIVAL_SECONDS = 2.4;
  * are off under reduced motion.
  */
 const STRIDE_UNITS = 2.1;
-const BOB_AMPLITUDE = 0.018;
+const BOB_AMPLITUDE = 0;
 const LEAN_ROLL = 0.017;
 const LEAN_SLIDE = 0;
 const FOV_WIDEN_DEGREES = 5;
