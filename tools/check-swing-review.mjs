@@ -25,11 +25,13 @@ await build({
   build: { outDir: OUT, emptyOutDir: true },
 });
 mkdirSync('tools/shots', { recursive: true });
-const browser = await chromium.launch({ args: [
-  '--single-process', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
-  // The sandbox cannot allocate macOS IOSurfaces for the compositor. WebGL
-  // still runs through SwiftShader with software compositing enabled.
-  '--disable-gpu-compositing',
+// The same launch the other checks use: it runs on a CI runner with no
+// display and in the macOS sandbox alike. The earlier macOS-only flag set
+// (`--disable-gpu-compositing`, ANGLE on SwiftShader) left Chromium waiting
+// on first paint on Linux, and the check hung for the job's whole timeout.
+const browser = await chromium.launch({ headless: true, args: [
+  '--no-sandbox', '--disable-gpu', '--single-process',
+  '--disable-dev-shm-usage', '--enable-unsafe-swiftshader',
 ] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 const page = await context.newPage();
@@ -53,6 +55,10 @@ await context.route('**/*', async (route) => {
 });
 const state = () => page.evaluate(() => window.__skylineReview.snapshot);
 const framing = () => page.evaluate(() => window.__skylineReview.framing());
+// State and framing in one hop. Each page.evaluate is a round trip into the
+// browser, and the route replay made three per 50 ms slice; the hop, not the
+// work, is what the two-core CI runner was paying for.
+const sample = () => page.evaluate(() => ({ s: window.__skylineReview.snapshot, f: window.__skylineReview.framing() }));
 const visible = (p, margin = .95) => p && Math.abs(p[0]) < margin && Math.abs(p[1]) < margin && p[2] < 1;
 const press = (direction) => page.keyboard.press({left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown'}[direction]);
 const advanceTo = async (time) => {
@@ -60,7 +66,13 @@ const advanceTo = async (time) => {
 };
 try {
   await page.clock.install(); await page.goto('https://swing-review.local/?level=2');
-  await page.waitForFunction(() => !!window.__skylineReview);
+  // Bounded: a page that never boots must fail with a screenshot, not run
+  // until the CI job is killed.
+  await page.waitForFunction(() => !!window.__skylineReview, null, { timeout: 90_000 });
+  // A quarter of the pixels per frame. Every assertion here is about where
+  // the camera puts things, the draw count or the simulation; none reads a
+  // pixel, and the software rasteriser's cost is almost entirely fill.
+  await page.evaluate(() => window.__skylineReview.setPixelRatioCap(0.5));
   assert.deepEqual(await page.evaluate(() => window.__skylineReview.course), review.course,
     'the bundled course must equal the course the solver verified');
   await page.clock.runFor(100);
@@ -110,10 +122,12 @@ try {
   const actions=review.solution.swipes.map(s=>[s.time,s.direction]);
   let action=0,maxDraws=0,maxTriangles=0; const captured=new Set(),seen=new Map();
   await swipe(actions[action++][1]);
-  for(let i=0;i<Math.ceil(review.course.duration/.05)+100&&!(await state()).complete;i++) {
-    const s=await state();
+  const replayStart=Date.now();
+  for(let i=0;i<Math.ceil(review.course.duration/.05)+100;i++) {
+    const {s,f}=await sample();
+    if(s.complete) break;
     while(action<actions.length&&s.elapsed>=actions[action][0]) await swipe(actions[action++][1]);
-    const f=await framing();maxDraws=Math.max(maxDraws,f.draws);maxTriangles=Math.max(maxTriangles,f.triangles);
+    maxDraws=Math.max(maxDraws,f.draws);maxTriangles=Math.max(maxTriangles,f.triangles);
     assert.ok(visible(f.player),`route player at ${s.elapsed}: ${f.player}`);
     for(const e of f.entities) if(visible(e.point)&&!seen.has(e.id)) seen.set(e.id,s.elapsed);
     for(const name of ['swing','descend','run','launch','transfer']) {
@@ -157,7 +171,7 @@ try {
     assert.ok(seen.has(id),`${id} is visible`);
     assert.ok(time-seen.get(id)>=2,`${id} warning ${(time-seen.get(id)).toFixed(2)}s`);
   }
-  console.log(`PASS real-touch generated route (${review.solution.outcome.score} points), two-second warnings, workload:`,{maxDraws,maxTriangles});
+  console.log(`PASS real-touch generated route (${review.solution.outcome.score} points), two-second warnings, workload:`,{maxDraws,maxTriangles},`replay ${((Date.now()-replayStart)/1000).toFixed(1)}s`);
 
   // Replay is the R key now; the button it used to click is gone.
   await page.keyboard.press('KeyR');await page.clock.runFor(50);assert.equal((await state()).started,false);

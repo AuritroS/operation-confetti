@@ -16,7 +16,6 @@ import { SKYLINE } from './levels/skyline/course';
 import { SkylineLevel } from './levels/skyline/controller';
 import type { Direction } from './levels/skyline/types';
 import { Hud } from './ui/hud';
-import { SpeedLines } from './ui/speedlines';
 
 document.body.dataset['level'] = '2';
 // Review-only: the portrait letterbox is correct for play and useless for a
@@ -31,7 +30,6 @@ const pauseOverlay = document.getElementById('pause')!;
 const resumeBtn = document.getElementById('btn-resume') as HTMLButtonElement;
 
 const hud = new Hud();
-const speedLines = new SpeedLines(document.getElementById('app') ?? document.body);
 const host = new RendererHost(document.getElementById('stage') as HTMLCanvasElement);
 host.observe();
 
@@ -54,7 +52,7 @@ let paused = false;
 
 const loop = new FixedLoop({
   update: (dt) => level.update(dt),
-  render: () => { level.render(); speedLines.set(level.view.ramp); },
+  render: () => level.render(),
 });
 
 const lifecycle = new Lifecycle({
@@ -106,6 +104,9 @@ void level.mount(ctx).then(() => {
 if (import.meta.env.DEV) Object.assign(window, { __skylineReview: {
   get snapshot() { return level.snapshot; }, get paused() { return paused; },
   get events() { return level.events; }, framing: () => level.framing(),
+  // Review only: fewer pixels per frame. The framing assertions are about
+  // where the camera projects things, which pixel count does not change.
+  setPixelRatioCap: (cap: number) => host.setPixelRatioCap(cap),
   // The offline solver stays outside the player bundle. The browser check
   // compares this course with the one it solved before sending real swipes.
   course: SKYLINE,

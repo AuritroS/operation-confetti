@@ -62,9 +62,16 @@ export class RendererHost {
     return () => { this.listeners.delete(listener); };
   }
 
-  /** Lower this on weak devices rather than changing simulation behaviour. */
+  /**
+   * Lower this on weak devices rather than changing simulation behaviour.
+   *
+   * The floor is 0.5, not 0.75: the headless review renders the whole level
+   * at six screen sizes on a software rasteriser, and its assertions are
+   * about where the camera projects things, which does not depend on how
+   * many pixels are filled. Half the ratio is a quarter of the fill.
+   */
   setPixelRatioCap(cap: number): void {
-    this.cap = Math.max(0.75, cap);
+    this.cap = Math.max(0.5, cap);
     this.resize();
   }
 

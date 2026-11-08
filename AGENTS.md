@@ -43,7 +43,7 @@ build order, decisions and evidence.
 | `/?story=<id>` | One comic panel, held up for review. Ids: `title`, `intro`, `vault`, `chase`, `rooftop`, `win`, `loss` |
 | `/?review=story` | The whole comic in order with the real page turns and iris, a stand-in card where each level would play, then the results card. Skip is ignored |
 | `/?review=chrome` | Every non-level screen in order: loader, cover and name, tutorial sheet, pause, results (win, loss), board, rotate prompt. Each is left by its own button |
-| `/?results=win`, `/?results=loss` | The end-of-run card with a sample score, and the leaderboard behind it. Presentational only: no level is mounted and nothing is submitted |
+| `/?results=win`, `/?results=loss` | The end-of-run card with a sample score, and the leaderboard behind it. Presentational only: no level is mounted and nothing is submitted. Add `&board=sample` for forty made-up rows, to feel the list scroll |
 | `/?level=1`, `/?level=2` | A single level's standalone review page, skipping the rehearsal |
 | `/?ending=1`, `/?ending=2` | The campaign dropped into that level five seconds before its finish: run-up, arrival, door, iris, chapter card. `&loop` replays the ending each time it finishes; `&closeup` (level 2) keeps the camera tight on Matthew. `tools/shoot-endings.mjs` captures the same route as a frame strip |
 | `/?perf` | Any route, with a chip at the bottom: fps, the lowest second so far, dropped simulation steps. Logged every ten seconds too |

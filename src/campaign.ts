@@ -38,7 +38,6 @@ import { StoryPlayer } from './ui/story';
 import { LoadingScreen } from './ui/loader';
 import { NameEntry } from './ui/name-entry';
 import { ResultsScreen } from './ui/results';
-import { SpeedLines } from './ui/speedlines';
 import { preloadAssets } from './assets/preload';
 import { flushPending, newId, submitRun, type Identity } from './net/scoreClient';
 import { BEATS, type StoryBeat } from './story/script';
@@ -57,7 +56,6 @@ const rotatePrompt = byId('rotate');
 const pauseOverlay = byId('pause');
 const pauseChapter = byId('pause-chapter');
 const resumeBtn = byId<HTMLButtonElement>('btn-resume');
-const stageLabel = byId('hud-stage');
 const levelHud = byId('level-hud');
 
 const host = new RendererHost(canvas);
@@ -70,7 +68,6 @@ const story = new StoryPlayer(app);
 const results = new ResultsScreen(app);
 const fade = new Fade(app);
 const loading = new LoadingScreen(app);
-const speedLines = new SpeedLines(app);
 /**
  * The cover's name field, with the leaderboard hung off it.
  *
@@ -346,7 +343,6 @@ const loop = new FixedLoop({
   render(alpha) {
     current?.render(alpha);
     if (current instanceof BossLevel) bossHud.update(current.snapshot);
-    speedLines.set(current instanceof SkylineLevel && !switching ? current.view.ramp : 0);
   },
 });
 
@@ -355,7 +351,6 @@ const loop = new FixedLoop({
 async function mountStage(): Promise<void> {
   switching = true;
   const spec = stage();
-  stageLabel.textContent = `${spec.id}/3`;
   hud.setVisible(true);
   // The row of presents belongs to the route levels; the boss has her own bars.
   hud.setGifts(0, spec.id !== 3);
@@ -422,7 +417,6 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
   await fade.cover();
   closing = false;
   loop.stop();
-  speedLines.set(0);
 
   if (endingLoop && endingAt === stage().id && current) {
     // Review: play the same ending again rather than moving on. A fresh
@@ -761,6 +755,9 @@ void (async () => {
   if (endScreen === 'win' || endScreen === 'loss') {
     loading.hide();
     hud.setVisible(false);
+    // `&board=sample` fills the board with forty made-up rows, locally, so
+    // the list's scroll can be felt on a phone without a long live table.
+    if (params.get('board') === 'sample') results.useSampleBoard();
     const sample: [number, number, number] = endScreen === 'win' ? [600, 450, 900] : [500, 250, 150];
     results.show(
       { outcome: endScreen, total: sample[0] + sample[1] + sample[2], levelScores: sample },

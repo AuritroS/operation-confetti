@@ -45,6 +45,19 @@ export class ResultsScreen {
 
   private playerId: string | null = null;
   private onReplay: (() => void) | null = null;
+  /** Review only: rows to show instead of fetching. */
+  private sample: LeaderboardRow[] | null = null;
+
+  /** Fill the board with forty made-up rows, the player at 24th. */
+  useSampleBoard(): void {
+    this.sample = Array.from({ length: 40 }, (_, i) => ({
+      rank: i + 1,
+      displayName: i === 23 ? 'You' : `Guest ${i + 1}`,
+      totalScore: 2300 - i * 37,
+      outcome: 'win' as const,
+      isSelf: i === 23,
+    }));
+  }
 
   constructor(container: HTMLElement) {
     this.root.className = 'results';
@@ -201,12 +214,17 @@ export class ResultsScreen {
     this.board.hidden = false;
     this.listEl.replaceChildren(this.message('Loading…'));
     try {
-      const rows = await fetchLeaderboard(this.playerId);
+      const rows = this.sample ?? await fetchLeaderboard(this.playerId);
       this.listEl.replaceChildren(
         ...(rows.length === 0
           ? [this.message('No runs yet. Yours could be first.')]
           : rows.map((row) => this.row(row))),
       );
+      // Land on your own row: the one you came to find.
+      const self = this.listEl.querySelector<HTMLElement>('.results__row--self');
+      if (self && typeof self.scrollIntoView === 'function') {
+        self.scrollIntoView({ block: 'center' });
+      }
     } catch {
       this.listEl.replaceChildren(this.message('Could not reach the leaderboard.'));
     }

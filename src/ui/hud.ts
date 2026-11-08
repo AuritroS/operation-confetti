@@ -106,9 +106,9 @@ export class Hud {
   /**
    * Show or hide the whole readout.
    *
-   * Used at the end of a run: the live score and the stage counter are both
-   * about a run in progress, and leaving "1/3" on screen under a results
-   * card states something that is no longer true.
+   * Used at the end of a run: the live score is about a run in progress,
+   * and leaving it on screen under a results card states something that
+   * is no longer true.
    */
   setVisible(visible: boolean): void {
     if (this.root) this.root.hidden = !visible;

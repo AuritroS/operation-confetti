@@ -1,4 +1,4 @@
-@import './theme.css';
+@import './chrome.css';
 
 /*
  * The boss fight's readouts.
@@ -16,16 +16,17 @@
 .boss-bar {
   position: absolute;
   z-index: 20;
-  top: max(94px, calc(env(safe-area-inset-top) + 80px));
-  left: 18px;
-  right: 18px;
+  /* Under the shared score block, on its margins. */
+  top: calc(var(--safe-t) + 60px);
+  left: calc(var(--safe-l) + 16px);
+  right: calc(var(--safe-r) + 16px);
   pointer-events: none;
 }
 .boss-bar-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-.boss-bar-name { font-size: 10px; font-weight: 800; letter-spacing: .14em; color: #e6c7ff; }
+.boss-bar-name { font-family: var(--font-display, var(--font-ui)); font-size: 11px; font-weight: 800; letter-spacing: .18em; color: #e6c7ff; }
 /* Her number, in her colour. Gold is Matthew's: his hearts, his cannon and
    the score all use it, so a gold figure over her bar read as his. */
-.boss-bar-row strong { font-size: 13px; color: #e6c7ff; font-variant-numeric: tabular-nums; }
+.boss-bar-row strong { font-family: var(--font-display, var(--font-ui)); font-size: 14px; font-weight: 800; color: #e6c7ff; font-variant-numeric: tabular-nums; }
 .boss-bar-track {
   height: 9px; border-radius: 999px; overflow: hidden;
   background: #18101acc; border: 1px solid #ffffff1f;
@@ -45,9 +46,9 @@
 .player-strip {
   position: absolute;
   z-index: 20;
-  bottom: max(18px, calc(env(safe-area-inset-bottom) + 6px));
-  left: 18px;
-  right: 18px;
+  bottom: calc(var(--safe-b) + 18px);
+  left: calc(var(--safe-l) + 16px);
+  right: calc(var(--safe-r) + 16px);
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
   pointer-events: none;
 }
@@ -62,7 +63,7 @@
 .gun { display: grid; gap: 3px; justify-items: end; min-width: 92px; }
 .gun-track { width: 92px; height: 6px; border-radius: 999px; background: #18101acc; border: 1px solid #ffffff1f; overflow: hidden; }
 .gun-track i { display: block; height: 100%; width: 100%; border-radius: 999px; background: var(--gold); }
-.gun-label { font-size: 9px; font-weight: 800; letter-spacing: .12em; color: var(--gold-text); }
+.gun-label { font-family: var(--font-display, var(--font-ui)); font-size: 10px; font-weight: 800; letter-spacing: .16em; color: var(--gold-text); }
 .gun.charging .gun-track i { background: var(--blue); }
 .gun.charging .gun-label { color: #9fb0d2; }
 /* A jam has to look like a fault, not a slow reload, or the rule goes unlearned. */

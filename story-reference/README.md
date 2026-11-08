@@ -21,8 +21,8 @@ which photographs each level through the real gameplay camera.
   runtime. Purple and gold.
 - **The gates** carry a **gift emblem**, not a bandit mask. Both level 1 and
   level 2 end at one.
-- **The gifts differ by level**: levels 1 and 2 collect the *yellow* present,
-  level 3 the *blue* one. `present.png` is the yellow one.
+- **One gift, every level**: the *yellow* present is the collectible in all
+  three levels. `present.png` is it.
 - **Two weapons, not one**: the grapple blaster (level 2) and the confetti
   cannon (level 3). Both gold.
 
