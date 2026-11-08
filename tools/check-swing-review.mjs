@@ -25,11 +25,13 @@ await build({
   build: { outDir: OUT, emptyOutDir: true },
 });
 mkdirSync('tools/shots', { recursive: true });
-const browser = await chromium.launch({ args: [
-  '--single-process', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
-  // The sandbox cannot allocate macOS IOSurfaces for the compositor. WebGL
-  // still runs through SwiftShader with software compositing enabled.
-  '--disable-gpu-compositing',
+// The same launch the other checks use: it runs on a CI runner with no
+// display and in the macOS sandbox alike. The earlier macOS-only flag set
+// (`--disable-gpu-compositing`, ANGLE on SwiftShader) left Chromium waiting
+// on first paint on Linux, and the check hung for the job's whole timeout.
+const browser = await chromium.launch({ headless: true, args: [
+  '--no-sandbox', '--disable-gpu', '--single-process',
+  '--disable-dev-shm-usage', '--enable-unsafe-swiftshader',
 ] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 const page = await context.newPage();
@@ -60,7 +62,9 @@ const advanceTo = async (time) => {
 };
 try {
   await page.clock.install(); await page.goto('https://swing-review.local/?level=2');
-  await page.waitForFunction(() => !!window.__skylineReview);
+  // Bounded: a page that never boots must fail with a screenshot, not run
+  // until the CI job is killed.
+  await page.waitForFunction(() => !!window.__skylineReview, null, { timeout: 90_000 });
   assert.deepEqual(await page.evaluate(() => window.__skylineReview.course), review.course,
     'the bundled course must equal the course the solver verified');
   await page.clock.runFor(100);

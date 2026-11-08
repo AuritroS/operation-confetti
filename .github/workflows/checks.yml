@@ -54,9 +54,11 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Campaign gate
+        timeout-minutes: 8
         run: npm run check:campaign
 
       - name: Swing review
+        timeout-minutes: 8
         run: npm run check:swing
 
       - name: Keep the review captures
