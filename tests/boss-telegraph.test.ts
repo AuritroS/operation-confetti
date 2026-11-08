@@ -6,7 +6,7 @@ import {
 
 /**
  * Properties of the combat cues that have to hold before any fight is built
- * on them. These are the invariants `design-level3.md` lists as gates, tested
+ * on them. These are the invariants `docs/DESIGN_LEVEL3.md` lists as gates, tested
  * against the data rather than against a rendered frame.
  */
 

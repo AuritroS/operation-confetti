@@ -1,0 +1,69 @@
+# Every pull request and every push to main: the same gates a release needs,
+# cheapest first, so a typo is reported in a minute and the browser checks
+# only run on code that already passes everything else.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      # The runtime models and story images are generated from the source
+      # packs tracked under assets/, so a clean clone has to build them. This
+      # is also the step that proves a clean clone works at all.
+      - name: Build runtime assets
+        run: npm run assets:build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Route solver
+        run: npm run check:route
+
+      - name: Scene audit
+        run: npm run check:scene
+
+      - name: Production build
+        run: npm run build
+
+      # Software-rendered Chromium: layout, framing and sequencing evidence.
+      # Never frame rate.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Campaign gate
+        run: npm run check:campaign
+
+      - name: Swing review
+        run: npm run check:swing
+
+      - name: Keep the review captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-shots
+          path: tools/shots/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -29,7 +29,7 @@ What shipped against this plan, and where it differs:
 - Depth layers exist for `chase` only; `win` and `loss` layers are a later
   spend if wanted (~$0.05 each).
 
-Related: `design.md` §2 (story), `story-reference/README.md` (what panels must
+Related: `docs/DESIGN.md` §2 (story), `story-reference/README.md` (what panels must
 match), `src/story/script.ts` (where the copy will live).
 
 ## 1. The spine

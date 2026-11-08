@@ -66,7 +66,7 @@ const SKIN = {
  *
  * Cells deliberately NOT listed are left untouched. Eye black (C1) must
  * survive unchanged, and skin (A1) is only ever given a skin ramp —
- * recolouring skin with a clothing colour is the specific failure design.md
+ * recolouring skin with a clothing colour is the specific failure docs/DESIGN.md
  * section 10 warns about, and a test asserts against it.
  *
  * B1 is hair. It was on the untouched list while every character wore

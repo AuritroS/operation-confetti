@@ -86,7 +86,7 @@ describe('recoloured atlases', () => {
   it('keeps the skin swatch a skin tone, never a clothing colour', async () => {
     // A1 is skin on every character. It IS deliberately recoloured now — to
     // tones sampled from each reference face — but recolouring skin with a
-    // clothing colour is the specific failure design.md section 10 warns
+    // clothing colour is the specific failure docs/DESIGN.md section 10 warns
     // about, so assert it still reads as skin: warm, with red above green
     // above blue, and nowhere near any garment hue in the palette.
     const garments = [PALETTE.navy, PALETTE.navyDeep, PALETTE.purpleDeep, PALETTE.magenta, PALETTE.steel];

@@ -19,7 +19,7 @@
     "db:check": "node tools/db-push.mjs --check",
     "deploy:secrets": "node tools/deploy-secrets.mjs",
     "assets:inspect": "node tools/inspect-glb.mjs",
-    "assets:build": "node tools/build-assets.mjs && node tools/recolour.mjs && node tools/build-asset-index.mjs",
+    "assets:build": "node tools/build-assets.mjs && node tools/recolour.mjs && node tools/boss-assets.mjs && node tools/build-asset-index.mjs",
     "tunnel": "node tools/tunnel.mjs",
     "dev:lan": "HOST=0.0.0.0 vite",
     "assets:index": "node tools/build-asset-index.mjs",

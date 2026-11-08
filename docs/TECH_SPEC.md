@@ -1,6 +1,6 @@
 # Operation Confetti — settled tech spec
 
-Companion to `design.md`. That document proposes; this one records what is
+Companion to `docs/DESIGN.md`. That document proposes; this one records what is
 **decided and implemented**, and what is still genuinely open.
 
 Date: 3 November 2026 · Scaffold: Phase 0 complete, unverified on device

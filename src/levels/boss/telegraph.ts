@@ -5,7 +5,7 @@
  * simulation side, and `src/render/boss/effects.ts` only ever reads what is
  * produced here.
  *
- * The boundary matters more than it looks. `design-level3.md` requires that a
+ * The boundary matters more than it looks. `docs/DESIGN_LEVEL3.md` requires that a
  * telegraph and the damage it predicts use the same committed target and the
  * same time bounds. If a cue animated on its own internal clock, the warning
  * and the strike could drift apart under frame-rate changes or a pause, and

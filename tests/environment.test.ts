@@ -220,7 +220,7 @@ describe('the environment stays inside its budget', () => {
     const env = await Environment.build(LEVEL_1, new Set(LAYER_IDS), diskLoader);
     const { triangles, materials } = env.measure();
 
-    // design.md section 11: aim below 150k visible triangles and 100 draw
+    // docs/DESIGN.md section 11: aim below 150k visible triangles and 100 draw
     // calls in the busiest scene. Materials stand in for draw calls here,
     // since the real count needs a renderer.
     expect(triangles, `${triangles} triangles`).toBeLessThan(150_000);

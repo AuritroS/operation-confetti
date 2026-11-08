@@ -4,7 +4,7 @@ All three levels live on `main` in this single checkout. The parallel-worktree
 arrangement that built Level 3 is finished and removed; `docs/COLLABORATION.md`
 is kept as the record of how it ran and merged, not as live instruction.
 
-Read `design.md`, `design-level2.md` and `design-level3.md` for each level's
+Read `docs/DESIGN.md`, `docs/DESIGN_LEVEL2.md` and `docs/DESIGN_LEVEL3.md` for each level's
 build order, decisions and evidence.
 
 ## Architecture
@@ -65,6 +65,17 @@ The comic's script, storyboard, image prompts and budget are in
 `docs/STORY_PASS.md`; the level polish pass and its evidence are in
 `docs/POLISH_PASS.md`. `src/story/script.ts` maps each panel to its image and
 marks which are still placeholders.
+
+## CI
+
+`.github/workflows/checks.yml` runs on every pull request and push to
+`main`: install from the lockfile, build the runtime assets, typecheck, unit
+tests, route solver, scene audit, production build, then Chromium for the
+campaign gate and the swing review. `deploy.yml` runs on `main` after the
+checks pass and waits for approval in the `production` environment before
+`wrangler deploy`. The Worker's secrets live in Cloudflare; CI holds only
+the account id and an API token. Open pull requests rather than pushing to
+`main`; the branch is protected.
 
 ## Habits
 
