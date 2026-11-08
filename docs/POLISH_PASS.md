@@ -1,6 +1,6 @@
 # Level polish pass — plan and review cycles
 
-Status: **for approval**, 7 Nov 2026. Follows `docs/STORY_PASS.md` (done).
+Status: **done, 8 Nov 2026**, awaiting Auri's deploy. Follows `docs/STORY_PASS.md` (done).
 
 The ask (Auri, 7 Nov): richer level 1 environment, fix its parallax and
 camera; level 2's speed ramp starts too slow; level 3 mostly fine; remove
@@ -196,6 +196,21 @@ they are.
   by stage 2's course edits.
 
 ### 7. Consolidation and deploy
+
+**Done 8 Nov**, bar the deploy. Suite, typecheck, build, campaign gate,
+swing review and route solver green. Security review by hand (the skill
+needs a remote this checkout has none of): Worker, scoring and the
+submission path untouched since the last deploy; no player text reaches
+the DOM as markup; every review route is a flagged test run; the image
+generator's key file now lives only for the duration of a call. A code
+review of the 23 commits ran until the session limit; one of its tracers
+returned four findings, all real and all fixed: level 1's arrival shot
+and confetti advanced per display frame rather than per simulation step
+(twice as fast at 120 Hz, cut off at 30); the shell froze a level's
+update while the iris closed over its ending; the mid parallax band's
+draw distance exceeded its ring period, so buildings snapped from z 0 to
+the far end instead of passing behind; and the ending review loop
+carried the run's events between passes, overfilling the present row.
 
 - Full test suite, typecheck, production build, `check:campaign`,
   `check:swing`, `check:route`.

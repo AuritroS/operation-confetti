@@ -326,11 +326,22 @@ resumeBtn.addEventListener('click', () => { resumeBtn.blur(); resume(); });
 
 // ---- the loop ----------------------------------------------------------
 
+/**
+ * True from a level reporting its result until the iris has shut over it.
+ *
+ * `switching` gates input and results; it must not gate the level's own
+ * update, or the ending animation freezes on the frame the result arrived
+ * in while the iris closes over it. During the close the level keeps
+ * stepping, and its result is simply not reported twice.
+ */
+let closing = false;
+
 const loop = new FixedLoop({
   update(step) {
-    if (switching || !current) return;
+    if (!current) return;
+    if (switching && !closing) return;
     current.update(step);
-    if (current.result !== null) void finishLevel(current.result);
+    if (!closing && current.result !== null) void finishLevel(current.result);
   },
   render(alpha) {
     current?.render(alpha);
@@ -404,15 +415,21 @@ async function finishLevel(result: 'complete' | 'defeated'): Promise<void> {
 
   // Iris down before the swap: a level being torn down while another is
   // built is the one moment the scene is genuinely inconsistent. The loop
-  // keeps drawing until the iris is shut, so the level's own ending — the
-  // celebration at the gate, the confetti — plays out underneath it rather
-  // than freezing on the frame the result arrived in.
+  // keeps stepping and drawing until the iris is shut, so the level's own
+  // ending — the celebration at the gate, the confetti — plays out
+  // underneath it rather than freezing on the frame the result arrived in.
+  closing = true;
   await fade.cover();
+  closing = false;
   loop.stop();
   speedLines.set(0);
 
   if (endingLoop && endingAt === stage().id && current) {
-    // Review: play the same ending again rather than moving on.
+    // Review: play the same ending again rather than moving on. A fresh
+    // event list, or the present row and the score carry over between passes.
+    events = [];
+    hud.reset();
+    hud.setGifts(0, true);
     current.beginPlay();
     skipToEnding();
     switching = false;

@@ -103,6 +103,27 @@ export class RouteLevel implements LevelController {
   private ending = 0;
   /** Seconds into the arrival shot, or -1 while the run is still on. */
   private arrival = -1;
+
+  /** Advance the arrival shot and its confetti by one simulation step. */
+  private stepArrival(step: number): void {
+    this.confetti.update(step);
+    if (this.arrival < 0) return;
+    this.arrival += step;
+    const arrive = this.arrivalEase();
+    const leaf = this.vault.getObjectByName('leaf');
+    if (leaf) leaf.rotation.y = -1.15 * arrive;
+    if (!this.confettiFired && arrive > 0.25) {
+      this.confettiFired = true;
+      this.confetti.burst(new Vector3(0, VAULT_H * 0.5, 0.6));
+    }
+  }
+
+  /** 0 before the arrival, easing to 1 as the shot settles. */
+  private arrivalEase(): number {
+    if (this.arrival < 0) return 0;
+    const t = Math.min(1, this.arrival / ARRIVAL_SHOT_S);
+    return 1 - (1 - t) * (1 - t);
+  }
   private readonly reduced =
     typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   inPractice = true;
@@ -245,6 +266,7 @@ export class RouteLevel implements LevelController {
       // Arrival: he stops short of the gate and celebrates. The level only
       // reports done once that has played, or the shell cuts it off.
       this.ending = Math.max(0, this.ending - step);
+      this.stepArrival(step);
       this.player.update(step, false);
       this.environment?.update(this.runner.snapshot.travelled, step, this.runner.lanes.renderX);
       if (this.ending === 0) this.result = 'complete';
@@ -254,6 +276,7 @@ export class RouteLevel implements LevelController {
     if (this.result !== null) {
       // Keep animating after the run ends, or the celebration never plays and
       // Matthew freezes mid-stride at the vault.
+      this.stepArrival(step);
       this.player.update(step, false);
       this.environment?.update(this.runner.snapshot.travelled, step, this.runner.lanes.renderX);
       return;
@@ -302,19 +325,10 @@ export class RouteLevel implements LevelController {
 
     // The arrival shot: back and up, looking at him and the opening door,
     // so the ending frames both rather than a door face filling the screen.
-    let arrive = 0;
-    if (this.arrival >= 0) {
-      this.arrival += STEP_S;
-      const t = Math.min(1, this.arrival / ARRIVAL_SHOT_S);
-      arrive = 1 - (1 - t) * (1 - t);
-      const leaf = this.vault.getObjectByName('leaf');
-      if (leaf) leaf.rotation.y = -1.15 * arrive;
-      if (!this.confettiFired && arrive > 0.25) {
-        this.confettiFired = true;
-        this.confetti.burst(new Vector3(0, VAULT_H * 0.5, 0.6));
-      }
-    }
-    this.confetti.update(STEP_S);
+    // Its clock is advanced by `update`, on simulation time, not here: render
+    // runs once per display frame, so stepping it here made the shot twice
+    // as fast at 120 Hz and cut it off at 30.
+    const arrive = this.arrivalEase();
     // Running: a bob on the stride, a roll into the lane change, and a view
     // that widens with speed. None of it during the rehearsal, the ending
     // or under reduced motion.

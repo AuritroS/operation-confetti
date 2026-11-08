@@ -42,10 +42,16 @@ const SPACING = 26;
  * three distances, and the eye fills in the rest.
  */
 const MID_SHAPES: PropId[] = ['buildingC', 'buildingD', 'buildingE', 'buildingF', 'buildingA'];
-const MID_PER_SIDE = 5;
-const MID_SPACING = 30;
+const MID_PER_SIDE = 6;
+const MID_SPACING = 34;
 const MID_PARALLAX = 0.4;
-const MID_SPAWN = 180;
+/**
+ * Below the ring's period (6 × 34 = 204), as the ring contract requires: a
+ * draw distance past the period can never place a building behind the
+ * player, so each one snapped from z 0 back to the far end as he drew level
+ * with it instead of passing behind.
+ */
+const MID_SPAWN = 170;
 
 /**
  * How far each band slides against a lane change, as a fraction of the
